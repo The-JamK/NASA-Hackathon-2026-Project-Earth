@@ -54,8 +54,13 @@ Last verified: 2026-11-14
   EXPECT: sentinel verified
   EVIDENCE: 11/11 featured points use Sentinel-2 L2A mosaics; each has 9/9 HTTP 200 mosaic tiles. Unsigned visual COG returns HTTP 409 PublicAccessNotPermitted; SAS signing returns 200; signed Range GET returns 206; the COG is 3-band uint8 RGB with scale 1.0. `data/sentinel_report.json` records the item, URLs and statuses; no SAS token is stored.
 
+- [x] G11: The production build works at the GitHub Pages repository subpath, not only at the domain root.
+  CHECK: npm run build, then serve `dist` under `/NASA-Hackathon-2026-Project-Earth/`
+  EXPECT: `./assets`, data, textures and point imagery all return 200; app opens a case
+  EVIDENCE: built `dist/index.html` references `./assets/...`; local subpath test returned 200 for JS, CSS, `data/points.json`, all three globe textures and `data/imagery/nairobi-sentinel.jpg`; Nairobi case opened with a 640×360 image and no console errors. `.github/workflows/deploy.yml` publishes `dist` through GitHub Actions.
+
 ## Status
 
-MET: 10
+MET: 11
 UNMET: 0
 ABANDONED: 0

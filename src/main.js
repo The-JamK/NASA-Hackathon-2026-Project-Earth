@@ -33,6 +33,15 @@ const state = {
   plan: null,
 };
 
+const BASE_URL = import.meta.env.BASE_URL || "/";
+
+function assetUrl(path) {
+  if (!path || /^(?:[a-z]+:)?\/\//i.test(path) || path.startsWith("data:") || path.startsWith("blob:")) {
+    return path;
+  }
+  return `${BASE_URL}${path.replace(/^\/+/, "")}`;
+}
+
 const els = {
   globe: document.getElementById("globe"),
   sourceStrip: document.getElementById("source-strip"),
@@ -63,11 +72,11 @@ async function init() {
   bindStaticEvents();
   try {
     const [variables, points, grid, rag, sources] = await Promise.all([
-      loadJson("/data/variables.json"),
-      loadJson("/data/points.json"),
-      loadJson("/data/grid.json"),
-      loadJson("/data/rag_index.json"),
-      loadJson("/data/sources.json"),
+      loadJson(assetUrl("/data/variables.json")),
+      loadJson(assetUrl("/data/points.json")),
+      loadJson(assetUrl("/data/grid.json")),
+      loadJson(assetUrl("/data/rag_index.json")),
+      loadJson(assetUrl("/data/sources.json")),
     ]);
 
     state.variables = variables.variables;
@@ -116,9 +125,9 @@ function buildGlobe() {
   const countries = feature(world, world.objects.countries).features;
 
   globe = new Globe(els.globe)
-    .globeImageUrl("/textures/earth-blue-marble.jpg")
-    .bumpImageUrl("/textures/earth-topology.png")
-    .backgroundImageUrl("/textures/night-sky.png")
+    .globeImageUrl(assetUrl("/textures/earth-blue-marble.jpg"))
+    .bumpImageUrl(assetUrl("/textures/earth-topology.png"))
+    .backgroundImageUrl(assetUrl("/textures/night-sky.png"))
     .atmosphereColor("#5fd3e0")
     .atmosphereAltitude(0.18)
     .showAtmosphere(true)
@@ -577,7 +586,7 @@ function imagery(point) {
   const source = meta.source || "NASA Blue Marble";
   const attribution = meta.attribution || "NASA Blue Marble context crop";
   return `<div class="imagery" data-source="${escapeHtml(meta.source_id || "blue-marble")}">
-    <img src="${escapeHtml(point.imagery)}" alt="${escapeHtml(source)} imagery around ${escapeHtml(
+    <img src="${escapeHtml(assetUrl(point.imagery))}" alt="${escapeHtml(source)} imagery around ${escapeHtml(
       point.name
     )}" title="${escapeHtml(attribution)}" loading="lazy" />
     <span>${escapeHtml(label)}</span>
