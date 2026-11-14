@@ -640,8 +640,9 @@ function positionRecommendationCard() {
   const screen = globe.getScreenCoords(rec.target.lat, rec.target.lng, 0.01);
   const width = el.offsetWidth || 250;
   const height = el.offsetHeight || 140;
-  const left = Math.min(Math.max(screen.x + 18, 12), window.innerWidth - width - 12);
-  const top = Math.min(Math.max(screen.y + 18, 74), window.innerHeight - height - 58);
+  const left = Math.min(Math.max(screen.x + 18, 10), window.innerWidth - width - 10);
+  // Leave room for the legend bar at the bottom, including the home-indicator inset.
+  const top = Math.min(Math.max(screen.y + 18, 66), window.innerHeight - height - 64);
   el.style.transform = `translate(${Math.round(left)}px, ${Math.round(top)}px)`;
 }
 
@@ -1114,6 +1115,8 @@ function handleAsk(question) {
   });
   state.plan = plan;
   renderPlan(plan);
+  // On a phone the intake panel scrolls; bring the plan's buttons into view.
+  if (plan) els.plan.scrollIntoView({ block: "nearest" });
 }
 
 function runPlan() {

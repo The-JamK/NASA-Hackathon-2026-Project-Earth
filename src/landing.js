@@ -1,5 +1,6 @@
 import "./style.css";
 import { renderSeriesChart } from "./chart.js";
+import { initHero } from "./hero.js";
 import { SOURCE_LINKS, SOURCE_ORDER } from "./sources.js";
 
 const BASE_URL = import.meta.env.BASE_URL || "/";
@@ -21,6 +22,7 @@ async function loadJson(path) {
   return response.json();
 }
 
+initHero();
 renderSourceLine();
 render();
 

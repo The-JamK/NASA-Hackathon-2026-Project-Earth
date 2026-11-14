@@ -2,7 +2,7 @@
 <html lang="en" class="landing">
   <head>
     <meta charset="utf-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
     <meta name="theme-color" content="#05080f" />
     <link
       rel="icon"
@@ -10,9 +10,9 @@
     />
     <meta
       name="description"
-      content="Case Files — ask the planet a question and get a defensible case file: a rate per decade, a 95% interval, a sample size and a verdict. NASA Space Apps 2026, Gaussian Frontiers."
+      content="Gaussian Frontiers — Signal &amp; Noise. Ask about a place and get a rate per decade, a 95% interval, a sample size and a verdict. NASA Space Apps Challenge 2026."
     />
-    <title>Case Files — NASA Space Apps 2026</title>
+    <title>Gaussian Frontiers — Signal &amp; Noise · NASA Space Apps 2026</title>
   </head>
   <body>
     <a class="skip-link" href="#main">Skip to content</a>
@@ -22,38 +22,53 @@
       <a class="ghost-btn cta-ghost" href="./app.html">Open the case</a>
     </header>
 
-    <main id="main" class="landing-main">
-      <section class="hero">
-        <div class="hero-copy">
-          <h1 class="panel-kicker">Case Files · NASA Space Apps 2026</h1>
-          <p class="hero-lede">
-            Ask about warming, rainfall, soil moisture or sunlight for a place, and get
-            a rate per decade, a 95% interval, a sample size and a verdict.
-          </p>
-          <div class="hero-actions">
-            <a class="primary-btn cta" href="./app.html">Open the case</a>
-            <a class="ghost-btn cta" href="#sample">See a case file</a>
-          </div>
-          <p class="hero-note">
-            Every number is computed by code at build time from a cached NASA record. The
-            assistant proposes and explains; it does not do the arithmetic.
+    <main id="main">
+      <section class="hero" id="hero" aria-labelledby="hero-name">
+        <div class="hero-stage">
+          <div class="hero-scene" id="hero-scene" aria-hidden="true"></div>
+          <button
+            class="hero-hit"
+            id="hero-globe"
+            type="button"
+            aria-label="Open the case analysis"
+          ></button>
+        </div>
+
+        <div class="callout callout--name" data-callout="name">
+          <h1 class="hero-name" id="hero-name">Gaussian Frontiers</h1>
+          <p class="hero-tagline">Signal &amp; Noise</p>
+          <p class="hero-label">NASA Space Apps Challenge 2026</p>
+        </div>
+
+        <div class="callout callout--about" data-callout="about">
+          <p class="callout-text">
+            Ask a question about a place. Get a verdict backed by statistics, not vibes.
+            The AI explains, the code computes.
           </p>
         </div>
 
-        <figure class="exhibit">
-          <img
-            src="./textures/earth-blue-marble.jpg"
-            width="2048"
-            height="1024"
-            alt="NASA Blue Marble texture used for the globe in the app."
-          />
-          <figcaption>
-            <span>NASA Blue Marble</span>
-            <span>globe texture</span>
-          </figcaption>
-        </figure>
-      </section>
+        <div class="callout callout--data" data-callout="data">
+          <p class="hero-label">Data</p>
+          <p class="callout-text">NASA GISTEMP v4, POWER (MERRA-2), Blue Marble, Sentinel-2</p>
+        </div>
 
+        <svg class="hero-lines" id="hero-lines" aria-hidden="true" focusable="false">
+          <path class="hero-line" data-callout="name" pathLength="1"></path>
+          <path class="hero-line" data-callout="about" pathLength="1"></path>
+          <path class="hero-line" data-callout="data" pathLength="1"></path>
+          <circle class="hero-dot" data-callout="name" r="3"></circle>
+          <circle class="hero-dot" data-callout="about" r="3"></circle>
+          <circle class="hero-dot" data-callout="data" r="3"></circle>
+        </svg>
+
+        <p class="hero-cursor" id="hero-cursor" aria-hidden="true" hidden>
+          Click to open the case
+        </p>
+        <a class="hero-scroll" href="#how">Scroll<span aria-hidden="true"></span></a>
+      </section>
+    </main>
+
+    <div class="landing-main">
       <section class="section" id="how" aria-labelledby="how-title">
         <div class="section-head">
           <div>
@@ -206,7 +221,7 @@
       </section>
 
       <footer class="landing-footer">
-        <span>Case Files · NASA Space Apps 2026 · Gaussian Frontiers</span>
+        <span>Gaussian Frontiers · Signal &amp; Noise · NASA Space Apps Challenge 2026</span>
         <span class="footer-links">
           <a
             class="text-link"
@@ -216,7 +231,18 @@
           <a class="text-link" href="./app.html">Open the app</a>
         </span>
       </footer>
-    </main>
+    </div>
+
+    <dialog class="hero-dialog" id="hero-dialog" aria-labelledby="hero-dialog-title">
+      <h2 id="hero-dialog-title">Open the case analysis?</h2>
+      <p>You'll leave the landing page and enter the case analysis tool.</p>
+      <div class="hero-dialog-actions">
+        <a class="hero-dialog-primary" href="./app.html">Open the case</a>
+        <button class="hero-dialog-secondary" type="button" data-action="stay">
+          Stay here
+        </button>
+      </div>
+    </dialog>
 
     <script>
       // GitHub Pages serves this folder as-is, so the Vite source reaches the
