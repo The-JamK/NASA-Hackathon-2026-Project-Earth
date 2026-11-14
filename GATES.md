@@ -1,4 +1,4 @@
-# Gates: Earth System Trend Detective — Case Files
+# Gates: Earth System Trend Detective — Signal & Noise
 
 OWNS: whole project
 Scope: a fresh, static web app with a Google-Earth-style 3D globe, real NASA/Meteomatics data bundles, deterministic trend statistics, local vector RAG for case plans, and a case-file UI.
@@ -91,7 +91,7 @@ Last verified: 2026-11-14
 - [x] G18: The tagline “Ask the planet. Get the evidence.”, the dot inside the wordmark, the intake label and the “Case board” wording are gone from both pages and from main.js, and the wordmark reads GAUSSIAN FRONTIERS.
   CHECK: node scripts/verify_app.mjs
   EXPECT: app verified
-  EVIDENCE: output lines `chrome: tagline, brand dot, Intake label and case board wording removed` and `case layout: narrative paragraph above the verdict block`; rendered brand text is `GAUSSIAN FRONTIERS`; the landing title is `Case Files — NASA Space Apps 2026`. The landing page's only h1 was that sentence, so the page label now carries it at the kicker's size (9 px, accent) — the hero renders identically to before.
+  EVIDENCE: output lines `chrome: tagline, brand dot, Intake label and case board wording removed` and `case layout: narrative paragraph above the verdict block`; rendered brand text is `GAUSSIAN FRONTIERS`; the landing title is `Signal & Noise — NASA Space Apps 2026`. The landing page's only h1 was that sentence, so the page label now carries it at the kicker's size (9 px, accent) — the hero renders identically to before.
 
 - [x] G19: With no case open the right-hand panel is not rendered; opening a case shows it.
   MANUAL: verified in the Cloud browser at 1440×900 against the dev server.

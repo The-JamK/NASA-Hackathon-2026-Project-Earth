@@ -1,4 +1,4 @@
-# Mission: Case Files
+# Mission: Signal & Noise
 
 **Project:** Earth System Trend Detective — NASA Space Apps 2026  
 **Team:** Gaussian Frontiers  

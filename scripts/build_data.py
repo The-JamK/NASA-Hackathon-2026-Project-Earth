@@ -1,4 +1,4 @@
-"""Build the Case Files data bundles from real cached sources.
+"""Build the Signal & Noise data bundles from real cached sources.
 
     uv run python scripts/build_data.py --env-file ~/Desktop/.../.env
 

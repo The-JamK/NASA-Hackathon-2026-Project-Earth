@@ -1,4 +1,4 @@
-"""Deterministic trend statistics for the Case Files app.
+"""Deterministic trend statistics for the Signal & Noise app.
 
 The contract:
   annual means only

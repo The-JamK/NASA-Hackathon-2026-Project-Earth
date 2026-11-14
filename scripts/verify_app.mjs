@@ -99,6 +99,12 @@ if (html.includes("brand-dot") || landing.includes("brand-dot")) {
 if (!html.includes("GAUSSIAN FRONTIERS") || !landing.includes("GAUSSIAN FRONTIERS")) {
   fail("the wordmark is not GAUSSIAN FRONTIERS on both pages");
 }
+if (!html.includes("Signal &amp; Noise") || !landing.includes("Signal &amp; Noise")) {
+  fail("the product name is not Signal & Noise on both pages");
+}
+if (/case files/i.test(html) || /case files/i.test(landing)) {
+  fail("the old product name is still on a page");
+}
 if (html.includes(">Intake<")) fail("the intake panel still shows the Intake label");
 if (html.includes("Case board") || main.includes("Case board")) {
   fail("the case board wording is still present");

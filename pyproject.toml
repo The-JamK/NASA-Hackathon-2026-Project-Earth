@@ -1,7 +1,7 @@
 [project]
 name = "earth-trend-detective-case-files"
 version = "0.1.0"
-description = "Case Files — Earth System Trend Detective (NASA Space Apps 2026)"
+description = "Signal & Noise — Earth System Trend Detective (NASA Space Apps 2026)"
 requires-python = ">=3.13"
 dependencies = [
   "numpy>=2.0",
