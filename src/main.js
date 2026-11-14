@@ -1,6 +1,23 @@
 import Globe from "globe.gl";
-import { CircleGeometry, DoubleSide, Group, Mesh, MeshBasicMaterial, RingGeometry, Vector3 } from "three";
-import { feature } from "topojson-client";
+import {
+  BufferGeometry,
+  CircleGeometry,
+  Color,
+  DoubleSide,
+  DynamicDrawUsage,
+  Float32BufferAttribute,
+  Group,
+  InstancedMesh,
+  LineBasicMaterial,
+  LineSegments,
+  Matrix4,
+  Mesh,
+  MeshBasicMaterial,
+  Quaternion,
+  RingGeometry,
+  Vector3,
+} from "three";
+import { mesh as topojsonMesh } from "topojson-client";
 import world from "world-atlas/countries-110m.json";
 import "./style.css";
 import { oceanRegionAt, oceanVariable, planCase, seaIceVariable } from "./rag.js";
@@ -85,10 +102,6 @@ let toastTimer;
 let autoRotateTimer;
 let hoveredMesh = null;
 let hoveredScale = null;
-let hoveredHalo = null;
-let hoveredHaloPoint = null;
-let countryFeatures = null;
-let countryShapes = null;
 let hoverFrame = 0;
 let pendingPointer = null;
 
@@ -120,6 +133,10 @@ async function init() {
     if (import.meta.env.DEV) {
       window.__caseFiles = {
         state,
+        // A getter, because the globe is built after this debug handle exists.
+        get globe() {
+          return globe;
+        },
         selectPoint,
         selectGlobal,
         refreshLayer,
@@ -235,9 +252,6 @@ function ensureSeaIce() {
 /* ------------------------------------------------------------------ globe */
 
 function buildGlobe() {
-  countryFeatures = feature(world, world.objects.countries).features;
-  const countries = countryFeatures;
-
   globe = new Globe(els.globe)
     .globeImageUrl(assetUrl("/textures/earth-blue-marble.jpg"))
     .bumpImageUrl(assetUrl("/textures/earth-topology.jpg"))
@@ -246,12 +260,6 @@ function buildGlobe() {
     .atmosphereAltitude(0.18)
     .showAtmosphere(true)
     .showGraticules(false)
-    .polygonsData(countries)
-    .polygonCapColor(() => "rgba(0,0,0,0)")
-    .polygonSideColor(() => "rgba(0,0,0,0)")
-    .polygonStrokeColor(() => "rgba(174, 216, 255, 0.2)")
-    .polygonAltitude(0.001)
-    .polygonsTransitionDuration(0)
     .pointLat("lat")
     .pointLng("lon")
     .pointAltitude(pointAltitude)
@@ -318,6 +326,7 @@ function buildGlobe() {
     tapOrigin = null;
   });
 
+  buildOverlay();
   refreshLayer();
 }
 
@@ -348,44 +357,173 @@ function pointColor(point) {
 
 /* Each station keeps a faint halo: the "imaginary" area around the dot. When
    the cursor is anywhere inside that area the dot grows and the halo lights up,
-   and a click there opens the case. three-globe keeps each point's mesh on its
-   datum as __threeObjPoint, so one mesh is scaled instead of re-digesting the
-   whole layer (4,039 points in the trend field). */
+   and a click there opens the case.
+
+   Drawn as one mesh per station, the 708 halos and the 286 country outlines were
+   ~3,000 of the frame's 3,552 draw calls, and the globe sat at 15 fps for it.
+   Both are now a single object each — the halos an InstancedMesh, the borders one
+   LineSegments — which is the same picture for four calls. three-globe keeps each
+   point's mesh on its datum as __threeObjPoint, so one mesh is scaled instead of
+   re-digesting the whole layer (4,039 points in the trend field). */
 const HOVER_GROWTH = 1.85;
 const HOVER_AREA_DEG = 1.6;
 const HALO_INNER = 1.15;
 const HALO_OUTER = 2.2;
+const HALO_SEGMENTS = 44;
 const HALO_HOVER_SCALE = 1.8;
 const HALO_ALTITUDE = 0.006;
+const HALO_OPACITY = 0.18;
+const HALO_SELECTED_OPACITY = 0.4;
+const HALO_HOVER_OPACITY = 0.55;
+const BORDER_ALTITUDE = 0.001;
+const BORDER_STEP_DEG = 2;
+const BORDER_COLOR = 0xaed8ff;
+// A shared border used to be stroked once per country, so 0.2 twice; drawn once
+// it needs a little more weight to read the same.
+const BORDER_OPACITY = 0.3;
 const RECOMMENDATION_COLOR = "#ffd166";
 const RECOMMENDATION_STROKE = 0.35;
 const TAP_MARKER_INNER = 0.85;
 const TAP_MARKER_OUTER = 1.45;
 
-function haloObject(point) {
-  const material = new MeshBasicMaterial({
-    color: pointColor(point),
-    transparent: true,
-    opacity: haloOpacity(point),
-    side: DoubleSide,
-    depthWrite: false,
-  });
-  const mesh = new Mesh(new RingGeometry(HALO_INNER, HALO_OUTER, 44), material);
-  mesh.renderOrder = 2;
-  point.__halo = mesh;
-  return mesh;
-}
+const HALO_Z = new Vector3(0, 0, 1);
+const haloPosition = new Vector3();
+const haloNormal = new Vector3();
+const haloQuaternion = new Quaternion();
+const haloScale = new Vector3();
+const haloMatrix = new Matrix4();
+const haloColor = new Color();
 
-// The same custom layer carries the station halos and the yellow marker on the
-// tapped point, so both follow the globe's surface with one digest.
-function customLayerObject(datum) {
-  return datum.kind === "tap" ? tapMarkerObject() : haloObject(datum);
+let overlayGroup = null;
+let haloMesh = null;
+let hoverHalo = null;
+let selectedHalo = null;
+let borderLines = null;
+
+// The custom layer carries the yellow marker on the tapped point; the halos and
+// the country borders live in one overlay group of their own so they keep a
+// stable draw-call count across layer switches.
+function customLayerObject() {
+  return tapMarkerObject();
 }
 
 function customLayerUpdate(object, datum) {
-  const coords = globe.getCoords(datum.lat, datum.lon, HALO_ALTITUDE);
-  object.position.set(coords.x, coords.y, coords.z);
-  object.quaternion.setFromUnitVectors(new Vector3(0, 0, 1), object.position.clone().normalize());
+  orientOnGlobe(object, datum.lat, datum.lon, HALO_ALTITUDE);
+}
+
+function orientOnGlobe(object, lat, lon, altitude) {
+  const coords = globe.getCoords(lat, lon, altitude);
+  object.position.copy(coords);
+  object.quaternion.setFromUnitVectors(HALO_Z, haloNormal.copy(coords).normalize());
+}
+
+function buildOverlay() {
+  if (overlayGroup || !globe) return;
+  overlayGroup = new Group();
+  overlayGroup.name = "globe-overlay";
+  borderLines = borderOutline();
+  haloMesh = haloInstances();
+  hoverHalo = haloRing(HALO_HOVER_OPACITY, HALO_HOVER_SCALE);
+  selectedHalo = haloRing(HALO_SELECTED_OPACITY, 1);
+  overlayGroup.add(borderLines, haloMesh, hoverHalo, selectedHalo);
+  globe.scene().add(overlayGroup);
+}
+
+function haloMaterial(opacity) {
+  return new MeshBasicMaterial({
+    transparent: true,
+    opacity,
+    side: DoubleSide,
+    depthWrite: false,
+  });
+}
+
+function haloInstances() {
+  const points = state.points;
+  const mesh = new InstancedMesh(
+    new RingGeometry(HALO_INNER, HALO_OUTER, HALO_SEGMENTS),
+    haloMaterial(HALO_OPACITY),
+    points.length
+  );
+  mesh.instanceMatrix.setUsage(DynamicDrawUsage);
+  mesh.renderOrder = 2;
+  // The instances cover the whole sphere, so a bounding sphere around the base
+  // ring at the origin would cull the mesh as soon as one station left frame.
+  mesh.frustumCulled = false;
+  points.forEach((point, index) => {
+    point.__haloIndex = index;
+    mesh.setColorAt(index, haloColor.set(pointColor(point)));
+    writeHalo(mesh, index, point);
+  });
+  mesh.instanceColor.needsUpdate = true;
+  return mesh;
+}
+
+function writeHalo(mesh, index, point) {
+  haloPosition.copy(globe.getCoords(point.lat, point.lon, HALO_ALTITUDE));
+  haloQuaternion.setFromUnitVectors(HALO_Z, haloNormal.copy(haloPosition).normalize());
+  // The hovered and selected station hide their base ring under the bright one,
+  // so the drawn opacity is the halo's own rather than two blended together.
+  haloScale.setScalar(haloScaleFor(point));
+  haloMatrix.compose(haloPosition, haloQuaternion, haloScale);
+  mesh.setMatrixAt(index, haloMatrix);
+}
+
+function haloScaleFor(point) {
+  if (state.layer !== "cities") return 1;
+  return point === state.hovered || isSelected(point) ? 0 : 1;
+}
+
+function haloRing(opacity, scale) {
+  const mesh = new Mesh(new RingGeometry(HALO_INNER, HALO_OUTER, HALO_SEGMENTS), haloMaterial(opacity));
+  mesh.renderOrder = 3;
+  mesh.scale.setScalar(scale);
+  mesh.visible = false;
+  return mesh;
+}
+
+// Country borders as one LineSegments: the cap and side meshes three-globe built
+// per country were fully transparent — they existed only to carry the stroke.
+function borderOutline() {
+  const lines = topojsonMesh(world, world.objects.countries);
+  const positions = [];
+  for (const line of lines.coordinates) {
+    for (let index = 0; index < line.length - 1; index += 1) {
+      const [lng1, lat1] = line[index];
+      const [lng2, lat2] = line[index + 1];
+      // One chord between distant vertices would cut under the sphere, so walk
+      // each segment in steps small enough to hug the surface.
+      const wrappedLng = ((((lng2 - lng1) % 360) + 540) % 360) - 180;
+      const steps = Math.max(
+        1,
+        Math.ceil(Math.max(Math.abs(lat2 - lat1), Math.abs(wrappedLng)) / BORDER_STEP_DEG)
+      );
+      let previous = null;
+      for (let part = 0; part <= steps; part += 1) {
+        const ratio = part / steps;
+        const coords = globe.getCoords(
+          lat1 + (lat2 - lat1) * ratio,
+          lng1 + wrappedLng * ratio,
+          BORDER_ALTITUDE
+        );
+        if (previous) positions.push(previous.x, previous.y, previous.z, coords.x, coords.y, coords.z);
+        previous = coords;
+      }
+    }
+  }
+  const geometry = new BufferGeometry();
+  geometry.setAttribute("position", new Float32BufferAttribute(positions, 3));
+  const mesh = new LineSegments(
+    geometry,
+    new LineBasicMaterial({
+      color: BORDER_COLOR,
+      transparent: true,
+      opacity: BORDER_OPACITY,
+      depthWrite: false,
+    })
+  );
+  mesh.renderOrder = 1;
+  return mesh;
 }
 
 function tapMarkerObject() {
@@ -404,55 +542,94 @@ function tapMarkerObject() {
   return group;
 }
 
-function haloOpacity(point) {
-  return isSelected(point) ? 0.4 : 0.18;
+function refreshHalos() {
+  if (!haloMesh) return;
+  for (const point of state.points) {
+    const index = point.__haloIndex;
+    if (index === undefined) continue;
+    haloMesh.setColorAt(index, haloColor.set(pointColor(point)));
+  }
+  haloMesh.instanceColor.needsUpdate = true;
+  syncHalos();
 }
 
-function refreshHalos() {
+// A full pass over the halos: only selection, layer and variable changes need
+// one; hover moves a single instance.
+function syncHalos() {
+  if (!haloMesh) return;
+  const cities = state.layer === "cities";
+  haloMesh.visible = cities;
+  const hovered = cities ? state.hovered : null;
+  const selected = cities && state.selectedKind === "city" ? state.selected : null;
   for (const point of state.points) {
-    const halo = point.__halo;
-    if (!halo) continue;
-    halo.material.color.set(pointColor(point));
-    halo.material.opacity = haloOpacity(point);
-    halo.scale.setScalar(state.hovered === point ? HALO_HOVER_SCALE : 1);
+    const index = point.__haloIndex;
+    if (index === undefined) continue;
+    writeHalo(haloMesh, index, point);
   }
+  haloMesh.instanceMatrix.needsUpdate = true;
+  paintHalo(hoverHalo, hovered, HALO_HOVER_OPACITY, HALO_HOVER_SCALE);
+  paintHalo(selectedHalo, selected, HALO_SELECTED_OPACITY, 1);
+}
+
+function paintHalo(mesh, point, opacity, scale) {
+  if (!mesh) return;
+  if (!point || state.layer !== "cities") {
+    mesh.visible = false;
+    return;
+  }
+  orientOnGlobe(mesh, point.lat, point.lon, HALO_ALTITUDE);
+  mesh.scale.setScalar(scale);
+  mesh.material.color.set(pointColor(point));
+  mesh.material.opacity = opacity;
+  mesh.visible = true;
 }
 
 function setHoveredPoint(point) {
   if (state.hovered === point) return;
-  restoreHoveredPoint();
+  const previous = state.hovered;
+  restoreHoveredMesh();
   state.hovered = point || null;
   if (els.globe) els.globe.style.cursor = point ? "pointer" : "";
-  if (!point) return;
-  const mesh = point.__threeObjPoint;
+  const mesh = state.hovered?.__threeObjPoint;
   if (mesh?.scale) {
     hoveredMesh = mesh;
     hoveredScale = { x: mesh.scale.x, y: mesh.scale.y };
     mesh.scale.x = hoveredScale.x * HOVER_GROWTH;
     mesh.scale.y = hoveredScale.y * HOVER_GROWTH;
   }
-  const halo = point.__halo;
-  if (halo) {
-    hoveredHalo = halo;
-    hoveredHaloPoint = point;
-    halo.scale.setScalar(HALO_HOVER_SCALE);
-    halo.material.opacity = 0.55;
+  if (haloMesh) {
+    // Two instances move: the one the cursor left and the one it entered.
+    for (const changed of [previous, state.hovered]) {
+      const index = changed?.__haloIndex;
+      if (index === undefined) continue;
+      writeHalo(haloMesh, index, changed);
+    }
+    haloMesh.instanceMatrix.needsUpdate = true;
+    paintHalo(hoverHalo, state.hovered, HALO_HOVER_OPACITY, HALO_HOVER_SCALE);
   }
 }
 
 function restoreHoveredPoint() {
+  const previous = state.hovered;
+  restoreHoveredMesh();
+  state.hovered = null;
+  if (haloMesh && previous) {
+    const index = previous.__haloIndex;
+    if (index !== undefined) {
+      writeHalo(haloMesh, index, previous);
+      haloMesh.instanceMatrix.needsUpdate = true;
+    }
+    paintHalo(hoverHalo, null, HALO_HOVER_OPACITY, HALO_HOVER_SCALE);
+  }
+}
+
+function restoreHoveredMesh() {
   if (hoveredMesh && hoveredScale) {
     hoveredMesh.scale.x = hoveredScale.x;
     hoveredMesh.scale.y = hoveredScale.y;
   }
-  if (hoveredHalo) {
-    hoveredHalo.scale.setScalar(1);
-    hoveredHalo.material.opacity = haloOpacity(hoveredHaloPoint);
-  }
   hoveredMesh = null;
   hoveredScale = null;
-  hoveredHalo = null;
-  hoveredHaloPoint = null;
 }
 
 // The ocean layer is a field of 4° cells; a tap lands within about 2.8° of a
@@ -578,8 +755,6 @@ function refreshLayer() {
   // Points are re-scaled by the layer update, so drop any hover growth with it.
   hoveredMesh = null;
   hoveredScale = null;
-  hoveredHalo = null;
-  hoveredHaloPoint = null;
   state.hovered = null;
   const data =
     state.layer === "ocean"
@@ -588,9 +763,6 @@ function refreshLayer() {
         ? state.gridPoints
         : state.points;
   globe.pointsData(data);
-  if (state.layer === "field") {
-    for (const point of state.points) delete point.__halo;
-  }
   syncCustomLayer();
   globe.ringsData(
     state.selected && !state.selected.global
@@ -717,9 +889,9 @@ function syncCustomLayer() {
   const key = `${state.layer}|${rec ? `${rec.target.lat},${rec.target.lng}` : ""}`;
   if (key !== customLayerKey) {
     customLayerKey = key;
-    const entries = state.layer === "cities" ? [...state.points] : [];
-    if (rec) entries.push({ kind: "tap", lat: rec.target.lat, lon: rec.target.lng });
-    globe.customLayerData(entries);
+    // The halos are their own instanced overlay, so the only custom object left
+    // is the marker on the tapped point.
+    globe.customLayerData(rec ? [{ kind: "tap", lat: rec.target.lat, lon: rec.target.lng }] : []);
   }
   refreshHalos();
 }
@@ -2163,6 +2335,20 @@ function escapeHtml(value) {
 /* --------------------------------------------------------------- events */
 
 function bindStaticEvents() {
+  // The source chips sit behind a disclosure so the top bar stays quiet. A
+  // click outside it or Escape closes the panel, including on the globe.
+  const sourceMenu = document.getElementById("source-menu");
+  if (sourceMenu) {
+    document.addEventListener("click", (event) => {
+      if (sourceMenu.open && !sourceMenu.contains(event.target)) sourceMenu.open = false;
+    });
+    document.addEventListener("keydown", (event) => {
+      if (event.key !== "Escape" || !sourceMenu.open) return;
+      sourceMenu.open = false;
+      sourceMenu.querySelector("summary")?.focus();
+    });
+  }
+
   els.askForm.addEventListener("submit", (event) => {
     event.preventDefault();
     handleAsk(els.askInput.value);
