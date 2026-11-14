@@ -88,8 +88,32 @@ Last verified: 2026-11-14
   EXPECT: identical hashes
   EVIDENCE: pushed `63cc511..3cd5c4e HEAD -> main`; `git rev-parse HEAD` and `FETCH_HEAD` both returned `3cd5c4eb52d168ba14783d206e75523fd7cb3099`.
 
+- [x] G18: The tagline “Ask the planet. Get the evidence.”, the dot inside the wordmark, the intake label and the “Case board” wording are gone from both pages and from main.js, and the wordmark reads GAUSSIAN FRONTIERS.
+  CHECK: node scripts/verify_app.mjs
+  EXPECT: app verified
+  EVIDENCE: output lines `chrome: tagline, brand dot, Intake label and case board wording removed` and `case layout: narrative paragraph above the verdict block`; rendered brand text is `GAUSSIAN FRONTIERS`; the landing title is `Case Files — NASA Space Apps 2026`. The landing page's only h1 was that sentence, so the page label now carries it at the kicker's size (9 px, accent) — the hero renders identically to before.
+
+- [x] G19: With no case open the right-hand panel is not rendered; opening a case shows it.
+  MANUAL: verified in the Cloud browser at 1440×900 against the dev server.
+  EVIDENCE: on load the case panel's computed `display` was `none` and its text was empty; `#featured-grid` and the “How a case works” block are gone from the page; locating Nairobi set `display: block` and rendered the case; “Case board” appears in no state.
+
+- [x] G20: In an open case the narrative paragraph sits after the Temperature/Rainfall/Soil/Solar and Window buttons and before the verdict stamp, above the chart and the facts, with its styling unchanged.
+  CHECK: node scripts/verify_app.mjs
+  EXPECT: app verified
+  EVIDENCE: source-order assertion reports `case layout: narrative paragraph above the verdict block`; measured DOM order in the browser was case-head, place-title, place-sub, live-chip, imagery, var-chips, window-row, narrative, verdict, chart, facts; the paragraph keeps `.narrative` (12 px, `#c4d0da`).
+
+- [x] G21: The production build succeeds after the chrome changes.
+  CHECK: npm run build
+  EXPECT: built in
+  EVIDENCE: built in 6.81s; only the existing chunk-size warning.
+
+- [x] G22: The chrome changes are pushed to `main` after the localhost check.
+  CHECK: git rev-parse HEAD and git rev-parse FETCH_HEAD agree after fetching `main`.
+  EXPECT: identical hashes
+  EVIDENCE: pushed `a5c2b6a..acdabc2 HEAD -> main` after the browser checks; HEAD and FETCH_HEAD both returned `acdabc2` for the feature commit, and the ledger follow-up advanced `main` afterwards.
+
 ## Status
 
-MET: 17
+MET: 22
 UNMET: 0
 ABANDONED: 0
