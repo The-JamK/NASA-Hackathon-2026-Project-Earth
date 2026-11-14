@@ -112,8 +112,13 @@ Last verified: 2026-11-14
   EXPECT: identical hashes
   EVIDENCE: pushed `a5c2b6a..acdabc2 HEAD -> main` after the browser checks; HEAD and FETCH_HEAD both returned `acdabc2` for the feature commit, and the ledger follow-up advanced `main` afterwards.
 
+- [x] G23: The tap recommendation and its ledger are pushed to `main` on GitHub.
+  CHECK: git rev-parse HEAD and git rev-parse FETCH_HEAD agree after fetching `main`.
+  EXPECT: identical hashes
+  EVIDENCE: pushed `d73057e..ea41331 HEAD -> main`; `git rev-parse HEAD` and `FETCH_HEAD` both returned `ea41331` for the feature commit, and the ledger follow-up advanced `main` afterwards.
+
 ## Status
 
-MET: 22
+MET: 23
 UNMET: 0
 ABANDONED: 0
