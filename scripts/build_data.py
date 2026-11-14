@@ -17,6 +17,8 @@ import json
 import math
 import re
 import sys
+import time
+from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
@@ -26,6 +28,7 @@ import numpy as np
 if __package__ in (None, ""):
     sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
+from scripts.build_cities import candidate_cities, merge_new_cities
 from scripts.envfile import load_env
 from scripts.fetch_sources import (
     POWER_CODES,
@@ -165,7 +168,22 @@ CITIES = [
     ("mcmurdo", "McMurdo", "Antarctica", "Antarctica", -77.8419, 166.6863, ["antarctica"]),
 ]
 
-FEATURED = {"nairobi", "london", "delhi", "manaus", "niamey", "tromso", "sydney", "lima", "tokyo", "cairo", "mcmurdo"}
+FEATURED = {
+    "nairobi",
+    "london",
+    "delhi",
+    "manaus",
+    "niamey",
+    "tromso",
+    "sydney",
+    "lima",
+    "tokyo",
+    "cairo",
+    "mcmurdo",
+    "shanghai",
+    "dhaka",
+    "reykjavik",
+}
 LIVE_IDS = {"nairobi", "london", "delhi", "manaus", "niamey", "sydney"}
 
 STOPWORDS = set(
@@ -305,65 +323,160 @@ def build_grid(env: dict[str, str], sources: list[dict[str, Any]]) -> dict[str, 
     }
 
 
-def build_points(env: dict[str, str], sources: list[dict[str, Any]]) -> dict[str, Any]:
-    username = env.get("METEOMATICS_USERNAME", "")
-    password = env.get("METEOMATICS_PASSWORD", "")
-    points: list[dict[str, Any]] = []
-    live_count = 0
-
-    for slug, name, country, continent, lat, lon, aliases in CITIES:
-        print(f"· POWER {name}")
-        payload = fetch_power_point(slug, lat, lon, START, END)
-        parameters = payload.get("properties", {}).get("parameter", {})
-        series: dict[str, list[float | None]] = {}
-        trends: dict[str, dict[str, Any]] = {}
-        for code in POWER_CODES:
-            if code not in parameters:
-                continue
-            annual = annual_from_power(parameters[code], START, END)
-            series[code] = series_array(annual, START, END)
-            trends[code] = {}
-            for window_start, window_end, key in WINDOWS:
-                pairs = [(year, value) for year, value in annual if window_start <= year <= window_end]
-                trends[code][key] = compute_trend([year for year, _ in pairs], [value for _, value in pairs])
-
-        live = None
-        if slug in LIVE_IDS and username and password:
-            try:
-                live = fetch_meteomatics(slug, lat, lon, username, password)
-                if live:
-                    live_count += 1
-            except Exception:  # noqa: BLE001 - live conditions are optional
-                live = None
-
-        points.append({
-            "id": slug,
+def curated_rows() -> list[dict[str, Any]]:
+    return [
+        {
+            "slug": slug,
             "name": name,
             "country": country,
             "continent": continent,
             "lat": lat,
             "lon": lon,
             "aliases": aliases,
-            "featured": slug in FEATURED,
-            "series": series,
-            "trends": trends,
-            "live": live,
-            "imagery": None,
-        })
+            "curated": True,
+        }
+        for slug, name, country, continent, lat, lon, aliases in CITIES
+    ]
+
+
+def _series_and_trends(
+    payload: dict[str, Any],
+) -> tuple[dict[str, list[float | None]], dict[str, dict[str, Any]]]:
+    parameters = payload.get("properties", {}).get("parameter", {})
+    series: dict[str, list[float | None]] = {}
+    trends: dict[str, dict[str, Any]] = {}
+    for code in POWER_CODES:
+        if code not in parameters:
+            continue
+        annual = annual_from_power(parameters[code], START, END)
+        series[code] = series_array(annual, START, END)
+        trends[code] = {}
+        for window_start, window_end, key in WINDOWS:
+            pairs = [(year, value) for year, value in annual if window_start <= year <= window_end]
+            trends[code][key] = compute_trend([year for year, _ in pairs], [value for _, value in pairs])
+    return series, trends
+
+
+def _coverage(series: dict[str, list[float | None]]) -> int:
+    usable = 0
+    for values in series.values():
+        finite = [value for value in values if isinstance(value, (int, float)) and math.isfinite(value)]
+        if len(finite) >= 30:
+            usable += 1
+    return usable
+
+
+def _fetch_payloads(rows: list[dict[str, Any]]) -> list[dict[str, Any] | None]:
+    """Fetch every POWER payload, three at a time, resuming from the cache."""
+
+    def fetch(row: dict[str, Any]) -> dict[str, Any] | None:
+        for attempt in range(3):
+            try:
+                return fetch_power_point(row["slug"], row["lat"], row["lon"], START, END)
+            except Exception as error:  # noqa: BLE001 - one missing point must not stop the build
+                if attempt == 2:
+                    print(f"  ! POWER {row['name']}: {type(error).__name__}")
+                    return None
+                time.sleep(1.0 + attempt)
+        return None
+
+    with ThreadPoolExecutor(max_workers=3) as pool:
+        return list(pool.map(fetch, rows))
+
+
+def build_points(
+    env: dict[str, str],
+    sources: list[dict[str, Any]],
+    rows: list[dict[str, Any]],
+    existing: dict[str, dict[str, Any]],
+) -> dict[str, Any]:
+    username = env.get("METEOMATICS_USERNAME", "")
+    password = env.get("METEOMATICS_PASSWORD", "")
+    points: list[dict[str, Any]] = []
+    skipped: list[dict[str, Any]] = []
+    live_count = 0
+    full_count = 0
+
+    payloads = _fetch_payloads(rows)
+    for row, payload in zip(rows, payloads):
+        slug = row["slug"]
+        if payload is None:
+            if row["curated"]:
+                raise RuntimeError(f"NASA POWER did not answer for the curated point {slug}")
+            skipped.append({"id": slug, "name": row["name"], "reason": "POWER request failed"})
+            continue
+
+        series, trends = _series_and_trends(payload)
+        coverage = _coverage(series)
+        if row["curated"]:
+            if coverage < 3:
+                raise RuntimeError(f"the curated point {slug} lost its usable variables")
+        elif coverage < len(POWER_CODES):
+            # A half-covered city would be a thin case file; the curated table
+            # keeps its 3-variable points because they are part of the demo.
+            skipped.append(
+                {"id": slug, "name": row["name"], "coverage": f"{coverage}/{len(POWER_CODES)}"}
+            )
+            continue
+        if coverage == len(POWER_CODES):
+            full_count += 1
+
+        print(f"· POWER {row['name']}")
+        previous = existing.get(slug, {})
+        live = None
+        if slug in LIVE_IDS:
+            try:
+                live = fetch_meteomatics(slug, row["lat"], row["lon"], username, password)
+            except Exception:  # noqa: BLE001 - live conditions are optional
+                live = None
+            if live is None:
+                # No credentials and no cache: keep the snapshot the previous
+                # bundle shipped, which the app labels Snapshot.
+                live = previous.get("live")
+            if live:
+                live_count += 1
+
+        points.append(
+            {
+                "id": slug,
+                "name": row["name"],
+                "country": row["country"],
+                "continent": row["continent"],
+                "lat": row["lat"],
+                "lon": row["lon"],
+                "aliases": row["aliases"],
+                "featured": slug in FEATURED,
+                "series": series,
+                "trends": trends,
+                "live": live,
+                "imagery": previous.get("imagery"),
+                "imagery_meta": previous.get("imagery_meta"),
+            }
+        )
 
     sources.append({
         "id": "power",
         "name": "NASA POWER",
         "kind": "point",
         "status": "ok",
-        "detail": f"{len(points)} points · {', '.join(POWER_CODES)} · 1990–2025",
+        "detail": (
+            f"{len(points)} points · {full_count} with all four variables · "
+            f"{', '.join(POWER_CODES)} · 1990–2025"
+        ),
+        "skipped_points": skipped,
     })
+    carried = not (username and password)
     sources.append({
         "id": "meteomatics",
         "name": "Meteomatics",
         "kind": "live",
         "status": "ok" if live_count else "unavailable",
-        "detail": f"Current conditions for {live_count} featured point(s)" if live_count else "Credentials not available or request failed",
+        "detail": (
+            f"Current conditions for {live_count} featured point(s)"
+            + (" (snapshot carried from the cache; no credentials in this environment)" if carried else "")
+            if live_count
+            else "Credentials not available or request failed"
+        ),
     })
     return {
         "meta": {
@@ -434,30 +547,100 @@ def build_rag(variables_payload: dict[str, Any], points_payload: dict[str, Any])
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--env-file", default=str(ROOT / ".env"))
+    parser.add_argument(
+        "--skip-grid",
+        action="store_true",
+        help="reuse the committed GISTEMP grid instead of rebuilding it",
+    )
+    parser.add_argument(
+        "--skip-imagery",
+        action="store_true",
+        help="reuse the committed context imagery instead of fetching it again",
+    )
     args = parser.parse_args()
 
     env = load_env(Path(args.env_file).expanduser())
     sources: list[dict[str, Any]] = []
 
+    points_path = PUBLIC / "points.json"
+    existing_points: dict[str, dict[str, Any]] = {}
+    if points_path.exists():
+        existing_payload = json.loads(points_path.read_text(encoding="utf-8"))
+        existing_points = {point["id"]: point for point in existing_payload.get("points", [])}
+
+    sources_path = PUBLIC / "sources.json"
+    existing_sources: dict[str, dict[str, Any]] = {}
+    if sources_path.exists():
+        existing_payload = json.loads(sources_path.read_text(encoding="utf-8"))
+        existing_sources = {source["id"]: source for source in existing_payload.get("sources", [])}
+
     variables_payload = build_variables()
     (PUBLIC / "variables.json").write_text(json.dumps(variables_payload, ensure_ascii=False, indent=1), encoding="utf-8")
 
     earthdata = check_earthdata(env)
+    if earthdata.get("status") != "ok":
+        previous_check = existing_sources.get("earthdata")
+        if previous_check and previous_check.get("status") == "ok":
+            # The auth probe needs credentials that this environment does not
+            # hold; keep the earlier verification instead of erasing it.
+            earthdata = {
+                **previous_check,
+                "detail": (
+                    f"{previous_check.get('detail', '')} · verified in an earlier build; "
+                    "credentials are not set in this environment"
+                ),
+            }
     sources.append({"id": "earthdata", "name": "NASA Earthdata", "kind": "auth", **earthdata})
 
     planetary = check_planetary()
     sources.append({"id": "planetary", "name": "Planetary Computer", "kind": "stac", **planetary})
 
-    points_payload = build_points(env, sources)
-    (PUBLIC / "points.json").write_text(json.dumps(points_payload, ensure_ascii=False, separators=(",", ":")), encoding="utf-8")
+    curated = curated_rows()
+    candidates = candidate_cities()
+    new_rows = [{**row, "curated": False} for row in merge_new_cities(curated, candidates)]
+    print(f"· cities: {len(curated)} curated + {len(new_rows)} largest-city candidates")
 
-    grid_payload = build_grid(env, sources)
-    (PUBLIC / "grid.json").write_text(json.dumps(grid_payload, ensure_ascii=False, separators=(",", ":")), encoding="utf-8")
+    points_payload = build_points(env, sources, [*curated, *new_rows], existing_points)
+    points_path.write_text(json.dumps(points_payload, ensure_ascii=False, separators=(",", ":")), encoding="utf-8")
+
+    grid_path = PUBLIC / "grid.json"
+    if args.skip_grid:
+        if not grid_path.exists():
+            raise SystemExit("--skip-grid needs an existing public/data/grid.json")
+        grid_payload = json.loads(grid_path.read_text(encoding="utf-8"))
+        gistemp = existing_sources.get("gistemp")
+        if not gistemp:
+            counts = grid_payload.get("meta", {}).get("counts", {})
+            cells = counts.get("cells") or len(grid_payload.get("cells", []))
+            gistemp = {
+                "id": "gistemp",
+                "name": "NASA GISTEMP v4",
+                "kind": "grid",
+                "status": "ok",
+                "detail": f"{cells:,} cells at 4° · baseline 1951–1980",
+            }
+        sources.append(gistemp)
+        print(f"· GISTEMP grid reused · {len(grid_payload.get('cells', [])):,} cells")
+    else:
+        grid_payload = build_grid(env, sources)
+        grid_path.write_text(json.dumps(grid_payload, ensure_ascii=False, separators=(",", ":")), encoding="utf-8")
 
     rag_payload = build_rag(variables_payload, points_payload)
     (PUBLIC / "rag_index.json").write_text(json.dumps(rag_payload, ensure_ascii=False, separators=(",", ":")), encoding="utf-8")
 
-    (PUBLIC / "sources.json").write_text(
+    if args.skip_imagery:
+        sources.append(
+            existing_sources.get("blue-marble")
+            or {
+                "id": "blue-marble",
+                "name": "NASA Blue Marble",
+                "kind": "fallback",
+                "status": "ok",
+                "detail": "globe texture + context imagery carried over from the previous bundle",
+            }
+        )
+
+    sources_path.write_text(
         json.dumps(
             {
                 "generated_utc": datetime.now(timezone.utc).isoformat(timespec="seconds"),
@@ -474,6 +657,10 @@ def main() -> int:
         path = PUBLIC / name
         print(f"  {name:18s} {path.stat().st_size / 1024:8.1f} KB")
     print(f"  points: {len(points_payload['points'])} · grid cells: {len(grid_payload['cells'])}")
+
+    if args.skip_imagery:
+        print("\n· context imagery reused from the previous bundle")
+        return 0
 
     print("\n· NASA Blue Marble context crops")
     from scripts.render_context import main as render_context  # local import keeps the data path optional

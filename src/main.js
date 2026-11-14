@@ -227,8 +227,10 @@ function pointAltitude(point) {
 }
 
 function pointRadius(point) {
-  if (isSelected(point)) return point.isGrid ? 0.25 : 0.6;
-  return point.isGrid ? 0.17 : 0.42;
+  if (isSelected(point)) return point.isGrid ? 0.25 : 0.5;
+  // The station layer now holds a case for every country, so the dots stay
+  // small enough to keep neighbouring cities apart on the globe.
+  return point.isGrid ? 0.17 : 0.2;
 }
 
 function pointColor(point) {
@@ -1430,7 +1432,11 @@ function bindStaticEvents() {
     button.addEventListener("click", () => {
       state.layer = button.dataset.layer;
       refreshLayer();
-      showToast(state.layer === "field" ? "Trend field: 4,039 GISTEMP cells" : "City points: 45 stations");
+      showToast(
+        state.layer === "field"
+          ? `Trend field: ${state.gridPoints.length.toLocaleString()} GISTEMP cells`
+          : `City points: ${state.points.length.toLocaleString()} stations`
+      );
     });
   });
 

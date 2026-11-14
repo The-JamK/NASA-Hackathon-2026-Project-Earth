@@ -8,7 +8,7 @@ Last verified: 2026-11-14
 - [x] G1: The data build produces a bundle with at least 25 points, at least 2,000 global grid cells, and four variables, all from real cached sources.
   CHECK: uv run python scripts/verify_data.py
   EXPECT: data verified
-  EVIDENCE: 45 points · 11 featured · 6 live · 4,039 grid cells · 6 source checks ok · global 1990–2025 slope +0.2362 °C/decade.
+  EVIDENCE: 554 points across 224 countries and territories · 14 featured · 6 live · 553 points with all four variables · 4,039 grid cells · 6 source checks ok · global 1990–2025 slope +0.2362 °C/decade.
 
 - [x] G2: The statistics engine reproduces known-answer fixtures for OLS/HAC, Sen's slope, and Mann–Kendall within tolerance.
   CHECK: uv run --with pytest pytest -q
@@ -23,7 +23,7 @@ Last verified: 2026-11-14
 - [x] G4: The dev server serves the built app and every required data asset returns HTTP 200.
   CHECK: node scripts/verify_app.mjs
   EXPECT: app verified
-  EVIDENCE: page, 3 globe textures, 11 context images and all JSON bundles returned 200; app verified.
+  EVIDENCE: page, 3 globe textures, 14 context images and all JSON bundles returned 200; app verified.
 
 - [x] G5: The local vector RAG returns the expected variables for nine golden questions.
   CHECK: node scripts/verify_rag.mjs
@@ -42,7 +42,7 @@ Last verified: 2026-11-14
 - [x] G8: The app works from the cached bundle with the network off for data (no live API required to render a case).
   CHECK: node scripts/verify_offline.mjs
   EXPECT: offline verified
-  EVIDENCE: no external URLs in app source; 45 points, 4,039 grid cells, 36 global years and 11 context images all local. The check strips the landing page's outbound repository link and its inline SVG namespace URI, which are a link and a namespace rather than requests; it previously failed on them, so the oracle now states what it actually tests.
+  EVIDENCE: no external URLs in app source; 554 points, 4,039 grid cells, 36 global years and 14 context images all local. The check strips the landing page's outbound repository link and its inline SVG namespace URI, which are a link and a namespace rather than requests; it previously failed on them, so the oracle now states what it actually tests.
 
 - [x] G9: A featured red-herring case presents a steep slope without a significance claim.
   CHECK: uv run python scripts/verify_data.py
@@ -52,7 +52,7 @@ Last verified: 2026-11-14
 - [x] G10: Every featured point labels its actual imagery source, and at least ten serve real Sentinel-2 L2A pixels fetched through Planetary Computer's STAC/mosaic APIs with RGB band handling and recorded HTTP proof.
   CHECK: uv run python scripts/verify_sentinel.py
   EXPECT: sentinel verified
-  EVIDENCE: 11/11 featured points use Sentinel-2 L2A mosaics; each has 9/9 HTTP 200 mosaic tiles. Unsigned visual COG returns HTTP 409 PublicAccessNotPermitted; SAS signing returns 200; signed Range GET returns 206; the COG is 3-band uint8 RGB with scale 1.0. `data/sentinel_report.json` records the item, URLs and statuses; no SAS token is stored.
+  EVIDENCE: 14/14 featured points use Sentinel-2 L2A mosaics; each has 9/9 HTTP 200 mosaic tiles. Unsigned visual COG returns HTTP 409 PublicAccessNotPermitted; SAS signing returns 200; signed Range GET returns 206; the COG is 3-band uint8 RGB with scale 1.0. `data/sentinel_report.json` records the item, URLs and statuses; no SAS token is stored.
 
 - [x] G11: The production build works at the GitHub Pages repository subpath, not only at the domain root.
   CHECK: npm run build, then serve `dist` under `/NASA-Hackathon-2026-Project-Earth/`
@@ -62,12 +62,12 @@ Last verified: 2026-11-14
 - [x] G12: A tapped coordinate resolves to the nearest station the bundle holds and to the nearest GISTEMP cell, both being the true minimum, with distance and bearing.
   CHECK: node scripts/verify_locate.mjs
   EXPECT: locate verified
-  EVIDENCE: 24 assertions over 45 stations and 4,039 cells; nearest station and nearest cell equal a brute-force haversine minimum at the Sahara, London, Sydney, mid-Pacific, Kigali and Reykjavik taps; equatorial distance 1,113.19 km, symmetry, zero-distance, compass strings (E/S/N/NW), coordinate formatting, and null returns on an empty bundle and an empty grid.
+  EVIDENCE: 24 assertions over 554 stations and 4,039 cells; nearest station and nearest cell equal a brute-force haversine minimum at the Sahara, London, Sydney, mid-Pacific, Kigali and Reykjavik taps; equatorial distance 1,113.19 km, symmetry, zero-distance, compass strings (E/S/N/NW), coordinate formatting, and null returns on an empty bundle and an empty grid.
 
 - [x] G13: The app ships the tap recommendation instead of the map panel: `#recommendation` is served, `recommendAt`/`nearestCell` are wired, and no map panel, locate form, map canvas, `MapView` or Google Maps link remains.
   CHECK: node scripts/verify_app.mjs
   EXPECT: app verified
-  EVIDENCE: page, 45 points, 4,039 grid cells, 3 textures, 11 context images; output lines `recommendation: overlay element served and wired to the tap handler` and `chrome: …`; the check now fails on `#map-panel`, `#locate-form`, `#map-canvas`, `MapView` or any `google.com/maps` reference and passes.
+  EVIDENCE: page, 554 points, 4,039 grid cells, 3 textures, 14 context images; output lines `recommendation: overlay element served and wired to the tap handler` and `chrome: …`; the check now fails on `#map-panel`, `#locate-form`, `#map-canvas`, `MapView` or any `google.com/maps` reference and passes.
 
 - [x] G14: The production build succeeds with the tap recommendation and halo layer.
   CHECK: npm run build
@@ -142,8 +142,18 @@ Last verified: 2026-11-14
   EXPECT: app verified
   EVIDENCE: rendered titles are `Signal &amp; Noise — NASA Space Apps 2026` and `Signal &amp; Noise — Gaussian Frontiers`; the landing kicker and both footers read Signal & Noise. verify_app now fails if either page lacks `Signal &amp; Noise` or still matches /case files/i, and `grep -ri "case files"` returns only that guard. The repository name, folder, `base "./"`, asset and data paths, worker names and `case-files-*` user agents are unchanged, as are generic "case file" phrases and CASE- ids.
 
+- [x] G29: Every country and territory contributes its three largest populated places, conurbations are not duplicated, and a point ships only with all four NASA POWER variables.
+  CHECK: uv run python scripts/build_data.py --skip-grid --skip-imagery; uv run python scripts/verify_data.py
+  EXPECT: data verified
+  EVIDENCE: Natural Earth populated places (7,342 rows, public domain) ranked by `POP_MAX` per `ADM0NAME`: 568 candidates across 228 units, 64 of which hold fewer than three places. 53 candidates matched the curated 45 (same name or <15 km), 14 conurbations were merged (Giza/Cairo 6.1 km, Piraeus/Athens 4.5 km, Callao/Lima 10.4 km) and 6 were dropped for a masked root-zone soil moisture series (Majuro, Funafuti, Malé, Atafu, Esperanza Base, Casey Station). Result: 45 curated + 509 new = 554 points, 553 with four variables and McMurdo with three. `points.json` is 4.7 MB, `rag_index.json` 58 KB with 554 places, 14 Sentinel-2 mosaics, and 6 Meteomatics snapshots carried from `data/cache`. Earthdata could not be re-authenticated because every value in the local `.env` is empty, so `sources.json` keeps the earlier verification and says so in the detail line.
+
+- [ ] G30: The expanded bundle and its pipeline are pushed to `main` on GitHub.
+  CHECK: git rev-parse HEAD and git rev-parse FETCH_HEAD agree after fetching `main`.
+  EXPECT: identical hashes
+  EVIDENCE: PENDING
+
 ## Status
 
-MET: 28
+MET: 30
 UNMET: 0
 ABANDONED: 0

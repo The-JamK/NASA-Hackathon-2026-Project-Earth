@@ -15,6 +15,32 @@ The app uses prebuilt data under `public/data`; rebuild the data bundle with:
 uv run python scripts/build_data.py --env-file path/to/.env
 ```
 
+## City coverage
+
+The bundle ships a hand-curated set of 45 cities plus the three largest populated
+places of every country and territory, ranked by Natural Earth's `POP_MAX`:
+
+- `scripts/build_cities.py` downloads `ne_10m_populated_places` and
+  `ne_10m_admin_0_countries` (public domain, no account) into
+  `data/cache/naturalearth` and parses the DBF tables with the standard library.
+- `scripts/build_data.py` merges those candidates with the curated table: one that
+  is already a case, or within 15 km of one (the same conurbation), is skipped, and
+  a candidate is kept only when NASA POWER returns all four variables for it.
+- `--skip-grid` reuses the committed GISTEMP grid and `--skip-imagery` reuses the
+  committed context imagery, so a city change does not rebuild the 4,039-cell
+  field or refetch every Sentinel-2 mosaic:
+
+```sh
+uv run python scripts/build_data.py --skip-grid --skip-imagery
+uv run python scripts/render_context.py --only <slug>   # Blue Marble fallback
+uv run python scripts/fetch_sentinel.py --only <slug>    # Sentinel-2 upgrade
+```
+
+The result is 554 points across 224 countries and territories: 553 carry all four
+variables, and McMurdo keeps three as the red-herring case. Islands and ice shelves
+where MERRA-2 masks root-zone soil moisture are left out rather than filled with an
+interpolated or mask value.
+
 ## Live conditions
 
 The “Live” chip on a city case is served by a small proxy so the Meteomatics
