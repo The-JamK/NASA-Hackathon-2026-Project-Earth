@@ -113,6 +113,14 @@ for (const point of points.points.filter((item) => item.imagery)) {
   await get(point.imagery, "image/jpeg");
 }
 
+// The hero globe is a link in effect: one click goes straight to the case page,
+// with no confirmation step between them.
+const heroSource = await (await get("/src/hero.js", "javascript")).text();
+if (!heroSource.includes('CASE_URL = "./app.html"')) {
+  fail("the hero globe does not navigate to the case page");
+}
+if (/hero-dialog/.test(landing)) fail("the hero still ships a confirmation dialog");
+
 const main = await (await get("/src/main.js", "javascript")).text();
 if (!main.includes("new Globe")) fail("main.js does not mount the globe");
 if (!main.includes("renderOceanCase")) fail("main.js does not render an ocean region case");

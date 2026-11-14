@@ -14,6 +14,7 @@ const START_LNG = 16;
 const altitudeFor = (width) => (width < 700 ? 2.05 : width < 1080 ? 1.82 : 1.44);
 const SPEED_IDLE = 0.6; // ≈100 s per revolution
 const SPEED_HOVER = 0.12;
+const CASE_URL = "./app.html";
 
 function assetUrl(path) {
   if (!path) return "";
@@ -26,7 +27,6 @@ export function initHero() {
   const scene = document.getElementById("hero-scene");
   const hit = document.getElementById("hero-globe");
   const cursor = document.getElementById("hero-cursor");
-  const dialog = document.getElementById("hero-dialog");
   if (!hero || !scene || !hit) return null;
 
   const prefersReduced = window.matchMedia("(prefers-reduced-motion: reduce)");
@@ -118,23 +118,10 @@ export function initHero() {
     )}px)`;
   }
 
-  /* --------------------------------------------------------------- dialog */
+  /* ---------------------------------------------------------- the case page */
 
-  function openDialog() {
-    if (!dialog) return;
-    if (typeof dialog.showModal === "function") dialog.showModal();
-    else dialog.setAttribute("open", "");
-  }
-
-  hit.addEventListener("click", openDialog);
-
-  if (dialog) {
-    dialog.addEventListener("click", (event) => {
-      if (event.target === dialog) dialog.close();
-    });
-    dialog.querySelector('[data-action="stay"]')?.addEventListener("click", () => dialog.close());
-    dialog.addEventListener("close", () => hit.focus());
-  }
+  // A click, Enter or Space on the globe goes straight to the case analysis.
+  hit.addEventListener("click", () => window.location.assign(CASE_URL));
 
   /* ------------------------------------------------------- motion + browser */
 

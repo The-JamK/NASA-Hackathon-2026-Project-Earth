@@ -332,6 +332,11 @@ Last verified: 2026-11-14
   EXPECT: app verified
   EVIDENCE: `app.html` had the tagline in the places that name the product: `<title>Signal & Noise — Gaussian Frontiers</title>`, the meta description opening with it, the brand link's `Back to the Signal & Noise overview`, the loading eyebrow above `Assembling the evidence locker…`, and the footer ordering. All five now read `Gaussian Frontiers` first with `Signal & Noise` after it, matching the landing page. `verify_app.mjs` gained three assertions — the exact `<title>Gaussian Frontiers — Signal &amp; Noise</title>`, no `Back to the Signal &amp; Noise` link and no `panel-kicker">Signal &amp; Noise` eyebrow — so the tagline cannot drift back into the name position. Run with the dev server it prints `app verified`, and it still requires `Signal &amp; Noise` to appear on both pages, which the new title, meta and footer satisfy.
 
-MET: 62
+- [x] G64: Clicking the hero globe opens the case analysis directly, and the boxes arc around the sphere.
+  CHECK: node scripts/verify_app.mjs
+  EXPECT: app verified
+  EVIDENCE: The `<dialog>`, its CSS block and the close/focus-return JavaScript are gone; `hero.js` now holds `const CASE_URL = "./app.html"` and one click listener that assigns it. In the browser at 1440x900 a click on the globe lands on `/app.html` (`title: Gaussian Frontiers — Signal & Noise`, canvas present) with no dialog in the DOM, and Enter on the focused globe navigates the same way. Hover still sets `is-hovering`, shows `Click to open the case` and a pointer cursor, and the keyboard focus ring is still `rgb(255, 107, 74)` (measured after Tab, where `:focus-visible` applies; a programmatic `.focus()` shows the UA ring instead). `verify_app.mjs` now also fetches `/src/hero.js` and fails if `CASE_URL = "./app.html"` is missing or if `hero-dialog` returns. The arc: `--box-bend: clamp(20px, 3.2vw, 48px)` steps the outer boxes inwards, measured at 1440x900 as name x 86-389, members 40-328, about 86-374 on the left and challenge 1050-1338, event 1096-1384, data 1050-1338 on the right, so the middle boxes sit closest to the limb and the corners tuck in. The phone layout is unchanged (stacked, stage 265-704, `scrollWidth` 375 <= 390) and its globe click also lands on `/app.html`.
+
+MET: 63
 UNMET: 1
 ABANDONED: 0

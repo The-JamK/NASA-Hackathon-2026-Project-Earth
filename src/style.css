@@ -1473,6 +1473,8 @@ html.landing body {
 
 .hero {
   --box-left: clamp(16px, 2.8vw, 48px);
+  /* The outer boxes step inwards so the two columns arc around the sphere. */
+  --box-bend: clamp(20px, 3.2vw, 48px);
 }
 
 .hero-boxes {
@@ -1507,12 +1509,12 @@ html.landing body {
 }
 
 /* The sphere passes in front of these, so only their inner edge is covered. */
-.hero-box--name { left: var(--box-left); top: 9vh; width: clamp(248px, 21vw, 312px); }
+.hero-box--name { left: calc(var(--box-left) + var(--box-bend)); top: 9vh; width: clamp(248px, 21vw, 312px); }
 .hero-box--members { left: var(--box-left); top: 47vh; }
-.hero-box--about { left: var(--box-left); bottom: 9vh; }
-.hero-box--challenge { right: var(--box-left); top: 12vh; }
+.hero-box--about { left: calc(var(--box-left) + var(--box-bend)); bottom: 9vh; }
+.hero-box--challenge { right: calc(var(--box-left) + var(--box-bend)); top: 12vh; }
 .hero-box--event { right: var(--box-left); top: 45vh; }
-.hero-box--data { right: var(--box-left); bottom: 11vh; }
+.hero-box--data { right: calc(var(--box-left) + var(--box-bend)); bottom: 11vh; }
 
 .hero-name {
   margin: 0 0 8px;
@@ -1599,72 +1601,6 @@ html.landing body {
 }
 
 .hero-scroll:hover { color: var(--paper); }
-
-/* ---------- hero dialog ---------- */
-
-.hero-dialog {
-  width: min(380px, calc(100vw - 40px));
-  padding: 24px;
-  border: 1px solid var(--line-strong);
-  border-radius: 4px;
-  background: #0a0f16;
-  color: var(--paper, #f3ede3);
-}
-
-.hero-dialog::backdrop {
-  background: rgba(3, 6, 10, 0.78);
-  backdrop-filter: blur(3px);
-}
-
-.hero-dialog h2 {
-  margin: 0 0 8px;
-  font-family: Fraunces, Georgia, serif;
-  font-weight: 400;
-  font-size: 25px;
-  letter-spacing: -0.02em;
-  color: #f3ede3;
-}
-
-.hero-dialog p {
-  margin: 0 0 20px;
-  font-size: 13px;
-  line-height: 1.6;
-  color: #aaa49a;
-}
-
-.hero-dialog-actions {
-  display: flex;
-  flex-wrap: wrap;
-  justify-content: flex-end;
-  gap: 8px;
-}
-
-.hero-dialog-primary {
-  padding: 10px 14px;
-  border-radius: 2px;
-  background: #ff6b4a;
-  color: #140704;
-  font-size: 9.5px;
-  letter-spacing: 0.14em;
-  text-transform: uppercase;
-  text-decoration: none;
-}
-
-.hero-dialog-primary:hover { background: #ff8361; }
-
-.hero-dialog-secondary {
-  padding: 10px 14px;
-  border: 1px solid var(--line-strong);
-  border-radius: 2px;
-  background: transparent;
-  color: #aaa49a;
-  font-size: 9.5px;
-  letter-spacing: 0.14em;
-  text-transform: uppercase;
-  cursor: pointer;
-}
-
-.hero-dialog-secondary:hover { color: #f3ede3; border-color: rgba(255, 255, 255, 0.32); }
 
 /* ---------- sections ---------- */
 
@@ -1933,9 +1869,6 @@ html.landing body {
   .hero-scroll { position: static; transform: none; order: 8; margin-top: 10px; }
   .hero-scroll span { display: none; }
   .hero-cursor { display: none; }
-  .hero-dialog { padding: 20px; }
-  .hero-dialog-actions { flex-direction: column-reverse; }
-  .hero-dialog-actions > * { text-align: center; }
 }
 
 /* ---------- reduced motion ---------- */
