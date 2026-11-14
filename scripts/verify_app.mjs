@@ -24,9 +24,14 @@ async function json(path) {
   }
 }
 
-const html = await (await get("/", "text/html")).text();
+const landing = await (await get("/", "text/html")).text();
+for (const marker of ['id="sample-case"', 'href="./app.html"']) {
+  if (!landing.includes(marker)) fail(`the landing page is missing ${marker}`);
+}
+
+const html = await (await get("/app.html", "text/html")).text();
 for (const marker of ['id="globe"', 'id="ask-form"', 'id="case-panel"', 'id="method-dialog"']) {
-  if (!html.includes(marker)) fail(`index.html is missing ${marker}`);
+  if (!html.includes(marker)) fail(`app.html is missing ${marker}`);
 }
 
 const variables = await json("/data/variables.json");

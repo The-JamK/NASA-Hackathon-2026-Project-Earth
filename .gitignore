@@ -21,3 +21,6 @@ data/cache/
 # OS/editor
 .DS_Store
 *.log
+
+# Local preview scaffolding (session-specific preview hosts)
+.preview.vite.config.mjs

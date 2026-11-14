@@ -116,6 +116,7 @@ async function init() {
     renderFeatured();
     renderEmptyCase();
     hideLoading();
+    if (window.location.hash === "#method") els.methodDialog.showModal();
   } catch (error) {
     showFatal(error);
   }
