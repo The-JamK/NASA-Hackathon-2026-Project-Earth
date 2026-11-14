@@ -12,12 +12,11 @@ __pycache__/
 *.py[cod]
 .pytest_cache/
 
-# Build output. dist/ is committed on purpose because GitHub Pages serves this
-# repository folder, so the built site lives in Git. It is deliberately NOT
-# ignored: with an ignore rule here, every file a rebuild *adds* to dist/ was
-# dropped silently, which is how ocean.json, seaice.json and countries.json once
-# shipped to GitHub Pages missing while the files that existed to begin with kept
-# updating. Check `git status` after a build instead of muting it.
+# Build output, never committed. The Pages workflow builds dist/ and publishes it
+# at the site root, so the deployed URLs carry no /dist/ segment and the folder
+# cannot drift out of sync with src/ the way a committed copy did (that drift is
+# how ocean.json, seaice.json and countries.json once shipped missing).
+dist/
 build/
 .next/
 data/cache/

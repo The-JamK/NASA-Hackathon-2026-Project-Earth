@@ -678,6 +678,46 @@ body.has-case .case-panel { display: block; }
 .measure-line { stroke-width: 1.4; }
 .measure-line.active { stroke-width: 2; }
 
+/* A case is long and the panel is short, so an export control in the flow is
+   unreachable exactly when it is wanted. Pinned to the panel's bottom edge it is
+   always one glance away; the panel's own 20px padding is what it sits in. */
+.export-box {
+  position: sticky;
+  bottom: -20px;
+  z-index: 4;
+  margin: 14px -20px -20px;
+  padding: 10px 20px 13px;
+  border-top: 1px solid var(--line-strong);
+  background: rgba(8, 13, 20, 0.97);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+}
+
+.export-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 8px;
+  font-size: 9px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.export-head span {
+  font-size: 8.5px;
+  letter-spacing: 0.04em;
+  text-transform: none;
+  color: var(--dim);
+}
+
+.export-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 7px;
+}
+
 .verdict {
   position: relative;
   border-left: 2px solid var(--flat);

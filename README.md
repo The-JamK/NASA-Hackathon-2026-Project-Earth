@@ -171,12 +171,46 @@ map driving the bump shading. `scripts/verify_textures.mjs` reads the image head
 texture cannot ship while the interface claims a higher resolution; it runs as part
 of `scripts/verify_all.sh`.
 
+## Export the numbers
+
+Every open case carries **Check the numbers** — two CSVs, no account and no round
+trip, so a reader can redo the statistics rather than take the panel's word. The
+bar is pinned to the bottom of the case panel: a case runs to about 1,300px in a
+324px-tall panel, so anything placed in the flow is unreachable exactly when it is
+wanted, and the pinned version stays in view from the verdict to the method notes.
+
+- `<case>-series.csv` — one row per year in the window: `year,value,fit,residual`.
+  `fit` is the fitted line at that year (`intercept + slope_per_decade / 10 ×
+  year`), so the slope can be refitted by hand and the residuals inspected for the
+  serial correlation the HAC errors assume away. There is no per-year confidence
+  band on purpose: the stored interval belongs to the slope, and spreading it
+  across the years would invent an uncertainty the bundle does not carry.
+- `<case>-statistics.csv` — `field,value` for place and detail, variable, units,
+  source, window, n, slope, 95% CI, HAC p, BH q (or an explicit note that the
+  record is not in a family), r², Sen's slope, the Hamed–Rao corrected
+  Mann–Kendall terms, lag-1 residual, Durbin–Watson, the verdict rule and the
+  "trend only, no causal attribution" claim.
+
+Both files are UTF-8 with a BOM and CRLF endings, so Excel shows `°C`, `−0.54` and
+`Benjamini–Hochberg` correctly. The sea-ice case exports the measure on screen, so
+both measures means switching the measure and exporting again. `node
+scripts/verify_export.mjs` reads the files back: refitting the exported series
+reproduces the stored slope (worst 1.7e-5 relative, the limit of the rounded
+bundle) and the statistics file copies the bundle unrounded.
+
 ## Deploy to GitHub Pages
 
-The app is built with Vite and served from `dist`. The workflow in
-`.github/workflows/deploy.yml` builds and publishes `dist` whenever `main` is
-pushed. In the repository settings, set **Pages → Build and deployment → Source**
-to **GitHub Actions** once; after that the workflow owns the deployment.
+`dist/` is build output and is not committed. The workflow in
+`.github/workflows/deploy.yml` runs `npm ci && npm run build` on every push to
+`main` and publishes the result **at the site root**, so the pages live at
+`/` and `/app.html` with no `/dist/` in the URL and no second copy of the bundle
+to keep in sync by hand. In the repository settings, **Pages → Build and
+deployment → Source** must be **GitHub Actions**: left on "deploy from a branch",
+GitHub also builds the repository root on every push, and the two publishers
+overwrite each other — one deploy serves the built site, the next serves the Vite
+sources, which is exactly the failure that sent `/dist/index.html` links around.
+`scripts/verify_live.sh` now fails if the live `/app.html` is the source shell or
+if `/dist/index.html` answers again.
 
 Vite uses relative asset paths (`base: "./"`) and the app resolves data,
 textures and point imagery through `import.meta.env.BASE_URL`, so the build works

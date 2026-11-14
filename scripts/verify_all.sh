@@ -17,6 +17,7 @@ node scripts/verify_live_proxy.mjs
 node scripts/verify_red_herring.mjs
 node scripts/verify_ocean.mjs
 node scripts/verify_seaice.mjs
+node scripts/verify_export.mjs
 npm run build
 node scripts/verify_firstload.mjs
 node scripts/verify_app.mjs
