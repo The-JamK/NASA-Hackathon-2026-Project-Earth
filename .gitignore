@@ -12,8 +12,8 @@ __pycache__/
 *.py[cod]
 .pytest_cache/
 
-# Build output
-dist/
+# Build output (dist/ is committed on purpose: GitHub Pages serves this
+# repository folder, so the built site has to live in Git)
 build/
 .next/
 data/cache/

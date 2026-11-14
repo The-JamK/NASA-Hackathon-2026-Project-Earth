@@ -1,0 +1,173 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="theme-color" content="#05080f" />
+    <link
+      rel="icon"
+      href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%2305080f'/%3E%3Ccircle cx='16' cy='16' r='8' fill='none' stroke='%235fd3e0' stroke-width='2'/%3E%3Cpath d='M8 16h16' stroke='%235fd3e0' stroke-width='1.5'/%3E%3C/svg%3E"
+    />
+    <meta
+      name="description"
+      content="Case Files — ask the planet a question and get a defensible case file. NASA Space Apps 2026, Gaussian Frontiers."
+    />
+    <title>Case Files — Gaussian Frontiers</title>
+    <script type="module" crossorigin src="./assets/app.js"></script>
+    <link rel="modulepreload" crossorigin href="./assets/sources.js">
+    <link rel="stylesheet" crossorigin href="./assets/sources.css">
+  </head>
+  <body>
+    <div id="globe" aria-label="Interactive 3D Earth"></div>
+    <div class="vignette" aria-hidden="true"></div>
+
+    <header class="topbar">
+      <a class="brand brand-link" href="./index.html" title="Back to the Case Files overview"
+        >GAUSSIAN<span class="brand-dot">·</span>FRONTIERS</a
+      >
+      <div class="mission">Ask the planet. Get the evidence.</div>
+      <div class="source-strip" id="source-strip" aria-label="Data sources"></div>
+      <button class="ghost-btn" id="global-btn" type="button">Global</button>
+      <button class="ghost-btn" id="method-btn" type="button">Method</button>
+    </header>
+
+    <aside class="panel ask-panel" id="ask-panel">
+      <div class="panel-kicker">Intake</div>
+      <h1>What do you want to investigate?</h1>
+      <p class="panel-lede">
+        Ask about warming, rainfall, soil moisture or sunlight. The intake assistant
+        suggests the variable, place and time; the statistics engine decides the verdict.
+      </p>
+      <form id="ask-form" autocomplete="off">
+        <label class="sr-only" for="ask-input">Ask a question about a place and a trend</label>
+        <input
+          id="ask-input"
+          name="question"
+          type="text"
+          placeholder="Is the Sahel getting drier?"
+          maxlength="180"
+        />
+        <button class="primary-btn" type="submit">Open case</button>
+      </form>
+      <div class="chips" id="suggestions" aria-label="Suggested questions"></div>
+      <div id="plan" class="plan-wrap" aria-live="polite"></div>
+      <div class="panel-foot">Local vector retrieval · every number comes from code</div>
+    </aside>
+
+    <aside class="panel case-panel" id="case-panel" aria-live="polite">
+      <div class="empty-state">
+        <div class="panel-kicker">Case board</div>
+        <h2>No case open.</h2>
+        <p class="panel-lede">
+          Pick a featured case, ask a question, or click a point on the globe.
+        </p>
+        <div class="featured-grid" id="featured-grid"></div>
+        <div class="how">
+          <div class="panel-kicker">How a case works</div>
+          <ol>
+            <li>Ask a question or choose a place.</li>
+            <li>The intake assistant proposes a variable and a record.</li>
+            <li>The stats engine fits the trend and tests it.</li>
+            <li>You get a verdict, a rate, an interval and the limits.</li>
+          </ol>
+        </div>
+      </div>
+    </aside>
+
+    <div class="bottom-bar">
+      <div class="legend" aria-label="Legend">
+        <span><i class="sw warm"></i>significant increase</span>
+        <span><i class="sw cool"></i>significant decrease</span>
+        <span><i class="sw none"></i>not significant</span>
+      </div>
+      <div class="layer-switch" role="group" aria-label="Map layer">
+        <button type="button" data-layer="cities" class="on">Cities</button>
+        <button type="button" data-layer="field">Trend field</button>
+      </div>
+      <div class="hint" id="hint">Drag to rotate · scroll to zoom · click a point</div>
+    </div>
+
+    <div class="loading" id="loading">
+      <div class="loading-mark" aria-hidden="true"></div>
+      <div>
+        <div class="panel-kicker">Case Files</div>
+        <div class="loading-text">Assembling the evidence locker…</div>
+      </div>
+    </div>
+
+    <div class="toast" id="toast" role="status" aria-live="polite"></div>
+
+    <dialog id="method-dialog" class="method-dialog">
+      <div class="dialog-head">
+        <div>
+          <div class="panel-kicker">Method</div>
+          <h2>The contract behind every verdict</h2>
+        </div>
+        <button class="icon-btn" id="close-method" type="button" aria-label="Close method">×</button>
+      </div>
+      <div class="dialog-grid">
+        <section>
+          <h3>What the app does</h3>
+          <p>
+            It fits one straight line to annual means and asks whether the slope is
+            distinguishable from noise. It reports the rate per decade, a 95% interval,
+            the sample size, and the test that produced the verdict.
+          </p>
+          <h3>Statistical contract</h3>
+          <ul>
+            <li>Annual means only; monthly rows are never fitted.</li>
+            <li>OLS slope with Newey–West HAC standard errors.</li>
+            <li>HAC lag <code>L = max(1, floor(4 · (n/100)<sup>2/9</sup>))</code>.</li>
+            <li>Verdict at HAC p &lt; 0.05, using the sign of the slope.</li>
+            <li>95% interval from the HAC SE with Student-t on n − 2 df.</li>
+            <li>Sen's slope as a robust second opinion.</li>
+            <li>Mann–Kendall reported descriptively only.</li>
+            <li>Below 20 annual means: <strong>exploratory</strong>, no significance claim.</li>
+            <li>Map cells use Benjamini–Hochberg q = 0.05 across the grid.</li>
+          </ul>
+        </section>
+        <section>
+          <h3>Data</h3>
+          <ul id="method-sources">
+            <li>NASA GISTEMP v4 — global gridded temperature anomalies, baseline 1951–1980.</li>
+            <li>NASA POWER — point temperature, rainfall, root-zone wetness and solar irradiance, MERRA-2 derived.</li>
+            <li>Meteomatics — current conditions for featured points.</li>
+            <li>NASA Earthdata — MERRA-2 catalogue access check.</li>
+            <li>Sentinel-2 L2A — Copernicus multispectral imagery, mosaicked for featured points by Microsoft Planetary Computer.</li>
+            <li>NASA Blue Marble — globe texture and fallback context when a Sentinel-2 mosaic is unavailable; the card label always names the source actually shown.</li>
+          </ul>
+          <p class="method-note">
+            Featured-point imagery is a low-cloud Sentinel-2 L2A mosaic. The visual
+            asset is true colour TCI (red B04, green B03, blue B02; asset band
+            indices 1, 2, 3; uint8 0–255), served by the Planetary Computer mosaic
+            API. Each case card names its actual source,
+            and <code>data/sentinel_report.json</code> records the STAC item, mosaic
+            request statuses and the signed-COG proof.
+          </p>
+          <h3>What it does not do</h3>
+          <ul>
+            <li>It does not attribute cause.</li>
+            <li>“Not significant” means “not proven”, not “no trend”.</li>
+            <li>Absolute POWER values are not anomalies; GISTEMP is an anomaly.</li>
+            <li>The AI proposes and explains; it never computes a number.</li>
+          </ul>
+        </section>
+      </div>
+      <div class="dialog-foot">
+        <span>Case Files · NASA Space Apps 2026 · Gaussian Frontiers</span>
+        <button class="ghost-btn" id="method-done" type="button">Back to the case</button>
+      </div>
+    </dialog>
+
+    <script>
+      // GitHub Pages serves this folder as-is, so the Vite source reaches the
+      // browser. When the bundle has not applied (no stylesheet at all), hand the
+      // visitor to the built copy committed in ./dist.
+      window.addEventListener("load", function () {
+        if (document.styleSheets.length || location.pathname.indexOf("/dist/") !== -1) return;
+        var page = location.pathname.split("/").pop() || "index.html";
+        location.replace("./dist/" + page + location.search + location.hash);
+      });
+    </script>
+  </body>
+</html>

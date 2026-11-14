@@ -1,0 +1,64 @@
+{
+ "variables": [
+  {
+   "code": "T2M",
+   "label": "Temperature at 2 m",
+   "short": "Temperature",
+   "units": "°C",
+   "source": "NASA POWER (MERRA-2 derived)",
+   "kind": "point",
+   "baseline": "absolute temperature — no anomaly baseline",
+   "description": "Annual mean air temperature two metres above the surface. Use for warming, heat, and cooling questions at a place.",
+   "keywords": "temperature temp warming warmed warm heat hot cold climate air degrees",
+   "supported": true
+  },
+  {
+   "code": "PRECTOTCORR",
+   "label": "Precipitation (corrected)",
+   "short": "Rainfall",
+   "units": "mm/day",
+   "source": "NASA POWER (MERRA-2 derived)",
+   "kind": "point",
+   "baseline": "absolute precipitation — no anomaly baseline",
+   "description": "Annual mean precipitation rate. Use for rain, rainfall, drying, drought, and wetting questions at a place.",
+   "keywords": "rain rainfall raining precipitation dry drier drying drought wet wetter monsoon storm water",
+   "supported": true
+  },
+  {
+   "code": "GWETROOT",
+   "label": "Root-zone soil wetness",
+   "short": "Soil moisture",
+   "units": "fraction",
+   "source": "NASA POWER (MERRA-2 derived)",
+   "kind": "point",
+   "baseline": "absolute wetness fraction",
+   "description": "Annual mean root-zone soil wetness. Use for soil moisture, agricultural drought, and land drying questions.",
+   "keywords": "soil moisture wetness drought agriculture land dryness dry drier declining groundwater root zone",
+   "supported": true
+  },
+  {
+   "code": "ALLSKY_SFC_SW_DWN",
+   "label": "Surface solar irradiance",
+   "short": "Solar radiation",
+   "units": "kWh/m²/day",
+   "source": "NASA POWER (MERRA-2 derived)",
+   "kind": "point",
+   "baseline": "absolute irradiance",
+   "description": "Annual mean all-sky downward shortwave radiation at the surface. Use for sunlight, solar, cloudiness, and radiation questions.",
+   "keywords": "solar sunlight radiation sunshine irradiance cloud cloudiness energy bright brighter dimmer",
+   "supported": true
+  },
+  {
+   "code": "GISTEMP",
+   "label": "Surface temperature anomaly",
+   "short": "Temperature anomaly",
+   "units": "°C",
+   "source": "NASA GISTEMP v4",
+   "kind": "grid",
+   "baseline": "anomalies relative to 1951–1980",
+   "description": "Global gridded surface temperature anomaly. Use for global, regional, continent, and map-scale warming questions with a 1951–1980 baseline.",
+   "keywords": "global planet world earth map region continent temperature warming warmed anomaly gistemp places",
+   "supported": true
+  }
+ ]
+}
