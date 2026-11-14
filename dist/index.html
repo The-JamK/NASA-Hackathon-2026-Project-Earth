@@ -1,0 +1,237 @@
+<!doctype html>
+<html lang="en" class="landing">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="theme-color" content="#05080f" />
+    <link
+      rel="icon"
+      href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%2305080f'/%3E%3Ccircle cx='16' cy='16' r='8' fill='none' stroke='%235fd3e0' stroke-width='2'/%3E%3Cpath d='M8 16h16' stroke='%235fd3e0' stroke-width='1.5'/%3E%3C/svg%3E"
+    />
+    <meta
+      name="description"
+      content="Case Files — ask the planet a question and get a defensible case file: a rate per decade, a 95% interval, a sample size and a verdict. NASA Space Apps 2026, Gaussian Frontiers."
+    />
+    <title>Case Files — Ask the planet. Get the evidence.</title>
+    <script type="module" crossorigin src="./assets/landing.js"></script>
+    <link rel="modulepreload" crossorigin href="./assets/sources.js">
+    <link rel="stylesheet" crossorigin href="./assets/sources.css">
+  </head>
+  <body>
+    <a class="skip-link" href="#main">Skip to content</a>
+
+    <header class="topbar">
+      <div class="brand">GAUSSIAN<span class="brand-dot">·</span>FRONTIERS</div>
+      <div class="mission">Ask the planet. Get the evidence.</div>
+      <a class="ghost-btn cta-ghost" href="./app.html">Open the case</a>
+    </header>
+
+    <main id="main" class="landing-main">
+      <section class="hero" aria-labelledby="hero-title">
+        <div class="hero-copy">
+          <p class="panel-kicker">Case Files · NASA Space Apps 2026</p>
+          <h1 id="hero-title">Ask the planet. Get the evidence.</h1>
+          <p class="hero-lede">
+            Ask about warming, rainfall, soil moisture or sunlight for a place, and get
+            a rate per decade, a 95% interval, a sample size and a verdict.
+          </p>
+          <div class="hero-actions">
+            <a class="primary-btn cta" href="./app.html">Open the case</a>
+            <a class="ghost-btn cta" href="#sample">See a case file</a>
+          </div>
+          <p class="hero-note">
+            Every number is computed by code at build time from a cached NASA record. The
+            assistant proposes and explains; it does not do the arithmetic.
+          </p>
+        </div>
+
+        <figure class="exhibit">
+          <img
+            src="./textures/earth-blue-marble.jpg"
+            width="2048"
+            height="1024"
+            alt="NASA Blue Marble texture used for the globe in the app."
+          />
+          <figcaption>
+            <span>NASA Blue Marble</span>
+            <span>globe texture</span>
+          </figcaption>
+        </figure>
+      </section>
+
+      <section class="section" id="how" aria-labelledby="how-title">
+        <div class="section-head">
+          <div>
+            <p class="panel-kicker">How a case works</p>
+            <h2 id="how-title">Four steps, one claim at a time.</h2>
+          </div>
+          <p class="section-lede">
+            The intake assistant proposes. The statistics engine decides. You get the part
+            you can defend.
+          </p>
+        </div>
+
+        <ol class="steps">
+          <li class="step">
+            <span class="step-num">01 · Intake</span>
+            <h3>Ask a question</h3>
+            <p>
+              Name a place and a change — “Is the Sahel getting drier?” The assistant
+              proposes the variable, the place and the time range, and cites the source it
+              used.
+            </p>
+          </li>
+          <li class="step">
+            <span class="step-num">02 · Evidence</span>
+            <h3>Annual means only</h3>
+            <p>
+              The record is assembled from cached NASA data. Monthly rows are never fitted,
+              and the annual series is drawn next to the fit so you can see the scatter
+              behind the line.
+            </p>
+          </li>
+          <li class="step">
+            <span class="step-num">03 · Forensics</span>
+            <h3>Fit and test</h3>
+            <p>
+              OLS with Newey–West HAC standard errors, a 95% interval from the same errors,
+              and Sen’s slope as a robust second opinion. Mann–Kendall is reported next to
+              the verdict, not used to set it.
+            </p>
+          </li>
+          <li class="step">
+            <span class="step-num">04 · Verdict</span>
+            <h3>Say what it is</h3>
+            <p>
+              Significant increase, significant decrease, not proven, or cold case. The
+              rate, the interval, the sample size and the limits sit beside the stamp.
+            </p>
+          </li>
+        </ol>
+      </section>
+
+      <section class="section" id="sample" aria-labelledby="sample-title">
+        <div class="section-head">
+          <div>
+            <p class="panel-kicker">Sample verdict</p>
+            <h2 id="sample-title">One real case, opened.</h2>
+          </div>
+          <p class="section-lede">
+            Read from the same data bundle the app loads. No number on this page was typed
+            by hand.
+          </p>
+        </div>
+
+        <div class="sample-grid">
+          <div class="sample-card" id="sample-case" aria-live="polite">
+            <p class="warn-note">Loading the case file…</p>
+          </div>
+
+          <div class="sample-notes">
+            <h3 class="notes-title">Read it in this order</h3>
+            <ul class="notes">
+              <li>
+                <b>The stamp</b> is the verdict. “Open and shut” means the slope cleared the
+                test with room to spare.
+              </li>
+              <li>
+                <b>The rate</b> is per decade, and the interval is the 95% range for that
+                rate — not for the raw years.
+              </li>
+              <li>
+                <b>n</b> is the count of annual means. Below 20 the app refuses a
+                significance claim and files the case as exploratory.
+              </li>
+              <li>
+                <b>The p-value</b> comes from the HAC test on the slope. A steep-looking line
+                that fails it is not a trend here.
+              </li>
+            </ul>
+            <p class="sample-foot">
+              <a class="text-link" href="./app.html">Open this case in the app</a> to change
+              the variable, the window, or the place.
+            </p>
+          </div>
+        </div>
+      </section>
+
+      <section class="section" id="contract" aria-labelledby="contract-title">
+        <div class="section-head">
+          <div>
+            <p class="panel-kicker">Why you can trust it</p>
+            <h2 id="contract-title">The contract behind every verdict.</h2>
+          </div>
+        </div>
+
+        <ul class="contract">
+          <li>
+            <b>The AI proposes and explains; it never computes.</b> Every figure on a case
+            file comes from code.
+          </li>
+          <li>
+            Annual means only, fitted with OLS and Newey–West HAC standard errors. The
+            verdict is set at HAC p &lt; 0.05, using the sign of the slope.
+          </li>
+          <li>
+            Sen’s slope is a second opinion. Mann–Kendall is descriptive only, so it cannot
+            promote a case the HAC test would not.
+          </li>
+          <li>
+            Map cells must survive a Benjamini–Hochberg correction at q = 0.05 across the
+            grid, so one lucky cell is not called a trend.
+          </li>
+          <li>
+            Under 20 annual means the case is labelled exploratory. There is no causal
+            attribution, and “not significant” means “not proven”, not “no trend”.
+          </li>
+        </ul>
+
+        <p class="contract-link">
+          <a class="text-link" href="./app.html#method">Open the Method panel</a> to read the
+          full statistical contract, the data sources and the limits.
+        </p>
+      </section>
+
+      <section class="section" id="data" aria-labelledby="data-title">
+        <div class="section-head">
+          <div>
+            <p class="panel-kicker">Data</p>
+            <h2 id="data-title">Where the record comes from.</h2>
+          </div>
+        </div>
+        <p class="sources-line" id="sources-line">
+          NASA GISTEMP v4 · NASA POWER · Meteomatics · NASA Earthdata · Sentinel-2 L2A via
+          Microsoft Planetary Computer · NASA Blue Marble
+        </p>
+        <p class="sources-note">
+          GISTEMP is an anomaly against the 1951–1980 baseline; NASA POWER values are
+          absolute. Featured-point imagery is a low-cloud Sentinel-2 L2A mosaic — contains
+          modified Copernicus Sentinel data, processed by Microsoft Planetary Computer.
+        </p>
+      </section>
+
+      <footer class="landing-footer">
+        <span>Case Files · NASA Space Apps 2026 · Gaussian Frontiers</span>
+        <span class="footer-links">
+          <a
+            class="text-link"
+            href="https://github.com/The-JamK/NASA-Hackathon-2026-Project-Earth"
+            >Source on GitHub</a
+          >
+          <a class="text-link" href="./app.html">Open the app</a>
+        </span>
+      </footer>
+    </main>
+
+    <script>
+      // GitHub Pages serves this folder as-is, so the Vite source reaches the
+      // browser. When the bundle has not applied (no stylesheet at all), hand the
+      // visitor to the built copy committed in ./dist.
+      window.addEventListener("load", function () {
+        if (document.styleSheets.length || location.pathname.indexOf("/dist/") !== -1) return;
+        var page = location.pathname.split("/").pop() || "index.html";
+        location.replace("./dist/" + page + location.search + location.hash);
+      });
+    </script>
+  </body>
+</html>
