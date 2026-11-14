@@ -17,5 +17,22 @@ for file in points.json rag_index.json countries.json; do
   echo "  $file matches dist"
 done
 
+# Every data file the app can ask for must exist on the live origin. A 404 here is
+# how a missing build file hides: the app loads fine, then one feature dies on a
+# fetch nobody watched (an ocean tap, for instance, fetched ocean.json and threw).
+missing=0
+while IFS= read -r path; do
+  rel="${path#dist/}"
+  code=$(curl -s -o /dev/null -w '%{http_code}' --max-time 30 "$BASE/$rel")
+  if [ "$code" != "200" ]; then
+    echo "FAIL: $rel returns $code on the live origin"
+    missing=1
+  fi
+done < <(find dist/data -name '*.json' | sort)
+if [ "$missing" -ne 0 ]; then
+  exit 1
+fi
+echo "  every dist/data/*.json is served"
+
 BASE_URL="$BASE" node scripts/verify_live_plan.mjs
 echo "live verified"
