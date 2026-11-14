@@ -91,19 +91,6 @@ button { color: inherit; }
   white-space: nowrap;
 }
 
-.brand-dot { color: var(--accent); padding: 0 2px; }
-
-.mission {
-  font-size: 10px;
-  letter-spacing: 0.18em;
-  text-transform: uppercase;
-  color: var(--muted);
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  min-width: 0;
-}
-
 .source-strip {
   display: flex;
   align-items: center;
@@ -204,6 +191,10 @@ a.source-pill:focus-visible {
   right: 24px;
   width: 418px;
 }
+
+/* No case open, no case panel: the right side stays clear for the globe. */
+.case-panel { display: none; }
+body.has-case .case-panel { display: block; }
 
 /* Intake and map share the left column: the map sits directly below the case
    search, and the column scrolls as one unit. */
@@ -523,71 +514,6 @@ a.source-pill:focus-visible {
   font-size: 9.5px;
   color: var(--dim);
   line-height: 1.5;
-}
-
-/* ---------- empty case board ---------- */
-
-.empty-state h2 { font-size: 30px; }
-
-.featured-grid {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 6px;
-  margin: 14px 0 18px;
-}
-
-.case-card {
-  text-align: left;
-  padding: 9px 10px 10px;
-  border: 1px solid var(--line);
-  border-radius: 3px;
-  background: rgba(5, 10, 16, 0.42);
-  cursor: pointer;
-  transition: border-color 0.15s ease, background 0.15s ease, transform 0.15s ease;
-}
-
-.case-card:hover {
-  border-color: rgba(95, 211, 224, 0.42);
-  background: rgba(95, 211, 224, 0.05);
-  transform: translateY(-1px);
-}
-
-.case-card .flag {
-  display: block;
-  width: 7px;
-  height: 7px;
-  border-radius: 50%;
-  margin-bottom: 7px;
-  background: var(--flat);
-}
-
-.case-card .name {
-  display: block;
-  font-size: 11px;
-  font-weight: 550;
-  color: var(--text);
-  margin-bottom: 2px;
-}
-
-.case-card .var {
-  display: block;
-  font-size: 8.5px;
-  letter-spacing: 0.12em;
-  text-transform: uppercase;
-  color: var(--muted);
-}
-
-.how {
-  border-top: 1px solid var(--line);
-  padding-top: 14px;
-}
-
-.how ol {
-  margin: 0;
-  padding-left: 17px;
-  color: var(--muted);
-  font-size: 11px;
-  line-height: 1.7;
 }
 
 /* ---------- case file ---------- */
@@ -1126,7 +1052,6 @@ details.work p {
   .left-stack { width: 320px; left: 16px; }
   .case-panel { width: 380px; right: 16px; }
   .topbar { padding: 0 16px; gap: 12px; }
-  .mission { display: none; }
 }
 
 @media (max-width: 900px) {
@@ -1158,7 +1083,6 @@ details.work p {
   .bottom-bar { left: 12px; right: 12px; bottom: 10px; gap: 8px; }
   .hint { display: none; }
   .legend { gap: 8px; font-size: 8px; padding: 6px 8px; }
-  .featured-grid { grid-template-columns: 1fr 1fr; }
   .dialog-grid { grid-template-columns: 1fr; max-height: 58vh; }
   .method-dialog { padding: 16px; }
   .dialog-foot { flex-direction: column; align-items: flex-start; }
@@ -1277,6 +1201,18 @@ html.landing body {
   font-weight: 300;
   letter-spacing: -0.035em;
   line-height: 1.02;
+}
+
+/* The hero's only heading is the page label, so it keeps the kicker's look. */
+.hero h1.panel-kicker {
+  margin: 0 0 9px;
+  max-width: none;
+  font-size: 9px;
+  font-weight: 650;
+  letter-spacing: 0.24em;
+  line-height: 1.4;
+  text-transform: uppercase;
+  color: var(--accent);
 }
 
 .hero-lede {

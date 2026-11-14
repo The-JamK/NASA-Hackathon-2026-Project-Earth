@@ -58,7 +58,6 @@ The confident line that isn't significant. The black box that says "AI found a t
 
 ## Taglines
 
-- Ask the planet. Get the evidence.
 - Every trend is a claim. We test it.
 - AI writes the case file. The data decides the verdict.
 - Don't trust the line. Test it.

@@ -9,16 +9,6 @@ import { SOURCE_LINKS } from "./sources.js";
 import { GAZETTEER, formatLatLon, haversineKm, nearestCell, normalize, resolveLocation } from "./geo.js";
 import { MapView, googleMapsUrl } from "./mapview.js";
 
-const FEATURED_CASES = [
-  { id: "nairobi", code: "T2M", window: "1990-2025", label: "Nairobi warming" },
-  { id: "london", code: "PRECTOTCORR", window: "1990-2025", label: "London rainfall" },
-  { id: "delhi", code: "T2M", window: "2000-2025", label: "Delhi heat" },
-  { id: "manaus", code: "PRECTOTCORR", window: "1990-2025", label: "Amazon drying" },
-  { id: "niamey", code: "PRECTOTCORR", window: "1990-2025", label: "Sahel rainfall" },
-  { id: "tromso", code: "T2M", window: "1990-2025", label: "Arctic warming" },
-  { id: "mcmurdo", code: "T2M", window: "1990-2025", label: "McMurdo red herring" },
-];
-
 const state = {
   variables: [],
   points: [],
@@ -59,7 +49,6 @@ const els = {
   suggestions: document.getElementById("suggestions"),
   plan: document.getElementById("plan"),
   casePanel: document.getElementById("case-panel"),
-  featuredGrid: document.getElementById("featured-grid"),
   loading: document.getElementById("loading"),
   toast: document.getElementById("toast"),
   hint: document.getElementById("hint"),
@@ -137,7 +126,6 @@ async function init() {
     renderSourceStrip();
     renderSuggestions();
     renderLocateSuggestions();
-    renderFeatured();
     renderEmptyCase();
     hideLoading();
     startLiveRefresh();
@@ -514,14 +502,6 @@ function clearCase() {
   els.hint.textContent = "Drag to rotate · scroll to zoom · click a point";
 }
 
-function openFeatured(id, code, windowKey) {
-  const point = state.byId.get(id);
-  if (!point) return;
-  state.variable = code;
-  state.windowKey = windowKey || state.meta.windows[0];
-  selectPoint(point);
-}
-
 /* --------------------------------------------------------------------- map */
 
 // Country outlines already loaded for the globe give an offline geocoder for
@@ -745,11 +725,11 @@ function renderCityCase() {
     ${imagery(point)}
     ${variableChips(variable, false)}
     ${windowChips()}
+    <p class="narrative">${cityNarrative(point, variable, trend, state.windowKey)}</p>
     ${verdictBlock(trend, variable, info)}
     ${caveatBlock(trend, variable, false)}
     <div class="chart" id="case-chart"></div>
     <dl class="facts">${facts(trend, variable, false)}</dl>
-    <p class="narrative">${cityNarrative(point, variable, trend, state.windowKey)}</p>
     ${caseSources(point, variable)}
     ${workBlock("point")}
   `;
@@ -784,11 +764,11 @@ function renderGridCase() {
     <p class="place-sub">${lat} &nbsp;${lon} · GISTEMP v4 · baseline 1951–1980</p>
     ${variableChips(variable, true)}
     ${windowChips()}
+    <p class="narrative">${gridNarrative(cell, trend, variable, state.windowKey)}</p>
     ${verdictBlock(trend, variable, info)}
     ${caveatBlock(trend, variable, true)}
     <div class="chart" id="case-chart"></div>
     <dl class="facts">${facts(trend, variable, true)}</dl>
-    <p class="narrative">${gridNarrative(cell, trend, variable, state.windowKey)}</p>
     ${caseSources(null, variable)}
     ${workBlock("grid")}
   `;
@@ -822,6 +802,7 @@ function renderGlobalCase() {
     <p class="place-sub">GISTEMP v4 · 4° grid · ${counts.cells.toLocaleString()} cells · baseline 1951–1980</p>
     ${variableChips(variable, true)}
     ${windowChips()}
+    <p class="narrative">${globalNarrative(trend, variable, state.windowKey, counts)}</p>
     ${verdictBlock(trend, variable, info)}
     <div class="caveat">
       The global series is an anomaly relative to 1951–1980. The cell counts use
@@ -830,7 +811,6 @@ function renderGlobalCase() {
     </div>
     <div class="chart" id="case-chart"></div>
     <dl class="facts">${facts(trend, variable, false, counts)}</dl>
-    <p class="narrative">${globalNarrative(trend, variable, state.windowKey, counts)}</p>
     ${caseSources(null, variable)}
     ${workBlock("global")}
   `;
@@ -1113,25 +1093,6 @@ function renderSuggestions() {
     .join("");
 }
 
-function renderFeatured() {
-  const grid = document.getElementById("featured-grid");
-  if (!grid) return;
-  grid.innerHTML = FEATURED_CASES.map((item) => {
-    const point = state.byId.get(item.id);
-    if (!point) return "";
-    const trend = point.trends?.[item.code]?.[item.window];
-    const color = trendColor(trend);
-    const variable = state.byCode.get(item.code);
-    return `<button class="case-card" data-action="featured" data-id="${item.id}" data-code="${
-      item.code
-    }" data-window="${item.window}" type="button">
-      <span class="flag" style="background:${color};box-shadow:0 0 8px ${color}55"></span>
-      <span class="name">${escapeHtml(item.label)}</span>
-      <span class="var">${escapeHtml(variable?.short || item.code)}</span>
-    </button>`;
-  }).join("");
-}
-
 function renderPlan(plan) {
   if (!plan) {
     els.plan.innerHTML = "";
@@ -1265,23 +1226,10 @@ function renderSourceStrip() {
     .join("");
 }
 
+// The case panel only exists while a case is open, so there is nothing to draw
+// and nothing to label when the board is empty.
 function renderEmptyCase() {
-  els.casePanel.innerHTML = `<div class="empty-state">
-    <div class="panel-kicker">Case board</div>
-    <h2>No case open.</h2>
-    <p class="panel-lede">Pick a featured case, ask a question, or click a point on the globe.</p>
-    <div class="featured-grid" id="featured-grid"></div>
-    <div class="how">
-      <div class="panel-kicker">How a case works</div>
-      <ol>
-        <li>Ask a question or choose a place.</li>
-        <li>The intake assistant proposes a variable and a record.</li>
-        <li>The stats engine fits the trend and tests it.</li>
-        <li>You get a verdict, a rate, an interval and the limits.</li>
-      </ol>
-    </div>
-  </div>`;
-  renderFeatured();
+  els.casePanel.innerHTML = "";
 }
 
 function showToast(message) {
@@ -1469,9 +1417,6 @@ function bindStaticEvents() {
       renderCase();
       refreshLayer();
       return;
-    }
-    if (name === "featured") {
-      openFeatured(action.dataset.id, action.dataset.code, action.dataset.window);
     }
   });
 

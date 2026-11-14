@@ -91,8 +91,35 @@ if (!main.includes("planCase")) fail("main.js is not wired to the retrieval plan
 if (!main.includes("new MapView")) fail("main.js does not mount the map panel");
 if (!main.includes("resolveLocation")) fail("main.js does not resolve entered locations");
 
+// Chrome copy that was removed on purpose: the tagline, the dot inside the
+// wordmark, the intake label and the case board wording must not come back.
+const TAGLINE = "Ask the planet. Get the evidence.";
+if (html.includes(TAGLINE) || landing.includes(TAGLINE)) fail("the tagline is still on a page");
+if (html.includes("brand-dot") || landing.includes("brand-dot")) {
+  fail("the wordmark still contains the brand dot");
+}
+if (!html.includes("GAUSSIAN FRONTIERS") || !landing.includes("GAUSSIAN FRONTIERS")) {
+  fail("the wordmark is not GAUSSIAN FRONTIERS on both pages");
+}
+if (html.includes(">Intake<")) fail("the intake panel still shows the Intake label");
+if (html.includes("Case board") || main.includes("Case board")) {
+  fail("the case board wording is still present");
+}
+if (!/id="case-panel"[^>]*><\/aside>/.test(html)) {
+  fail("the case panel still ships an empty state instead of staying hidden");
+}
+
+// The narrative paragraph is read before the stamp, the chart and the facts.
+const narrativeAt = main.indexOf('class="narrative"');
+const verdictAt = main.indexOf("${verdictBlock(");
+if (narrativeAt === -1 || verdictAt === -1 || narrativeAt > verdictAt) {
+  fail("the narrative paragraph is not rendered above the verdict block");
+}
+
 console.log(`page: ${BASE}`);
 console.log(`points: ${points.points.length} · grid: ${grid.cells.length} · sources: ${sources.sources.length}`);
 console.log(`assets: 3 textures · ${points.points.filter((point) => point.imagery).length} context images`);
 console.log("map: panel, canvas and locate form served");
+console.log("chrome: tagline, brand dot, Intake label and case board wording removed");
+console.log("case layout: narrative paragraph above the verdict block");
 console.log("app verified");
