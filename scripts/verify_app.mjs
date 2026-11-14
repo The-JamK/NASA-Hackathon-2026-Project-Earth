@@ -35,9 +35,7 @@ for (const marker of [
   'id="ask-form"',
   'id="case-panel"',
   'id="method-dialog"',
-  'id="map-panel"',
-  'id="locate-form"',
-  'id="map-canvas"',
+  'id="recommendation"',
 ]) {
   if (!html.includes(marker)) fail(`app.html is missing ${marker}`);
 }
@@ -88,8 +86,8 @@ for (const point of points.points.filter((item) => item.imagery)) {
 const main = await (await get("/src/main.js", "javascript")).text();
 if (!main.includes("new Globe")) fail("main.js does not mount the globe");
 if (!main.includes("planCase")) fail("main.js is not wired to the retrieval planner");
-if (!main.includes("new MapView")) fail("main.js does not mount the map panel");
-if (!main.includes("resolveLocation")) fail("main.js does not resolve entered locations");
+if (!main.includes("recommendAt")) fail("main.js does not recommend the nearest record on tap");
+if (!main.includes("nearestCell")) fail("main.js does not look up the nearest GISTEMP cell");
 
 // Chrome copy that was removed on purpose: the tagline, the dot inside the
 // wordmark, the intake label and the case board wording must not come back.
@@ -108,6 +106,12 @@ if (html.includes("Case board") || main.includes("Case board")) {
 if (!/id="case-panel"[^>]*><\/aside>/.test(html)) {
   fail("the case panel still ships an empty state instead of staying hidden");
 }
+if (html.includes("map-canvas") || html.includes("locate-form") || main.includes("MapView")) {
+  fail("the map panel is still present");
+}
+if (/google\.com\/maps/i.test(main) || /google\.com\/maps/i.test(html)) {
+  fail("a Google Maps link is still present");
+}
 
 // The narrative paragraph is read before the stamp, the chart and the facts.
 const narrativeAt = main.indexOf('class="narrative"');
@@ -119,7 +123,7 @@ if (narrativeAt === -1 || verdictAt === -1 || narrativeAt > verdictAt) {
 console.log(`page: ${BASE}`);
 console.log(`points: ${points.points.length} · grid: ${grid.cells.length} · sources: ${sources.sources.length}`);
 console.log(`assets: 3 textures · ${points.points.filter((point) => point.imagery).length} context images`);
-console.log("map: panel, canvas and locate form served");
+console.log("recommendation: overlay element served and wired to the tap handler");
 console.log("chrome: tagline, brand dot, Intake label and case board wording removed");
 console.log("case layout: narrative paragraph above the verdict block");
 console.log("app verified");

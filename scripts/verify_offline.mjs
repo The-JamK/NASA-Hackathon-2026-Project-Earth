@@ -21,7 +21,7 @@ const LANDING_LINKS = [
   "https://github.com/The-JamK/NASA-Hackathon-2026-Project-Earth",
 ];
 
-for (const file of ["index.html", "src/main.js", "src/rag.js", "src/chart.js", "src/style.css"]) {
+for (const file of ["index.html", "src/main.js", "src/rag.js", "src/chart.js", "src/style.css", "src/geo.js"]) {
   let text = read(file);
   for (const link of LANDING_LINKS) text = text.split(link).join("");
   if (/https?:\/\//i.test(text)) fail(`${file} contains an external URL`);
@@ -30,19 +30,10 @@ if (/\b(fetch|XMLHttpRequest)\s*\(\s*["'`]https?:/i.test(read("src/main.js"))) {
   fail("main.js performs a remote fetch");
 }
 
-// The map panel draws its base map from the local Blue Marble texture. The only
-// outbound reference allowed is the Google Maps deep link the user can choose to
-// open; there must be no tile server, geocoder or other remote fetch.
-const mapModule = read("src/mapview.js");
-const mapUrls = mapModule.match(/https?:\/\/[^\s"'`)]+/gi) || [];
-const allowedUrls = mapUrls.filter((url) => /^https:\/\/www\.google\.com\/maps\//.test(url));
-if (mapUrls.length !== allowedUrls.length) {
-  fail(`src/mapview.js references an unexpected external URL: ${mapUrls.join(", ")}`);
-}
-if (/\b(fetch|XMLHttpRequest)\s*\(/.test(mapModule)) {
-  fail("src/mapview.js fetches a remote map; the base map must come from the local texture");
-}
-for (const file of ["src/geo.js", "src/mapview.js"]) {
+// The tap recommendation is pure geometry over the cached bundle: no map tiles,
+// no geocoder, no outbound link.
+for (const file of ["src/geo.js"]) {
+  if (/https?:\/\//i.test(read(file))) fail(`${file} contains an external URL`);
   if (/\b(fetch|XMLHttpRequest)\s*\(/.test(read(file))) fail(`${file} performs a network call`);
 }
 
@@ -89,7 +80,7 @@ if (failures) {
 }
 
 console.log("network: no external URLs in the app source");
-console.log("map: base map from the local Blue Marble texture; Google Maps is an outbound link only");
+console.log("recommendation: nearest station and cell computed from the cached bundle, no map service");
 console.log(`bundle: ${points.points.length} points · ${grid.cells.length} grid cells · ${grid.meta.global.series.length} global years`);
 console.log(`imagery: ${points.points.filter((point) => point.imagery).length} local context images`);
 console.log("offline verified");

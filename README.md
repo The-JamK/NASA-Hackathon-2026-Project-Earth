@@ -46,21 +46,19 @@ Vite uses relative asset paths (`base: "./"`) and the app resolves data,
 textures and point imagery through `import.meta.env.BASE_URL`, so the build works
 under the repository subpath rather than only at the domain root.
 
-## Map panel
+## Tap anywhere on the globe
 
-The left column links the 3D globe to a map. Enter a place or a coordinate
-(`Kigali`, `-1.29, 36.82`, `1°17′S 36°49′E`) and the app finds the closest record
-it holds, opens that case, and shows the distance and bearing on a small map. When
-the nearest GISTEMP cell is closer than the nearest station, the map readout
-offers that cell as a second option. Selecting a point on the globe centres the
-map on it; clicking the map searches that spot.
+Tapping the globe answers with the records closest to that coordinate. A yellow
+marker sits on the tapped point, two dashed yellow arcs run to the nearest station
+and to the nearest GISTEMP cell, each with its distance printed on the globe, and a
+small card beside the point lists both records with their distances, a compass
+bearing for the station, and an **Open** button for each.
 
-The base map is the local NASA Blue Marble texture cropped to the search area, so
-the panel needs no tile server or API key. **Google Maps** is an outbound link for
-the searched coordinate, not an embedded layer. Names resolve through the station
-bundle, the country outlines already loaded for the globe, and an offline
-gazetteer in `src/geo.js`; `node scripts/verify_locate.mjs` checks that resolution
-without a browser.
+Tapping inside a station's halo (1.6° around the dot) opens that station directly
+instead of recommending neighbours, so the globe still behaves like a case browser.
+The recommendation is local geometry over the cached bundle: no map tiles, no
+geocoder, no outbound link. `node scripts/verify_locate.mjs` checks the nearest
+record and the nearest cell against a brute-force minimum without a browser.
 
 Station dots carry a faint halo, which is also the hover target: while the cursor
 is anywhere inside that area the dot grows, its halo lights up, and a click opens

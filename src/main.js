@@ -1,13 +1,12 @@
 import Globe from "globe.gl";
-import { DoubleSide, Mesh, MeshBasicMaterial, RingGeometry, Vector3 } from "three";
+import { CircleGeometry, DoubleSide, Group, Mesh, MeshBasicMaterial, RingGeometry, Vector3 } from "three";
 import { feature } from "topojson-client";
 import world from "world-atlas/countries-110m.json";
 import "./style.css";
 import { planCase } from "./rag.js";
 import { renderSeriesChart, trendColor } from "./chart.js";
 import { SOURCE_LINKS } from "./sources.js";
-import { GAZETTEER, formatLatLon, haversineKm, nearestCell, normalize, resolveLocation } from "./geo.js";
-import { MapView, googleMapsUrl } from "./mapview.js";
+import { formatLatLon, haversineKm, nearestCell, nearestRecord } from "./geo.js";
 
 const state = {
   variables: [],
@@ -25,8 +24,7 @@ const state = {
   selected: null,
   selectedKind: null,
   plan: null,
-  locate: null,
-  map: null,
+  recommendation: null,
   hovered: null,
 };
 
@@ -57,13 +55,7 @@ const els = {
   globalBtn: document.getElementById("global-btn"),
   closeMethod: document.getElementById("close-method"),
   methodDone: document.getElementById("method-done"),
-  mapPanel: document.getElementById("map-panel"),
-  mapCanvas: document.getElementById("map-canvas"),
-  mapReadout: document.getElementById("map-readout"),
-  mapExternal: document.getElementById("map-external"),
-  locateForm: document.getElementById("locate-form"),
-  locateInput: document.getElementById("locate-input"),
-  locateSuggestions: document.getElementById("locate-suggestions"),
+  recommendation: document.getElementById("recommendation"),
 };
 
 let globe;
@@ -116,16 +108,14 @@ async function init() {
         selectGlobal,
         refreshLayer,
         renderCase,
-        locateFromInput,
-        syncMap,
+        recommendAt,
+        clearRecommendation,
       };
     }
 
     buildGlobe();
-    buildMap();
     renderSourceStrip();
     renderSuggestions();
-    renderLocateSuggestions();
     renderEmptyCase();
     hideLoading();
     startLiveRefresh();
@@ -171,26 +161,33 @@ function buildGlobe() {
     .pointResolution(6)
     .pointsTransitionDuration(0)
     .pointsMerge(false)
-    .customLayerData(state.points)
-    .customThreeObject(haloObject)
-    .customThreeObjectUpdate(haloUpdate)
-    .onPointClick((point) => selectPoint(point))
+    .customLayerData([])
+    .customThreeObject(customLayerObject)
+    .customThreeObjectUpdate(customLayerUpdate)
+    .arcsData([])
+    .arcStartLat("startLat")
+    .arcStartLng("startLng")
+    .arcEndLat("endLat")
+    .arcEndLng("endLng")
+    .arcColor(() => ["rgba(255, 209, 102, 0.2)", RECOMMENDATION_COLOR])
+    .arcStroke(RECOMMENDATION_STROKE)
+    .arcDashLength(0.35)
+    .arcDashGap(0.2)
+    .arcDashAnimateTime(2600)
+    .arcAltitudeAutoScale(0.35)
+    .arcsTransitionDuration(0)
+    .arcLabel((arc) => arc.distance)
+    .labelsData([])
+    .labelLat("lat")
+    .labelLng("lng")
+    .labelText("text")
+    .labelColor(() => RECOMMENDATION_COLOR)
+    .labelSize("size")
+    .labelDotRadius(0.4)
+    .labelAltitude(0.016)
+    .labelResolution(3)
+    .labelsTransitionDuration(0)
     .onPointHover((point) => setHoveredPoint(point))
-    .onGlobeClick(({ lat, lng }) => {
-      if (state.layer === "cities") {
-        const near = nearestWithin(lat, lng, HOVER_AREA_DEG);
-        if (near) {
-          selectPoint(near);
-          return;
-        }
-        const found = nearestCity(lat, lng);
-        if (found) selectPoint(found);
-        else showToast("No station nearby. Turn on Trend field for the gridded view.");
-        return;
-      }
-      const found = nearestGrid(lat, lng);
-      if (found) selectPoint(found);
-    })
     .ringColor(() => ["rgba(95, 211, 224, 0.65)", "rgba(95, 211, 224, 0)"])
     .ringMaxRadius(2.8)
     .ringPropagationSpeed(1.5)
@@ -215,6 +212,11 @@ function buildGlobe() {
   const canvas = globe.renderer().domElement;
   canvas.addEventListener("pointermove", handleCanvasPointerMove);
   canvas.addEventListener("pointerleave", () => setHoveredPoint(null));
+  canvas.addEventListener("pointerdown", startGlobeTap);
+  canvas.addEventListener("pointerup", finishGlobeTap);
+  canvas.addEventListener("pointercancel", () => {
+    tapOrigin = null;
+  });
 
   refreshLayer();
 }
@@ -253,6 +255,10 @@ const HALO_INNER = 1.15;
 const HALO_OUTER = 2.2;
 const HALO_HOVER_SCALE = 1.8;
 const HALO_ALTITUDE = 0.006;
+const RECOMMENDATION_COLOR = "#ffd166";
+const RECOMMENDATION_STROKE = 0.35;
+const TAP_MARKER_INNER = 0.85;
+const TAP_MARKER_OUTER = 1.45;
 
 function haloObject(point) {
   const material = new MeshBasicMaterial({
@@ -268,10 +274,32 @@ function haloObject(point) {
   return mesh;
 }
 
-function haloUpdate(mesh, point) {
-  const coords = globe.getCoords(point.lat, point.lon, HALO_ALTITUDE);
-  mesh.position.set(coords.x, coords.y, coords.z);
-  mesh.quaternion.setFromUnitVectors(new Vector3(0, 0, 1), mesh.position.clone().normalize());
+// The same custom layer carries the station halos and the yellow marker on the
+// tapped point, so both follow the globe's surface with one digest.
+function customLayerObject(datum) {
+  return datum.kind === "tap" ? tapMarkerObject() : haloObject(datum);
+}
+
+function customLayerUpdate(object, datum) {
+  const coords = globe.getCoords(datum.lat, datum.lon, HALO_ALTITUDE);
+  object.position.set(coords.x, coords.y, coords.z);
+  object.quaternion.setFromUnitVectors(new Vector3(0, 0, 1), object.position.clone().normalize());
+}
+
+function tapMarkerObject() {
+  const material = (opacity) =>
+    new MeshBasicMaterial({
+      color: RECOMMENDATION_COLOR,
+      transparent: true,
+      opacity,
+      side: DoubleSide,
+      depthWrite: false,
+    });
+  const group = new Group();
+  group.add(new Mesh(new CircleGeometry(TAP_MARKER_INNER, 32), material(0.32)));
+  group.add(new Mesh(new RingGeometry(TAP_MARKER_INNER * 1.3, TAP_MARKER_OUTER, 44), material(0.95)));
+  group.renderOrder = 3;
+  return group;
 }
 
 function haloOpacity(point) {
@@ -338,6 +366,33 @@ function nearestWithin(lat, lng, maxDegrees) {
   return best;
 }
 
+let tapOrigin = null;
+
+function startGlobeTap(event) {
+  if (event.button !== 0) return;
+  tapOrigin = { x: event.clientX, y: event.clientY, time: performance.now(), id: event.pointerId };
+}
+
+// globe.gl only resolves a click when the pointer already hovered the globe, which
+// never happens on a touchscreen. Read the tap straight off the canvas instead, so
+// the first tap on the world both works and lands on the right coordinates.
+function finishGlobeTap(event) {
+  const origin = tapOrigin;
+  tapOrigin = null;
+  if (!origin || origin.id !== event.pointerId || !globe) return;
+  if (Math.hypot(event.clientX - origin.x, event.clientY - origin.y) > 6) return;
+  if (performance.now() - origin.time > 700) return;
+  const rect = globe.renderer().domElement.getBoundingClientRect();
+  const coords = globe.toGlobeCoords(event.clientX - rect.left, event.clientY - rect.top);
+  if (!coords) return;
+  const near = state.layer === "cities" ? nearestWithin(coords.lat, coords.lng, HOVER_AREA_DEG) : null;
+  if (near) {
+    selectPoint(near);
+    return;
+  }
+  recommendAt(coords.lat, coords.lng);
+}
+
 function handleCanvasPointerMove(event) {
   if (state.layer !== "cities" || event.buttons !== 0) return;
   const rect = globe.renderer().domElement.getBoundingClientRect();
@@ -382,68 +437,26 @@ function refreshLayer() {
   state.hovered = null;
   const data = state.layer === "field" ? state.gridPoints : state.points;
   globe.pointsData(data);
-  if (state.layer === "cities") {
-    globe.customLayerData(state.points);
-  } else {
+  if (state.layer === "field") {
     for (const point of state.points) delete point.__halo;
-    globe.customLayerData([]);
   }
+  syncCustomLayer();
   globe.ringsData(
     state.selected && !state.selected.global
       ? [{ lat: state.selected.lat, lng: state.selected.lon }]
       : []
   );
   refreshHalos();
-  syncMap();
   document.querySelectorAll(".layer-switch button").forEach((button) => {
     button.classList.toggle("on", button.dataset.layer === state.layer);
   });
-}
-
-function nearestCity(lat, lng) {
-  let best = null;
-  let bestDistance = Infinity;
-  for (const point of state.points) {
-    const distance = haversine(lat, lng, point.lat, point.lon);
-    if (distance < bestDistance) {
-      best = point;
-      bestDistance = distance;
-    }
-  }
-  if (!best) return null;
-  if (bestDistance > 13) {
-    showToast(`Nearest city is ${Math.round(bestDistance * 111)} km away — showing ${best.name}.`);
-  }
-  return best;
-}
-
-function nearestGrid(lat, lng) {
-  let best = null;
-  let bestDistance = Infinity;
-  for (const cell of state.gridPoints) {
-    const distance = haversine(lat, lng, cell.lat, cell.lon);
-    if (distance < bestDistance) {
-      best = cell;
-      bestDistance = distance;
-    }
-  }
-  return best;
-}
-
-function haversine(lat1, lon1, lat2, lon2) {
-  const rad = Math.PI / 180;
-  const dLat = (lat2 - lat1) * rad;
-  const dLon = (lon2 - lon1) * rad;
-  const a =
-    Math.sin(dLat / 2) ** 2 +
-    Math.cos(lat1 * rad) * Math.cos(lat2 * rad) * Math.sin(dLon / 2) ** 2;
-  return (2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a))) / rad;
 }
 
 /* --------------------------------------------------------------- selection */
 
 function selectPoint(point, options = {}) {
   if (!point) return;
+  clearRecommendation();
   state.selected = point;
   state.selectedKind = point.isGrid ? "grid" : "city";
   state.layer = point.isGrid ? "field" : "cities";
@@ -466,16 +479,13 @@ function selectPoint(point, options = {}) {
     globe.controls().autoRotate = false;
     clearTimeout(autoRotateTimer);
   }
-  if (state.map && options.centerMap !== false) {
-    state.map.centerOn(point.lat, point.lon, point.isGrid ? 42 : 26);
-  }
-  syncMap();
   els.hint.textContent = point.isGrid
     ? "GISTEMP cell · click another cell"
     : `${point.name} · ${state.byCode.get(state.variable)?.short || "trend"}`;
 }
 
 function selectGlobal(windowKey = state.windowKey) {
+  clearRecommendation();
   state.selected = { global: true, name: "Global", lat: 12, lon: 0 };
   state.selectedKind = "global";
   state.variable = "GISTEMP";
@@ -486,8 +496,6 @@ function selectGlobal(windowKey = state.windowKey) {
   refreshLayer();
   globe.pointOfView({ lat: 12, lng: 8, altitude: 3.0 }, 900);
   globe.controls().autoRotate = true;
-  if (state.map) state.map.centerOn(12, 8, 120);
-  syncMap();
   els.hint.textContent = "Global field · click a cell or a city";
 }
 
@@ -498,175 +506,161 @@ function clearCase() {
   renderEmptyCase();
   refreshLayer();
   globe.controls().autoRotate = true;
-  syncMap();
-  els.hint.textContent = "Drag to rotate · scroll to zoom · click a point";
+  els.hint.textContent = "Drag to rotate · scroll to zoom · tap anywhere to find the nearest record";
 }
 
-/* --------------------------------------------------------------------- map */
+/* ----------------------------------------------------- tap recommendation */
 
-// Country outlines already loaded for the globe give an offline geocoder for
-// country names: the centroid of the country's largest ring is the target, and
-// the nearest record is what the case shows.
-function buildCountryCentroids() {
-  const map = new Map();
-  for (const country of countryFeatures || []) {
-    const label = country.properties?.name;
-    if (!label) continue;
-    const centre = largestRingCentroid(country.geometry);
-    if (centre) map.set(normalize(label), { ...centre, label });
+// Tapping the globe answers "what do you have near here?" without leaving it: a
+// yellow marker on the tap, dashed yellow arcs to the closest station and the
+// closest GISTEMP cell, their distances written on the globe, and a small card
+// that can open either record.
+
+let recommendationFrame = 0;
+let customLayerKey = "";
+
+function recommendAt(lat, lng) {
+  if (!globe) return;
+  state.recommendation = {
+    target: { lat, lng },
+    station: nearestRecord(lat, lng, state.points),
+    cell: nearestCell(lat, lng, state.gridPoints),
+  };
+  globe.controls().autoRotate = false;
+  clearTimeout(autoRotateTimer);
+  syncCustomLayer();
+  renderRecommendationOverlay();
+  els.hint.textContent = "Nearest station and cell to the tapped point";
+}
+
+function clearRecommendation() {
+  if (!state.recommendation) return;
+  state.recommendation = null;
+  if (globe) {
+    globe.arcsData([]);
+    globe.labelsData([]);
   }
-  return map;
-}
-
-function largestRingCentroid(geometry) {
-  if (!geometry) return null;
-  const polygons = geometry.type === "Polygon" ? [geometry.coordinates] : geometry.coordinates || [];
-  let best = null;
-  for (const rings of polygons) {
-    const ring = rings?.[0];
-    if (!ring || ring.length < 4) continue;
-    let twiceArea = 0;
-    let cx = 0;
-    let cy = 0;
-    for (let index = 0; index < ring.length - 1; index += 1) {
-      const [x1, y1] = ring[index];
-      const [x2, y2] = ring[index + 1];
-      const cross = x1 * y2 - x2 * y1;
-      twiceArea += cross;
-      cx += (x1 + x2) * cross;
-      cy += (y1 + y2) * cross;
-    }
-    const area = twiceArea / 2;
-    if (Math.abs(area) < 1e-6) continue;
-    if (!best || Math.abs(area) > best.area) {
-      best = { lat: cy / (6 * area), lon: cx / (6 * area), area: Math.abs(area) };
-    }
+  syncCustomLayer();
+  stopRecommendationFrame();
+  if (els.recommendation) {
+    els.recommendation.hidden = true;
+    els.recommendation.innerHTML = "";
   }
-  return best ? { lat: best.lat, lon: best.lon } : null;
 }
 
-function countryCentroid(name) {
-  if (!countryShapes) countryShapes = buildCountryCentroids();
-  return countryShapes.get(normalize(name)) || null;
+// One custom layer holds the station halos and, while a recommendation is up,
+// the marker on the tapped point. three-globe re-digests the whole layer when the
+// data identity changes, so hand it a new array only when the contents change.
+function syncCustomLayer() {
+  if (!globe) return;
+  const rec = state.recommendation;
+  const key = `${state.layer}|${rec ? `${rec.target.lat},${rec.target.lng}` : ""}`;
+  if (key !== customLayerKey) {
+    customLayerKey = key;
+    const entries = state.layer === "cities" ? [...state.points] : [];
+    if (rec) entries.push({ kind: "tap", lat: rec.target.lat, lon: rec.target.lng });
+    globe.customLayerData(entries);
+  }
+  refreshHalos();
 }
 
-function buildMap() {
-  if (!els.mapCanvas) return;
-  state.map = new MapView({
-    canvas: els.mapCanvas,
-    textureUrl: assetUrl("/textures/earth-blue-marble.jpg"),
-    points: state.points,
-    colorFor: (point) => pointColor(point),
-    onPick: (lat, lon) => locateFromInput(`${lat.toFixed(4)}, ${lon.toFixed(4)}`, { centerMap: false }),
-  });
-  syncMap();
+function renderRecommendationOverlay() {
+  const rec = state.recommendation;
+  if (!rec || !globe) return;
+  const arcs = [];
+  // The card already names the tapped coordinates, so the globe only carries the
+  // two yellow distances to keep the overlay legible.
+  const labels = [];
+  for (const entry of [rec.station, rec.cell]) {
+    if (!entry) continue;
+    const target = entry.point || entry.cell;
+    arcs.push({
+      startLat: rec.target.lat,
+      startLng: rec.target.lng,
+      endLat: target.lat,
+      endLng: target.lon,
+      distance: distanceText(entry.km),
+    });
+    labels.push({
+      lat: target.lat,
+      lng: target.lon,
+      text: distanceText(entry.km),
+      size: 1,
+    });
+  }
+  globe.arcsData(arcs);
+  globe.labelsData(labels);
+  renderRecommendationCard();
 }
 
-function locateFromInput(text, { centerMap = true } = {}) {
-  const raw = String(text ?? "").trim();
-  if (!raw) return;
-  const result = resolveLocation(raw, { points: state.points, countryCentroid });
-  if (!result.ok) {
-    state.locate = { target: null, nearest: null, cell: null, error: result.reason };
-    syncMap();
-    showToast("No match in the offline place index.");
+function renderRecommendationCard() {
+  const el = els.recommendation;
+  const rec = state.recommendation;
+  if (!el) return;
+  if (!rec) {
+    el.hidden = true;
+    el.innerHTML = "";
     return;
   }
-  applyLocation(result, { centerMap });
+  const station = rec.station;
+  const cell = rec.cell;
+  const offset = station && station.km > 1 ? ` ${escapeHtml(station.direction)}` : "";
+  el.innerHTML = `
+    <button class="rec-close" type="button" data-action="close-recommendation" aria-label="Close recommendation">×</button>
+    <div class="rec-target">${escapeHtml(formatLatLon(rec.target.lat, rec.target.lng))}</div>
+    <div class="rec-row">
+      <span class="rec-kind">Nearest station</span>
+      <b>${escapeHtml(station?.point?.name || "none")}</b>
+      <span class="rec-distance">${station ? `${distanceText(station.km)}${offset}` : "—"}</span>
+      ${station ? `<button type="button" data-action="open-station">Open</button>` : ""}
+    </div>
+    <div class="rec-row">
+      <span class="rec-kind">GISTEMP cell</span>
+      <b>${escapeHtml(cell?.cell?.name || "none")}</b>
+      <span class="rec-distance">${cell ? distanceText(cell.km) : "—"}</span>
+      ${cell ? `<button type="button" data-action="open-cell">Open</button>` : ""}
+    </div>
+  `;
+  el.hidden = false;
+  positionRecommendationCard();
+  startRecommendationFrame();
 }
 
-function applyLocation(result, { centerMap = true } = {}) {
-  const cell = nearestCell(result.target.lat, result.target.lon, state.gridPoints);
-  state.locate = { target: result.target, nearest: result.nearest, cell, error: null };
-  if (result.nearest?.point) {
-    selectPoint(result.nearest.point, { centerMap });
-  } else {
-    if (centerMap && globe) {
-      globe.pointOfView({ lat: result.target.lat, lng: result.target.lon, altitude: 2.2 }, 900);
-    }
-    syncMap();
-  }
-  if (result.target.kind === "coordinates" && result.nearest) {
-    showToast(
-      `${distanceText(result.nearest.km)} to ${result.nearest.point.name} — the nearest record for this area.`
-    );
-  }
+// Keep the card beside the tapped point as the globe moves, and hide it when the
+// point has rotated behind the globe.
+function positionRecommendationCard() {
+  const el = els.recommendation;
+  const rec = state.recommendation;
+  if (!el || !rec || !globe) return;
+  const { x, y, z } = globe.getCoords(rec.target.lat, rec.target.lng, 0);
+  const facing = new Vector3(x, y, z).normalize().dot(globe.camera().position) > 100;
+  el.style.opacity = facing ? "1" : "0";
+  el.style.pointerEvents = facing ? "auto" : "none";
+  if (!facing) return;
+  const screen = globe.getScreenCoords(rec.target.lat, rec.target.lng, 0.01);
+  const width = el.offsetWidth || 250;
+  const height = el.offsetHeight || 140;
+  const left = Math.min(Math.max(screen.x + 18, 12), window.innerWidth - width - 12);
+  const top = Math.min(Math.max(screen.y + 18, 74), window.innerHeight - height - 58);
+  el.style.transform = `translate(${Math.round(left)}px, ${Math.round(top)}px)`;
 }
 
-function syncMap() {
-  if (!state.map) return;
-  const selected = state.selected && !state.selected.global ? state.selected : null;
-  const nearest = state.locate?.nearest?.point ? state.locate.nearest : null;
-  state.map.setPoints(state.points);
-  state.map.setSelected(selected);
-  state.map.setTarget(state.locate?.target || null, nearest, state.locate?.cell || null);
-  state.map.draw();
-  renderMapReadout();
-  const anchor = state.locate?.target || selected;
-  if (els.mapExternal && anchor) {
-    els.mapExternal.href = googleMapsUrl(anchor.lat, anchor.lon);
-    els.mapExternal.removeAttribute("aria-disabled");
-  }
+function startRecommendationFrame() {
+  if (recommendationFrame) return;
+  const tick = () => {
+    if (!state.recommendation) {
+      recommendationFrame = 0;
+      return;
+    }
+    positionRecommendationCard();
+    recommendationFrame = requestAnimationFrame(tick);
+  };
+  recommendationFrame = requestAnimationFrame(tick);
 }
 
-function renderMapReadout() {
-  if (!els.mapReadout) return;
-  const locate = state.locate;
-  const selected = state.selected && !state.selected.global ? state.selected : null;
-  const rows = [];
-
-  if (locate?.error) {
-    rows.push(`<div class="map-point is-miss"><span>Not found</span>${escapeHtml(locate.error)}</div>`);
-    els.mapReadout.innerHTML = rows.join("");
-    return;
-  }
-
-  if (locate?.target) {
-    rows.push(
-      `<div class="map-point is-target"><span>Search</span><b>${escapeHtml(
-        locate.target.label
-      )}</b>${escapeHtml(formatLatLon(locate.target.lat, locate.target.lon))}</div>`
-    );
-    const nearest = locate.nearest;
-    if (nearest?.point) {
-      const offset = nearest.km > 1 ? ` ${escapeHtml(nearest.direction)}` : "";
-      rows.push(
-        `<div class="map-point"><span>Nearest station</span><b>${escapeHtml(
-          nearest.point.name
-        )}</b>${distanceText(nearest.km)}${offset}<button type="button" data-action="open-nearest">Open</button></div>`
-      );
-    } else {
-      rows.push(`<div class="map-point"><span>Nearest station</span>none in the bundle</div>`);
-    }
-    const cell = locate.cell;
-    if (cell && (!nearest || cell.km < nearest.km - 1)) {
-      rows.push(
-        `<div class="map-point"><span>GISTEMP cell</span><b>${escapeHtml(
-          cell.cell.name
-        )}</b>${distanceText(cell.km)}<button type="button" data-action="open-cell">Open</button></div>`
-      );
-    }
-    if (nearest && nearest.km > 150) {
-      rows.push(
-        `<p class="map-note">Closest record to this point, not an interpolation: the trend is the station's own series.</p>`
-      );
-    } else {
-      rows.push(`<p class="map-note">Drag the map, scroll to zoom, click anywhere to search that spot.</p>`);
-    }
-  } else if (selected) {
-    rows.push(
-      `<div class="map-point"><span>Selected</span><b>${escapeHtml(
-        selected.name || "Point"
-      )}</b>${escapeHtml(formatLatLon(selected.lat, selected.lon))}</div>`
-    );
-    rows.push(`<p class="map-note">Drag the map, scroll to zoom, click anywhere to search that spot.</p>`);
-  } else {
-    rows.push(
-      `<div class="map-empty">Click the map or enter a place to compare it with the nearest record.</div>`
-    );
-  }
-
-  els.mapReadout.innerHTML = rows.join("");
+function stopRecommendationFrame() {
+  if (recommendationFrame) cancelAnimationFrame(recommendationFrame);
+  recommendationFrame = 0;
 }
 
 function distanceText(km) {
@@ -674,21 +668,6 @@ function distanceText(km) {
   if (km < 1) return "< 1 km";
   if (km < 10) return `${km.toFixed(1)} km`;
   return `${Math.round(km).toLocaleString()} km`;
-}
-
-function renderLocateSuggestions() {
-  if (!els.locateSuggestions) return;
-  const names = new Set();
-  for (const point of state.points) {
-    names.add(point.name);
-    if (point.country && point.country !== point.continent) names.add(point.country);
-    for (const alias of point.aliases || []) names.add(alias);
-  }
-  for (const [name] of GAZETTEER) names.add(name);
-  els.locateSuggestions.innerHTML = [...names]
-    .sort((a, b) => a.localeCompare(b))
-    .map((name) => `<option value="${escapeHtml(name)}"></option>`)
-    .join("");
 }
 
 /* ------------------------------------------------------------------- cases */
@@ -1438,34 +1417,20 @@ function bindStaticEvents() {
     if (event.target === els.methodDialog) els.methodDialog.close();
   });
 
-  els.locateForm?.addEventListener("submit", (event) => {
-    event.preventDefault();
-    locateFromInput(els.locateInput.value);
-  });
-
-  // On a short viewport the map panel is the second panel in the column; bring it
-  // into view as soon as the visitor starts using it.
-  els.locateInput?.addEventListener("focus", () => {
-    els.mapPanel?.scrollIntoView({ block: "nearest", behavior: "smooth" });
-  });
-
-  els.mapPanel?.addEventListener("click", (event) => {
-    const action = event.target.closest("[data-action], [data-map-action]");
-    if (!action || !els.mapPanel.contains(action)) return;
-    if (action.dataset.mapAction === "zoom-in") {
-      state.map?.zoomBy(0.7);
+  els.recommendation?.addEventListener("click", (event) => {
+    const action = event.target.closest("[data-action]");
+    if (!action || !els.recommendation.contains(action)) return;
+    const rec = state.recommendation;
+    if (action.dataset.action === "close-recommendation") {
+      clearRecommendation();
       return;
     }
-    if (action.dataset.mapAction === "zoom-out") {
-      state.map?.zoomBy(1.4);
+    if (action.dataset.action === "open-station" && rec?.station?.point) {
+      selectPoint(rec.station.point);
       return;
     }
-    if (action.dataset.action === "open-nearest" && state.locate?.nearest?.point) {
-      selectPoint(state.locate.nearest.point, { centerMap: false });
-      return;
-    }
-    if (action.dataset.action === "open-cell" && state.locate?.cell?.cell) {
-      selectPoint(state.locate.cell.cell, { centerMap: false });
+    if (action.dataset.action === "open-cell" && rec?.cell?.cell) {
+      selectPoint(rec.cell.cell);
     }
   });
 }

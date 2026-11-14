@@ -59,29 +59,29 @@ Last verified: 2026-11-14
   EXPECT: `./assets`, data, textures and point imagery all return 200; app opens a case
   EVIDENCE: built `dist/index.html` references `./assets/...`; local subpath test returned 200 for JS, CSS, `data/points.json`, all three globe textures and `data/imagery/nairobi-sentinel.jpg`; Nairobi case opened with a 640×360 image and no console errors. `.github/workflows/deploy.yml` publishes `dist` through GitHub Actions.
 
-- [x] G12: A place name or a coordinate resolves to the nearest record the bundle holds, covering decimal pairs, DMS, hemisphere suffixes, station names, aliases, countries and the offline gazetteer.
+- [x] G12: A tapped coordinate resolves to the nearest station the bundle holds and to the nearest GISTEMP cell, both being the true minimum, with distance and bearing.
   CHECK: node scripts/verify_locate.mjs
   EXPECT: locate verified
-  EVIDENCE: 28 checks over 45 stations and 4,039 grid cells; decimal, degree/minute, hemisphere, station, alias (Sahel → Niamey), country (Kenya → Nairobi), gazetteer (Kigali) and country-centroid lookups resolve; unknown input and out-of-range pairs are rejected; the nearest record is the haversine minimum.
+  EVIDENCE: 24 assertions over 45 stations and 4,039 cells; nearest station and nearest cell equal a brute-force haversine minimum at the Sahara, London, Sydney, mid-Pacific, Kigali and Reykjavik taps; equatorial distance 1,113.19 km, symmetry, zero-distance, compass strings (E/S/N/NW), coordinate formatting, and null returns on an empty bundle and an empty grid.
 
-- [x] G13: The map panel is served with the app: locate form, canvas, halo markers, and main.js mounts both the globe and the map.
+- [x] G13: The app ships the tap recommendation instead of the map panel: `#recommendation` is served, `recommendAt`/`nearestCell` are wired, and no map panel, locate form, map canvas, `MapView` or Google Maps link remains.
   CHECK: node scripts/verify_app.mjs
   EXPECT: app verified
-  EVIDENCE: page, 45 points, 4,039 grid cells, 3 textures, 11 context images; `#map-panel`, `#locate-form` and `#map-canvas` present; `new MapView` and `resolveLocation` wired in main.js.
+  EVIDENCE: page, 45 points, 4,039 grid cells, 3 textures, 11 context images; output lines `recommendation: overlay element served and wired to the tap handler` and `chrome: …`; the check now fails on `#map-panel`, `#locate-form`, `#map-canvas`, `MapView` or any `google.com/maps` reference and passes.
 
-- [x] G14: The production build succeeds with the map panel and halo layer.
+- [x] G14: The production build succeeds with the tap recommendation and halo layer.
   CHECK: npm run build
   EXPECT: built in
-  EVIDENCE: built in 7.53s on the final source; only the existing chunk-size warning.
+  EVIDENCE: built in 6.67s on the final source; only the existing chunk-size warning.
 
-- [x] G15: The base map is local: no tile server, geocoder or remote fetch, and the only outbound URL is the Google Maps deep link.
+- [x] G15: The recommendation needs no map service: no external URL and no fetch in the app source, and the overlay is computed from the cached bundle.
   CHECK: node scripts/verify_offline.mjs
   EXPECT: offline verified
-  EVIDENCE: `src/mapview.js` references only `https://www.google.com/maps/…`, calls no fetch, and draws from the local Blue Marble texture; `src/geo.js` makes no network call.
+  EVIDENCE: `index.html`, `src/main.js`, `src/rag.js`, `src/chart.js`, `src/style.css` and `src/geo.js` contain no external URL; `src/geo.js` performs no fetch; the only allowed outbound references remain the landing page's inline SVG namespace and repository link.
 
-- [x] G16: In the browser the map panel shows a real base map, a typed place opens the nearest case, and the station dot grows when the cursor is anywhere inside its halo, not only on the dot.
+- [x] G16: In the browser the first tap on the world (no prior hover) puts a yellow marker on the tapped point, draws yellow dashed arcs with distance labels to the nearest station and the nearest cell, and shows a card whose Open and close actions work.
   MANUAL: verified in the Cloud browser at 1440×900 against the dev server.
-  EVIDENCE: locating “Kigali” read 1.94°S 30.06°E, nearest station Nairobi 755 km E (case CASE-6CA4 opened), closer GISTEMP cell 1.0°S 29.0°E 158 km with an Open action, Google Maps link `?api=1&query=-1.94410,30.06190`; map drew the Blue Marble crop, station dots, target crosshair, connector and scale bar; 45 halo meshes created; hovering the Nairobi dot and a point 11 px away both set hovered=Nairobi, halo scale 1.8, opacity 0.55, cursor pointer, and cleared when the pointer left; console showed only WebGL performance warnings and the expected `/api/live` 503 (no Meteomatics credentials, labelled Snapshot).
+  EVIDENCE: an un-hovered tap at (700, 430) resolved 15.55°N 3.34°E, nearest station Niamey 261 km SSW, nearest cell 15.0°N 5.0°E 189 km, and placed the card at (722, 448); a tap in the South Atlantic resolved 15.31°S 4.55°W with Accra 2,375 km NNE and cell 17.0°S 3.0°W 250 km, drawn as two dashed yellow arcs with `2,375 km` and `250 km` labels; Open on the station row rendered the Accra case and cleared the card and arcs; the × removed the card and the state; a second tap after closing produced a new recommendation; console showed only the expected `/api/live` 503 (no Meteomatics credentials). The map panel, locate form and Google Maps link are absent from the page.
 
 - [x] G17: The work is pushed to `main` on GitHub.
   CHECK: git rev-parse HEAD and git rev-parse FETCH_HEAD agree after fetching `main`.
