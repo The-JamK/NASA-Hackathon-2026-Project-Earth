@@ -115,7 +115,6 @@ button { color: inherit; }
 .source-pill {
   display: inline-flex;
   align-items: center;
-  gap: 6px;
   padding: 5px 8px;
   border: 1px solid var(--line);
   border-radius: 999px;
@@ -125,6 +124,11 @@ button { color: inherit; }
   text-transform: uppercase;
   color: var(--muted);
   white-space: nowrap;
+}
+
+.source-pill.offline {
+  color: var(--amber);
+  border-color: rgba(201, 162, 39, 0.4);
 }
 
 a.source-pill {
@@ -140,16 +144,6 @@ a.source-pill:focus-visible {
   color: var(--text);
   outline: none;
 }
-
-.source-pill i {
-  width: 4px;
-  height: 4px;
-  border-radius: 50%;
-  background: var(--accent);
-  box-shadow: 0 0 7px rgba(95, 211, 224, 0.55);
-}
-
-.source-pill.offline i { background: var(--amber); box-shadow: none; }
 
 .ghost-btn, .icon-btn, .primary-btn {
   cursor: pointer;

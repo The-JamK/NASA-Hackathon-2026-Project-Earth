@@ -806,8 +806,8 @@ function renderSourceStrip() {
       const title = escapeHtml(source.detail || "");
       const label = `${escapeHtml(source.name.replace("NASA ", ""))}`;
       const href = SOURCE_LINKS[source.id];
-      if (!href) return `<span class="${cls}" title="${title}"><i></i>${label}</span>`;
-      return `<a class="${cls}" href="${escapeHtml(href)}" target="_blank" rel="noopener noreferrer" title="${title}"><i></i>${label}</a>`;
+      if (!href) return `<span class="${cls}" title="${title}">${label}</span>`;
+      return `<a class="${cls}" href="${escapeHtml(href)}" target="_blank" rel="noopener noreferrer" title="${title}">${label}</a>`;
     })
     .join("");
 }
