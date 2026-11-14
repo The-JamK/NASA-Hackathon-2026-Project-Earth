@@ -42,7 +42,7 @@ The confident line that isn't significant. The black box that says "AI found a t
 
 - A first-time user gets a case file in under 30 seconds.
 - Every verdict shows rate, CI, n, p, and source.
-- A red-herring case proves a steep line can still be noise.
+- A red-herring case is steep but not proven at the 5% level.
 - A judge can ask "why?" and we can show every step.
 - The demo lands in two minutes.
 
