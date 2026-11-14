@@ -145,7 +145,7 @@ function buildGlobe() {
 
   globe = new Globe(els.globe)
     .globeImageUrl(assetUrl("/textures/earth-blue-marble.jpg"))
-    .bumpImageUrl(assetUrl("/textures/earth-topology.png"))
+    .bumpImageUrl(assetUrl("/textures/earth-topology.jpg"))
     .backgroundImageUrl(assetUrl("/textures/night-sky.png"))
     .atmosphereColor("#5fd3e0")
     .atmosphereAltitude(0.18)

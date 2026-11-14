@@ -46,7 +46,7 @@ function measure(name, minimum) {
 
 const report = [
   measure("earth-blue-marble.jpg", { width: 8192, height: 4096 }),
-  measure("earth-topology.png", { width: 2048, height: 1024 }),
+  measure("earth-topology.jpg", { width: 4096, height: 2048 }),
   measure("night-sky.png", { width: 4096, height: 2048 }),
 ];
 

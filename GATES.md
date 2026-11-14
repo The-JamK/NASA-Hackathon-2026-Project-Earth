@@ -212,6 +212,11 @@ Last verified: 2026-11-14
   EXPECT: textures verified
   EVIDENCE: The texture was the three-globe example image at 4096×2048 (1.46 MB). It is now NASA GIBS Blue Marble shaded relief and bathymetry at 8192×4096 (3.12 MB), which is 30 texels per degree at the equator and twice the linear detail of the old file. `verify_textures.mjs` parses the JPEG and PNG headers and requires 2:1 equirectangular images of at least 8192×4096, 2048×1024 and 4096×2048; it is wired into `scripts/verify_all.sh`, so the suite reports `textures verified` before `all checks passed`. Visual check on the dev server: coastlines, terrain and bathymetry are visibly sharper with no WebGL or console texture errors.
 
-MET: 41
+- [x] G42: The relief shading is a higher-resolution map than the skin it sits on and costs no more to download.
+  CHECK: node scripts/verify_textures.mjs
+  EXPECT: textures verified
+  EVIDENCE: The bump map was a 2048×1024 PNG (0.38 MB) at 15 texels per degree while the skin had moved to 30. It is now ASTER GDEM greyscale shaded relief at 4096×2048 JPEG (0.36 MB), so the shading matches the skin and the download is 20 KB smaller. `verify_textures.mjs` requires at least 4096×2048 for this file and still enforces the 2:1 equirectangular aspect; the suite reports `textures verified` and `all checks passed`. Visual check on the dev server: terrain relief reads cleanly with no double-shadowing artefacts.
+
+MET: 42
 UNMET: 0
 ABANDONED: 0

@@ -76,7 +76,7 @@ if (sources.sources.some((source) => source.status !== "ok")) fail("a source is 
 
 for (const path of [
   "/textures/earth-blue-marble.jpg",
-  "/textures/earth-topology.png",
+  "/textures/earth-topology.jpg",
   "/textures/night-sky.png",
 ]) {
   await get(path, "image/");

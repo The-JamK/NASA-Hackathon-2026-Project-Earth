@@ -79,8 +79,8 @@ To host the proxy, build with `npm run build`, deploy `worker/` with Wrangler
 
 The planet is NASA Blue Marble shaded relief and bathymetry at **8192 × 4096** —
 30 texels per degree at the equator, 3.1 MB — served from NASA GIBS and committed as
-`public/textures/earth-blue-marble.jpg`, with a 2048 × 1024 topology map driving the
-relief shading. `scripts/verify_textures.mjs` reads the image headers, so a downsized
+`public/textures/earth-blue-marble.jpg`, with a 4096 × 2048 greyscale shaded-relief
+map driving the bump shading. `scripts/verify_textures.mjs` reads the image headers, so a downsized
 texture cannot ship while the interface claims a higher resolution; it runs as part
 of `scripts/verify_all.sh`.
 

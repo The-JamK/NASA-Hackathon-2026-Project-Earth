@@ -39,7 +39,7 @@ for (const file of ["src/geo.js"]) {
 
 for (const file of [
   "public/textures/earth-blue-marble.jpg",
-  "public/textures/earth-topology.png",
+  "public/textures/earth-topology.jpg",
   "public/textures/night-sky.png",
 ]) {
   if (!existsSync(resolve(ROOT, file)) || statSync(resolve(ROOT, file)).size < 10_000) {
