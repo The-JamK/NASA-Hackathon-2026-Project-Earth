@@ -66,6 +66,8 @@ const els = {
 let globe;
 let toastTimer;
 let autoRotateTimer;
+let hoveredMesh = null;
+let hoveredScale = null;
 
 init();
 
@@ -150,6 +152,7 @@ function buildGlobe() {
     .pointsTransitionDuration(0)
     .pointsMerge(false)
     .onPointClick((point) => selectPoint(point))
+    .onPointHover(handlePointHover)
     .onGlobeClick(({ lat, lng }) => {
       const found = state.layer === "field" ? nearestGrid(lat, lng) : nearestCity(lat, lng);
       if (found) selectPoint(found);
@@ -200,6 +203,32 @@ function pointColor(point) {
   return trendColor(trend);
 }
 
+/* Hover grows the point under the cursor so it is easier to hit.
+   globe.gl fires this only when the hovered point changes, and three-globe keeps
+   each point's mesh on its datum as __threeObjPoint, so scale that one mesh rather
+   than re-digesting the whole layer (4,039 points in the trend field). */
+const HOVER_GROWTH = 1.8;
+
+function handlePointHover(point) {
+  restoreHoveredPoint();
+  if (!point) return;
+  const mesh = point.__threeObjPoint;
+  if (!mesh || !mesh.scale) return;
+  hoveredMesh = mesh;
+  hoveredScale = { x: mesh.scale.x, y: mesh.scale.y };
+  mesh.scale.x = hoveredScale.x * HOVER_GROWTH;
+  mesh.scale.y = hoveredScale.y * HOVER_GROWTH;
+}
+
+function restoreHoveredPoint() {
+  if (hoveredMesh && hoveredScale) {
+    hoveredMesh.scale.x = hoveredScale.x;
+    hoveredMesh.scale.y = hoveredScale.y;
+  }
+  hoveredMesh = null;
+  hoveredScale = null;
+}
+
 function pointLabel(point) {
   if (point.isGrid) {
     const trend = point.trends?.[state.windowKey];
@@ -219,6 +248,9 @@ function isSelected(item) {
 
 function refreshLayer() {
   if (!globe) return;
+  // Points are re-scaled by the layer update, so drop any hover growth with it.
+  hoveredMesh = null;
+  hoveredScale = null;
   const data = state.layer === "field" ? state.gridPoints : state.points;
   globe.pointsData(data);
   globe.ringsData(
