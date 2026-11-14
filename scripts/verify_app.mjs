@@ -96,6 +96,10 @@ for (const point of points.points.filter((item) => item.imagery)) {
 
 const main = await (await get("/src/main.js", "javascript")).text();
 if (!main.includes("new Globe")) fail("main.js does not mount the globe");
+if (!main.includes("renderOceanCase")) fail("main.js does not render an ocean region case");
+if (!main.includes("ensureOcean")) fail("main.js does not load the ocean bundle");
+if (!html.includes('data-layer="ocean"')) fail("the layer switch has no ocean layer");
+if (!html.includes('id="ocean-legend"')) fail("the ocean legend is missing");
 if (!main.includes("planCase")) fail("main.js is not wired to the retrieval planner");
 if (!main.includes("recommendAt")) fail("main.js does not recommend the nearest record on tap");
 if (!main.includes("nearestCell")) fail("main.js does not look up the nearest GISTEMP cell");

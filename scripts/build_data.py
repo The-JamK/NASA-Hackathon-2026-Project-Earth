@@ -86,13 +86,13 @@ VARIABLES = [
     {
         "code": "GWETROOT",
         "label": "Root-zone soil wetness",
-        "short": "Soil moisture",
+        "short": "Root-zone wetness",
         "units": "fraction",
         "source": "NASA POWER (MERRA-2 derived)",
         "kind": "point",
-        "baseline": "absolute wetness fraction",
-        "description": "Annual mean root-zone soil wetness. Use for soil moisture, agricultural drought, and land drying questions.",
-        "keywords": "soil moisture wetness drought agriculture land dryness dry drier declining groundwater root zone",
+        "baseline": "absolute wetness — fraction of pore space filled (0 = dry, 1 = saturated)",
+        "description": "Annual mean root-zone soil wetness: the share of the soil's pore space holding water, 0 (dry) to 1 (saturated), over roughly the top metre. Use for soil moisture, agricultural drought, and land drying questions.",
+        "keywords": "soil moisture wetness saturation drought agriculture land dryness dry drier declining groundwater root zone",
         "supported": True,
     },
     {

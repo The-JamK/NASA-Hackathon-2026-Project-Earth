@@ -33,7 +33,7 @@
     <aside class="panel ask-panel" id="ask-panel">
       <h1>What do you want to investigate?</h1>
       <p class="panel-lede">
-        Ask about warming, rainfall, soil moisture or sunlight. The intake assistant
+        Ask about warming, rainfall, soil wetness or sunlight. The intake assistant
         suggests the variable, place and time; the statistics engine decides the verdict.
       </p>
       <form id="ask-form" autocomplete="off">
@@ -61,10 +61,12 @@
         <span><i class="sw warm"></i>significant increase</span>
         <span><i class="sw cool"></i>significant decrease</span>
         <span><i class="sw none"></i>not significant</span>
+        <span id="ocean-legend" hidden><i class="sw ocean"></i>ocean cell · SST</span>
       </div>
       <div class="layer-switch" role="group" aria-label="Map layer">
         <button type="button" data-layer="cities" class="on">Cities</button>
         <button type="button" data-layer="field">Trend field</button>
+        <button type="button" data-layer="ocean">Ocean</button>
       </div>
       <div class="hint" id="hint">Drag to rotate · scroll to zoom · tap anywhere for the nearest record</div>
     </div>
@@ -114,9 +116,11 @@
           <h3>Data</h3>
           <ul id="method-sources">
             <li>NASA GISTEMP v4 — global gridded temperature anomalies, baseline 1951–1980.</li>
+            <li>Ocean cells carry ERSST-based sea surface temperature; land cells carry surface air temperature. Ocean regions average their cells by area (cos lat) and correct across the eight basins, not the mixed field.</li>
             <li>NASA POWER — point temperature, rainfall, root-zone wetness and solar irradiance, MERRA-2 derived.</li>
             <li>Meteomatics — current conditions for every point, proxied server-side so the app itself holds no weather credentials. The build snapshot is labelled and used when the proxy is unavailable.</li>
             <li>NASA Earthdata — MERRA-2 catalogue access check.</li>
+            <li>NSIDC/NOAA Sea Ice Index (G02135) — monthly ice extent per hemisphere, averaged to annual means and served as a timeseries by NOAA PSL.</li>
             <li>Sentinel-2 L2A — Copernicus multispectral imagery, mosaicked for featured points by Microsoft Planetary Computer.</li>
             <li>NASA Blue Marble — globe texture and fallback context when a Sentinel-2 mosaic is unavailable; the card label always names the source actually shown.</li>
           </ul>

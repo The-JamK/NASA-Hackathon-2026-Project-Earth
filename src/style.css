@@ -582,6 +582,93 @@ body.has-case .case-panel { display: block; }
 .var-chip.on { color: var(--accent); border-color: rgba(95, 211, 224, 0.5); background: rgba(95, 211, 224, 0.07); }
 .var-chip:disabled { opacity: 0.35; cursor: default; }
 
+/* ---------- sea ice: two measures on one record ---------- */
+
+.measure-chips {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 9px;
+}
+
+.ice-measures {
+  display: grid;
+  gap: 4px;
+  margin-bottom: 13px;
+}
+
+.ice-measure {
+  display: grid;
+  grid-template-columns: 1fr auto auto;
+  align-items: baseline;
+  gap: 10px;
+  width: 100%;
+  padding: 8px 10px;
+  border: 1px solid var(--line);
+  border-radius: 2px;
+  background: transparent;
+  color: var(--muted);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.ice-measure:hover { color: var(--text); border-color: var(--line-strong); }
+
+.ice-measure.on {
+  color: var(--text);
+  border-color: rgba(95, 211, 224, 0.5);
+  background: rgba(95, 211, 224, 0.07);
+}
+
+.ice-measure-name {
+  font-size: 9px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+
+.ice-measure-rate { font-size: 11px; font-variant-numeric: tabular-nums; }
+.ice-measure-rate em { font-style: normal; font-size: 8.5px; color: var(--dim); }
+
+.ice-measure-word {
+  font-size: 8.5px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--dim);
+}
+
+.ice-measure-word.cool { color: var(--accent); }
+
+.chart-legend {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px;
+  margin: -6px 0 13px;
+  font-size: 9px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.chart-legend i {
+  display: inline-block;
+  width: 14px;
+  height: 2px;
+  margin-right: 5px;
+  vertical-align: middle;
+}
+
+.chart-legend .legend-note {
+  font-size: 8.5px;
+  letter-spacing: 0.04em;
+  text-transform: none;
+  color: var(--dim);
+}
+
+.measure-line { stroke-width: 1.4; }
+.measure-line.active { stroke-width: 2; }
+
 .verdict {
   position: relative;
   border-left: 2px solid var(--flat);
@@ -846,6 +933,7 @@ details.work p {
 .sw.warm { background: var(--warm); box-shadow: 0 0 6px rgba(255, 107, 74, 0.55); }
 .sw.cool { background: var(--cool); box-shadow: 0 0 6px rgba(79, 147, 214, 0.55); }
 .sw.none { background: var(--flat); }
+.sw.ocean { background: var(--accent); box-shadow: 0 0 6px rgba(95, 211, 224, 0.5); }
 
 .layer-switch {
   display: flex;
@@ -1045,7 +1133,12 @@ details.work p {
   body.has-case .ask-panel { display: none; }
   .bottom-bar { left: 12px; right: 12px; bottom: 10px; gap: 8px; }
   .hint { display: none; }
-  .legend { gap: 8px; font-size: 8px; padding: 6px 8px; }
+  .legend { gap: 8px; font-size: 8px; padding: 6px 8px; min-width: 0; }
+  /* The switch keeps its width; the ocean note is the one legend row that can
+     go, because the case panel already names sea surface temperature. Without
+     this the fourth row pushed the Ocean button outside the bar at 631 px. */
+  #ocean-legend { display: none; }
+  .layer-switch { flex: 0 0 auto; }
   .dialog-grid { grid-template-columns: 1fr; max-height: 58vh; }
   .method-dialog { padding: 16px; }
   .dialog-foot { flex-direction: column; align-items: flex-start; }
