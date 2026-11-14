@@ -72,7 +72,7 @@ Last verified: 2026-11-14
 - [x] G14: The production build succeeds with the map panel and halo layer.
   CHECK: npm run build
   EXPECT: built in
-  EVIDENCE: built in 6.61s; app.js 1,951.23 kB (564.48 kB gzip); only the existing chunk-size warning.
+  EVIDENCE: built in 7.53s on the final source; only the existing chunk-size warning.
 
 - [x] G15: The base map is local: no tile server, geocoder or remote fetch, and the only outbound URL is the Google Maps deep link.
   CHECK: node scripts/verify_offline.mjs
@@ -84,9 +84,9 @@ Last verified: 2026-11-14
   EVIDENCE: locating “Kigali” read 1.94°S 30.06°E, nearest station Nairobi 755 km E (case CASE-6CA4 opened), closer GISTEMP cell 1.0°S 29.0°E 158 km with an Open action, Google Maps link `?api=1&query=-1.94410,30.06190`; map drew the Blue Marble crop, station dots, target crosshair, connector and scale bar; 45 halo meshes created; hovering the Nairobi dot and a point 11 px away both set hovered=Nairobi, halo scale 1.8, opacity 0.55, cursor pointer, and cleared when the pointer left; console showed only WebGL performance warnings and the expected `/api/live` 503 (no Meteomatics credentials, labelled Snapshot).
 
 - [x] G17: The work is pushed to `main` on GitHub.
-  CHECK: git rev-parse HEAD and git rev-parse origin/main agree after the push.
+  CHECK: git rev-parse HEAD and git rev-parse FETCH_HEAD agree after fetching `main`.
   EXPECT: identical hashes
-  EVIDENCE: pushed to `main` as the commit recorded below.
+  EVIDENCE: pushed `63cc511..3cd5c4e HEAD -> main`; `git rev-parse HEAD` and `FETCH_HEAD` both returned `3cd5c4eb52d168ba14783d206e75523fd7cb3099`.
 
 ## Status
 
