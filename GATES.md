@@ -207,6 +207,11 @@ Last verified: 2026-11-14
   EXPECT: live verified
   EVIDENCE: Pushed and confirmed with `bash scripts/verify_live.sh`: `points.json`, `rag_index.json` and `countries.json` all match `dist`, and the deployed bundle plans all 222 country averages plus the city spot checks (`live plan verified`).
 
-MET: 40
+- [x] G41: The globe skin is a genuinely higher-resolution map, and the build cannot quietly ship a smaller one.
+  CHECK: node scripts/verify_textures.mjs
+  EXPECT: textures verified
+  EVIDENCE: The texture was the three-globe example image at 4096×2048 (1.46 MB). It is now NASA GIBS Blue Marble shaded relief and bathymetry at 8192×4096 (3.12 MB), which is 30 texels per degree at the equator and twice the linear detail of the old file. `verify_textures.mjs` parses the JPEG and PNG headers and requires 2:1 equirectangular images of at least 8192×4096, 2048×1024 and 4096×2048; it is wired into `scripts/verify_all.sh`, so the suite reports `textures verified` before `all checks passed`. Visual check on the dev server: coastlines, terrain and bathymetry are visibly sharper with no WebGL or console texture errors.
+
+MET: 41
 UNMET: 0
 ABANDONED: 0

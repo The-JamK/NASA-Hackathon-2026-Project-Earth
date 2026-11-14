@@ -11,6 +11,7 @@ node scripts/verify_rag.mjs
 node scripts/verify_country_plan.mjs
 node scripts/verify_locate.mjs
 node scripts/verify_offline.mjs
+node scripts/verify_textures.mjs
 node scripts/verify_clean.mjs
 npm run build
 node scripts/verify_app.mjs
