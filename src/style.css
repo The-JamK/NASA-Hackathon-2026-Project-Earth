@@ -1217,7 +1217,6 @@ details.work p {
      go, because the case panel already names sea surface temperature. Without
      this the fourth row pushed the Ocean button outside the bar at 631 px. */
   #ocean-legend { display: none; }
->>>>>>> ab33e1e999d5762cdec5c2d86c078d7760135221
   .method-dialog { padding: 16px; }
   .dialog-grid { grid-template-columns: 1fr; max-height: 58vh; gap: 16px; }
   .dialog-foot { flex-direction: column; align-items: flex-start; }
