@@ -15,6 +15,26 @@ The app uses prebuilt data under `public/data`; rebuild the data bundle with:
 uv run python scripts/build_data.py --env-file path/to/.env
 ```
 
+## Live conditions
+
+The “Live” chip on a city case is served by a small proxy so the Meteomatics
+credentials never reach the browser:
+
+- `worker/live.js` — allowlists the bundle's points, queries Meteomatics for them
+  in one request, caches for 10 minutes, and answers `live_unconfigured` when
+  credentials are absent.
+- `worker/index.js` — Workers entry: `/api/live` plus the static app.
+- `vite.config.js` — the same handler behind the dev and preview servers, reading
+  `METEOMATICS_USERNAME` and `METEOMATICS_PASSWORD` from `.env`.
+
+If the proxy is not running — the static GitHub Pages build, for example — the
+app falls back to the snapshot captured during the data build and labels the
+chip **Snapshot**.
+
+To host the proxy, build with `npm run build`, deploy `worker/` with Wrangler
+(`worker/wrangler.toml` serves `dist/` as static assets), and store
+`METEOMATICS_USERNAME` and `METEOMATICS_PASSWORD` as Worker secrets.
+
 ## Deploy to GitHub Pages
 
 The app is built with Vite and served from `dist`. The workflow in

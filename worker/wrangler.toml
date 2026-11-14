@@ -1,0 +1,8 @@
+name = "earth-trend-detective-case-files"
+main = "index.js"
+compatibility_date = "2025-11-01"
+
+# Serve the Vite build as static assets and let /api/live fall through to the Worker.
+[assets]
+directory = "../dist"
+binding = "ASSETS"

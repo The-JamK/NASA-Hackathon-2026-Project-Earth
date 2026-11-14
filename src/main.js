@@ -35,6 +35,7 @@ const state = {
 };
 
 const BASE_URL = import.meta.env.BASE_URL || "/";
+const LIVE_REFRESH_MS = 10 * 60 * 1000;
 
 function assetUrl(path) {
   if (!path || /^(?:[a-z]+:)?\/\//i.test(path) || path.startsWith("data:") || path.startsWith("blob:")) {
@@ -110,6 +111,7 @@ async function init() {
     renderFeatured();
     renderEmptyCase();
     hideLoading();
+    startLiveRefresh();
     if (window.location.hash === "#method") els.methodDialog.showModal();
   } catch (error) {
     showFatal(error);
@@ -610,7 +612,30 @@ function liveChip(point) {
   if (Number.isFinite(point.live.precip_1h)) values.push(`${point.live.precip_1h.toFixed(2)} mm/h`);
   if (Number.isFinite(point.live.wind_speed_10m)) values.push(`${point.live.wind_speed_10m.toFixed(1)} m/s`);
   if (!values.length) return "";
-  return `<div class="live-chip"><i></i> Live · ${escapeHtml(values.join(" · "))} · Meteomatics</div>`;
+  const live = Boolean(point.live.is_live);
+  const observed = liveTimeLabel(point.live.valid_time || point.live.fetched_at, live);
+  const title = live
+    ? `Meteomatics current conditions, fetched ${liveTimeLabel(point.live.fetched_at)}`
+    : `Meteomatics snapshot from the last data build (${liveTimeLabel(
+        point.live.valid_time || point.live.fetched_at
+      )}); the live proxy is unavailable`;
+  return `<div class="live-chip ${live ? "is-live" : "is-snapshot"}" title="${escapeHtml(
+    title
+  )}"><i></i>${live ? "Live" : "Snapshot"} · ${escapeHtml(
+    values.join(" · ")
+  )} · Meteomatics${observed ? ` · ${escapeHtml(observed)}` : ""}</div>`;
+}
+
+function liveTimeLabel(value, compact = false) {
+  const date = new Date(value);
+  if (!value || Number.isNaN(date.getTime())) return "";
+  const hours = String(date.getUTCHours()).padStart(2, "0");
+  const minutes = String(date.getUTCMinutes()).padStart(2, "0");
+  const time = `${hours}:${minutes} UTC`;
+  if (compact) return time;
+  const day = String(date.getUTCDate()).padStart(2, "0");
+  const month = date.toLocaleString("en-US", { month: "short", timeZone: "UTC" });
+  return `${day} ${month} ${time}`;
 }
 
 function imagery(point) {
@@ -819,6 +844,65 @@ function runPlan() {
     selectPoint(point);
   }
   showToast(`Case opened: ${plan.variable.short} · ${plan.place.name}`);
+}
+
+/* ------------------------------------------------------------------- live */
+
+function startLiveRefresh() {
+  refreshLiveReadings();
+  setInterval(() => {
+    if (!document.hidden) refreshLiveReadings();
+  }, LIVE_REFRESH_MS);
+}
+
+async function refreshLiveReadings() {
+  try {
+    const response = await fetch(assetUrl("/api/live"), { headers: { accept: "application/json" } });
+    if (!response.ok) {
+      if (import.meta.env.DEV) {
+        console.debug(`Live readings unavailable (HTTP ${response.status}); using the build snapshot.`);
+      }
+      return;
+    }
+    const payload = await response.json();
+    if (!payload?.ok || !payload.points) return;
+
+    let updated = 0;
+    for (const point of state.points) {
+      const reading = payload.points[point.id];
+      if (!reading || !Number.isFinite(reading.t_2m)) continue;
+      point.live = {
+        t_2m: reading.t_2m,
+        precip_1h: reading.precip_1h,
+        wind_speed_10m: reading.wind_speed_10m,
+        valid_time: reading.valid_time || payload.valid_time,
+        fetched_at: payload.fetched_at,
+        source: "Meteomatics",
+        is_live: true,
+      };
+      updated += 1;
+    }
+
+    if (updated && state.selectedKind === "city") refreshLiveChip();
+  } catch (error) {
+    if (import.meta.env.DEV) {
+      console.debug("Live readings unavailable; using the build snapshot.", error);
+    }
+  }
+}
+
+function refreshLiveChip() {
+  if (!state.selected || state.selectedKind !== "city") return;
+  const markup = liveChip(state.selected);
+  const chip = els.casePanel.querySelector(".live-chip");
+  if (chip) {
+    if (markup) chip.outerHTML = markup;
+    else chip.remove();
+    return;
+  }
+  if (!markup) return;
+  const subtitle = els.casePanel.querySelector(".place-sub");
+  if (subtitle) subtitle.insertAdjacentHTML("afterend", markup);
 }
 
 /* -------------------------------------------------------------- chrome UI */
