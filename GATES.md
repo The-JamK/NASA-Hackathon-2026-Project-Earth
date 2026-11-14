@@ -147,10 +147,10 @@ Last verified: 2026-11-14
   EXPECT: data verified
   EVIDENCE: Natural Earth populated places (7,342 rows, public domain) ranked by `POP_MAX` per `ADM0NAME`: 568 candidates across 228 units, 64 of which hold fewer than three places. 53 candidates matched the curated 45 (same name or <15 km), 14 conurbations were merged (Giza/Cairo 6.1 km, Piraeus/Athens 4.5 km, Callao/Lima 10.4 km) and 6 were dropped for a masked root-zone soil moisture series (Majuro, Funafuti, Malé, Atafu, Esperanza Base, Casey Station). Result: 45 curated + 509 new = 554 points, 553 with four variables and McMurdo with three. `points.json` is 4.7 MB, `rag_index.json` 58 KB with 554 places, 14 Sentinel-2 mosaics, and 6 Meteomatics snapshots carried from `data/cache`. Earthdata could not be re-authenticated because every value in the local `.env` is empty, so `sources.json` keeps the earlier verification and says so in the detail line.
 
-- [ ] G30: The expanded bundle and its pipeline are pushed to `main` on GitHub.
-  CHECK: git rev-parse HEAD and git rev-parse FETCH_HEAD agree after fetching `main`.
+- [x] G30: The expanded bundle and its pipeline are pushed to `main` on GitHub.
+  CHECK: git rev-parse HEAD and git rev-parse origin/main agree after fetching `main`.
   EXPECT: identical hashes
-  EVIDENCE: PENDING
+  EVIDENCE: pushed `c78898d..62dc704 HEAD -> main`; `git rev-parse HEAD` and `origin/main` both returned `62dc704dd619c6dd7c2305f5e87dcfad7923f404`. The ledger follow-up advanced `main` afterwards.
 
 ## Status
 
