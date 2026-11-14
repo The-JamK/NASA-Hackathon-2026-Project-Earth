@@ -4,6 +4,7 @@ import world from "world-atlas/countries-110m.json";
 import "./style.css";
 import { planCase } from "./rag.js";
 import { renderSeriesChart, trendColor } from "./chart.js";
+import { SOURCE_LINKS } from "./sources.js";
 
 const FEATURED_CASES = [
   { id: "nairobi", code: "T2M", window: "1990-2025", label: "Nairobi warming" },
@@ -34,15 +35,6 @@ const state = {
 };
 
 const BASE_URL = import.meta.env.BASE_URL || "/";
-
-const SOURCE_LINKS = {
-  earthdata: "https://www.earthdata.nasa.gov/",
-  planetary: "https://planetarycomputer.microsoft.com/",
-  power: "https://power.larc.nasa.gov/",
-  meteomatics: "https://www.meteomatics.com/",
-  gistemp: "https://data.giss.nasa.gov/gistemp/",
-  "blue-marble": "https://visibleearth.nasa.gov/collection/1484/blue-marble",
-};
 
 function assetUrl(path) {
   if (!path || /^(?:[a-z]+:)?\/\//i.test(path) || path.startsWith("data:") || path.startsWith("blob:")) {
@@ -805,7 +797,7 @@ function renderSourceStrip() {
       const cls = `source-pill ${source.status === "ok" ? "" : "offline"}`;
       const title = escapeHtml(source.detail || "");
       const label = `${escapeHtml(source.name.replace("NASA ", ""))}`;
-      const href = SOURCE_LINKS[source.id];
+      const href = SOURCE_LINKS[source.id]?.url;
       if (!href) return `<span class="${cls}" title="${title}">${label}</span>`;
       return `<a class="${cls}" href="${escapeHtml(href)}" target="_blank" rel="noopener noreferrer" title="${title}">${label}</a>`;
     })

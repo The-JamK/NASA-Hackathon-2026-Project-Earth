@@ -1,5 +1,6 @@
 import "./style.css";
 import { renderSeriesChart } from "./chart.js";
+import { SOURCE_LINKS, SOURCE_ORDER } from "./sources.js";
 
 const BASE_URL = import.meta.env.BASE_URL || "/";
 const POINT_ID = "nairobi";
@@ -20,7 +21,20 @@ async function loadJson(path) {
   return response.json();
 }
 
+renderSourceLine();
 render();
+
+function renderSourceLine() {
+  const line = document.getElementById("sources-line");
+  if (!line) return;
+  line.innerHTML = SOURCE_ORDER.map((id) => {
+    const entry = SOURCE_LINKS[id];
+    if (!entry) return "";
+    return `<a class="text-link" href="${entry.url}" target="_blank" rel="noopener noreferrer">${entry.label}</a>`;
+  })
+    .filter(Boolean)
+    .join(" · ");
+}
 
 async function render() {
   const root = document.getElementById("sample-case");
