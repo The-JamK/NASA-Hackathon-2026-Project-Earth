@@ -22,7 +22,7 @@ A trend line is easy to draw and hard to trust. Most tools stop at the line. We 
 - **Lead detective (human):** asks the question, approves the case plan, owns the verdict.
 - **Intake assistant (AI/RAG):** recommends variables, place, and time; cites sources.
 - **Forensics lab (stats engine):** computes annual means, OLS + HAC, confidence interval, Sen's slope, Mann–Kendall, and the verdict.
-- **Evidence locker (data):** GISTEMP and NASA POWER; cached, cited, reproducible.
+- **Evidence locker (data):** GISTEMP, NASA POWER, Meteomatics live conditions, and Sentinel-2 L2A context imagery via Planetary Computer; cached, cited, reproducible. Blue Marble is the labelled fallback.
 - **Case writer (AI):** explains the evidence in plain English; falls back to a template if the LLM is unavailable.
 
 ## Rules of engagement

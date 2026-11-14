@@ -5,11 +5,18 @@
 
 # Dependencies
 node_modules/
+.venv/
+
+# Python bytecode and test cache
+__pycache__/
+*.py[cod]
+.pytest_cache/
 
 # Build output
 dist/
 build/
 .next/
+data/cache/
 
 # OS/editor
 .DS_Store
