@@ -46,6 +46,26 @@ Vite uses relative asset paths (`base: "./"`) and the app resolves data,
 textures and point imagery through `import.meta.env.BASE_URL`, so the build works
 under the repository subpath rather than only at the domain root.
 
+## Map panel
+
+The left column links the 3D globe to a map. Enter a place or a coordinate
+(`Kigali`, `-1.29, 36.82`, `1°17′S 36°49′E`) and the app finds the closest record
+it holds, opens that case, and shows the distance and bearing on a small map. When
+the nearest GISTEMP cell is closer than the nearest station, the map readout
+offers that cell as a second option. Selecting a point on the globe centres the
+map on it; clicking the map searches that spot.
+
+The base map is the local NASA Blue Marble texture cropped to the search area, so
+the panel needs no tile server or API key. **Google Maps** is an outbound link for
+the searched coordinate, not an embedded layer. Names resolve through the station
+bundle, the country outlines already loaded for the globe, and an offline
+gazetteer in `src/geo.js`; `node scripts/verify_locate.mjs` checks that resolution
+without a browser.
+
+Station dots carry a faint halo, which is also the hover target: while the cursor
+is anywhere inside that area the dot grows, its halo lights up, and a click opens
+the case.
+
 ## Pages
 
 Two pages are built from `vite.config.js` (`build.rollupOptions.input`):

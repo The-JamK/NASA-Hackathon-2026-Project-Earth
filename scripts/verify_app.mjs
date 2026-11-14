@@ -30,7 +30,15 @@ for (const marker of ['id="sample-case"', 'href="./app.html"']) {
 }
 
 const html = await (await get("/app.html", "text/html")).text();
-for (const marker of ['id="globe"', 'id="ask-form"', 'id="case-panel"', 'id="method-dialog"']) {
+for (const marker of [
+  'id="globe"',
+  'id="ask-form"',
+  'id="case-panel"',
+  'id="method-dialog"',
+  'id="map-panel"',
+  'id="locate-form"',
+  'id="map-canvas"',
+]) {
   if (!html.includes(marker)) fail(`app.html is missing ${marker}`);
 }
 
@@ -80,8 +88,11 @@ for (const point of points.points.filter((item) => item.imagery)) {
 const main = await (await get("/src/main.js", "javascript")).text();
 if (!main.includes("new Globe")) fail("main.js does not mount the globe");
 if (!main.includes("planCase")) fail("main.js is not wired to the retrieval planner");
+if (!main.includes("new MapView")) fail("main.js does not mount the map panel");
+if (!main.includes("resolveLocation")) fail("main.js does not resolve entered locations");
 
 console.log(`page: ${BASE}`);
 console.log(`points: ${points.points.length} · grid: ${grid.cells.length} · sources: ${sources.sources.length}`);
 console.log(`assets: 3 textures · ${points.points.filter((point) => point.imagery).length} context images`);
+console.log("map: panel, canvas and locate form served");
 console.log("app verified");

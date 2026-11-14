@@ -42,7 +42,7 @@ Last verified: 2026-11-14
 - [x] G8: The app works from the cached bundle with the network off for data (no live API required to render a case).
   CHECK: node scripts/verify_offline.mjs
   EXPECT: offline verified
-  EVIDENCE: no external URLs in app source; 45 points, 4,039 grid cells, 36 global years and 11 context images all local.
+  EVIDENCE: no external URLs in app source; 45 points, 4,039 grid cells, 36 global years and 11 context images all local. The check strips the landing page's outbound repository link and its inline SVG namespace URI, which are a link and a namespace rather than requests; it previously failed on them, so the oracle now states what it actually tests.
 
 - [x] G9: A featured red-herring case presents a steep slope without a significance claim.
   CHECK: uv run python scripts/verify_data.py
@@ -59,8 +59,37 @@ Last verified: 2026-11-14
   EXPECT: `./assets`, data, textures and point imagery all return 200; app opens a case
   EVIDENCE: built `dist/index.html` references `./assets/...`; local subpath test returned 200 for JS, CSS, `data/points.json`, all three globe textures and `data/imagery/nairobi-sentinel.jpg`; Nairobi case opened with a 640×360 image and no console errors. `.github/workflows/deploy.yml` publishes `dist` through GitHub Actions.
 
+- [x] G12: A place name or a coordinate resolves to the nearest record the bundle holds, covering decimal pairs, DMS, hemisphere suffixes, station names, aliases, countries and the offline gazetteer.
+  CHECK: node scripts/verify_locate.mjs
+  EXPECT: locate verified
+  EVIDENCE: 28 checks over 45 stations and 4,039 grid cells; decimal, degree/minute, hemisphere, station, alias (Sahel → Niamey), country (Kenya → Nairobi), gazetteer (Kigali) and country-centroid lookups resolve; unknown input and out-of-range pairs are rejected; the nearest record is the haversine minimum.
+
+- [x] G13: The map panel is served with the app: locate form, canvas, halo markers, and main.js mounts both the globe and the map.
+  CHECK: node scripts/verify_app.mjs
+  EXPECT: app verified
+  EVIDENCE: page, 45 points, 4,039 grid cells, 3 textures, 11 context images; `#map-panel`, `#locate-form` and `#map-canvas` present; `new MapView` and `resolveLocation` wired in main.js.
+
+- [x] G14: The production build succeeds with the map panel and halo layer.
+  CHECK: npm run build
+  EXPECT: built in
+  EVIDENCE: built in 6.61s; app.js 1,951.23 kB (564.48 kB gzip); only the existing chunk-size warning.
+
+- [x] G15: The base map is local: no tile server, geocoder or remote fetch, and the only outbound URL is the Google Maps deep link.
+  CHECK: node scripts/verify_offline.mjs
+  EXPECT: offline verified
+  EVIDENCE: `src/mapview.js` references only `https://www.google.com/maps/…`, calls no fetch, and draws from the local Blue Marble texture; `src/geo.js` makes no network call.
+
+- [x] G16: In the browser the map panel shows a real base map, a typed place opens the nearest case, and the station dot grows when the cursor is anywhere inside its halo, not only on the dot.
+  MANUAL: verified in the Cloud browser at 1440×900 against the dev server.
+  EVIDENCE: locating “Kigali” read 1.94°S 30.06°E, nearest station Nairobi 755 km E (case CASE-6CA4 opened), closer GISTEMP cell 1.0°S 29.0°E 158 km with an Open action, Google Maps link `?api=1&query=-1.94410,30.06190`; map drew the Blue Marble crop, station dots, target crosshair, connector and scale bar; 45 halo meshes created; hovering the Nairobi dot and a point 11 px away both set hovered=Nairobi, halo scale 1.8, opacity 0.55, cursor pointer, and cleared when the pointer left; console showed only WebGL performance warnings and the expected `/api/live` 503 (no Meteomatics credentials, labelled Snapshot).
+
+- [x] G17: The work is pushed to `main` on GitHub.
+  CHECK: git rev-parse HEAD and git rev-parse origin/main agree after the push.
+  EXPECT: identical hashes
+  EVIDENCE: pushed to `main` as the commit recorded below.
+
 ## Status
 
-MET: 11
+MET: 17
 UNMET: 0
 ABANDONED: 0

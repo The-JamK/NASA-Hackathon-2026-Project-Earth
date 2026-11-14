@@ -1,10 +1,13 @@
 import Globe from "globe.gl";
+import { DoubleSide, Mesh, MeshBasicMaterial, RingGeometry, Vector3 } from "three";
 import { feature } from "topojson-client";
 import world from "world-atlas/countries-110m.json";
 import "./style.css";
 import { planCase } from "./rag.js";
 import { renderSeriesChart, trendColor } from "./chart.js";
 import { SOURCE_LINKS } from "./sources.js";
+import { GAZETTEER, formatLatLon, haversineKm, nearestCell, normalize, resolveLocation } from "./geo.js";
+import { MapView, googleMapsUrl } from "./mapview.js";
 
 const FEATURED_CASES = [
   { id: "nairobi", code: "T2M", window: "1990-2025", label: "Nairobi warming" },
@@ -32,6 +35,9 @@ const state = {
   selected: null,
   selectedKind: null,
   plan: null,
+  locate: null,
+  map: null,
+  hovered: null,
 };
 
 const BASE_URL = import.meta.env.BASE_URL || "/";
@@ -62,6 +68,13 @@ const els = {
   globalBtn: document.getElementById("global-btn"),
   closeMethod: document.getElementById("close-method"),
   methodDone: document.getElementById("method-done"),
+  mapPanel: document.getElementById("map-panel"),
+  mapCanvas: document.getElementById("map-canvas"),
+  mapReadout: document.getElementById("map-readout"),
+  mapExternal: document.getElementById("map-external"),
+  locateForm: document.getElementById("locate-form"),
+  locateInput: document.getElementById("locate-input"),
+  locateSuggestions: document.getElementById("locate-suggestions"),
 };
 
 let globe;
@@ -69,6 +82,12 @@ let toastTimer;
 let autoRotateTimer;
 let hoveredMesh = null;
 let hoveredScale = null;
+let hoveredHalo = null;
+let hoveredHaloPoint = null;
+let countryFeatures = null;
+let countryShapes = null;
+let hoverFrame = 0;
+let pendingPointer = null;
 
 init();
 
@@ -102,12 +121,22 @@ async function init() {
     }));
 
     if (import.meta.env.DEV) {
-      window.__caseFiles = { state, selectPoint, selectGlobal, refreshLayer, renderCase };
+      window.__caseFiles = {
+        state,
+        selectPoint,
+        selectGlobal,
+        refreshLayer,
+        renderCase,
+        locateFromInput,
+        syncMap,
+      };
     }
 
     buildGlobe();
+    buildMap();
     renderSourceStrip();
     renderSuggestions();
+    renderLocateSuggestions();
     renderFeatured();
     renderEmptyCase();
     hideLoading();
@@ -128,7 +157,8 @@ function loadJson(path) {
 /* ------------------------------------------------------------------ globe */
 
 function buildGlobe() {
-  const countries = feature(world, world.objects.countries).features;
+  countryFeatures = feature(world, world.objects.countries).features;
+  const countries = countryFeatures;
 
   globe = new Globe(els.globe)
     .globeImageUrl(assetUrl("/textures/earth-blue-marble.jpg"))
@@ -150,15 +180,28 @@ function buildGlobe() {
     .pointRadius(pointRadius)
     .pointColor(pointColor)
     .pointLabel(pointLabel)
-    .pointResolution(5)
+    .pointResolution(6)
     .pointsTransitionDuration(0)
     .pointsMerge(false)
+    .customLayerData(state.points)
+    .customThreeObject(haloObject)
+    .customThreeObjectUpdate(haloUpdate)
     .onPointClick((point) => selectPoint(point))
-    .onPointHover(handlePointHover)
+    .onPointHover((point) => setHoveredPoint(point))
     .onGlobeClick(({ lat, lng }) => {
-      const found = state.layer === "field" ? nearestGrid(lat, lng) : nearestCity(lat, lng);
+      if (state.layer === "cities") {
+        const near = nearestWithin(lat, lng, HOVER_AREA_DEG);
+        if (near) {
+          selectPoint(near);
+          return;
+        }
+        const found = nearestCity(lat, lng);
+        if (found) selectPoint(found);
+        else showToast("No station nearby. Turn on Trend field for the gridded view.");
+        return;
+      }
+      const found = nearestGrid(lat, lng);
       if (found) selectPoint(found);
-      else showToast("No point nearby. Turn on Trend field for the gridded view.");
     })
     .ringColor(() => ["rgba(95, 211, 224, 0.65)", "rgba(95, 211, 224, 0)"])
     .ringMaxRadius(2.8)
@@ -179,17 +222,23 @@ function buildGlobe() {
     globe.width(window.innerWidth).height(window.innerHeight);
   });
 
+  // globe.gl only reports hits on a station's mesh. Projecting the pointer onto
+  // the globe extends hover and clicks to the halo around each station.
+  const canvas = globe.renderer().domElement;
+  canvas.addEventListener("pointermove", handleCanvasPointerMove);
+  canvas.addEventListener("pointerleave", () => setHoveredPoint(null));
+
   refreshLayer();
 }
 
 function pointAltitude(point) {
-  if (isSelected(point)) return 0.045;
+  if (isSelected(point)) return 0.05;
   return point.isGrid ? 0.004 : 0.014;
 }
 
 function pointRadius(point) {
-  if (isSelected(point)) return point.isGrid ? 0.22 : 0.46;
-  return point.isGrid ? 0.12 : 0.27;
+  if (isSelected(point)) return point.isGrid ? 0.25 : 0.6;
+  return point.isGrid ? 0.17 : 0.42;
 }
 
 function pointColor(point) {
@@ -205,21 +254,72 @@ function pointColor(point) {
   return trendColor(trend);
 }
 
-/* Hover grows the point under the cursor so it is easier to hit.
-   globe.gl fires this only when the hovered point changes, and three-globe keeps
-   each point's mesh on its datum as __threeObjPoint, so scale that one mesh rather
-   than re-digesting the whole layer (4,039 points in the trend field). */
-const HOVER_GROWTH = 1.8;
+/* Each station keeps a faint halo: the "imaginary" area around the dot. When
+   the cursor is anywhere inside that area the dot grows and the halo lights up,
+   and a click there opens the case. three-globe keeps each point's mesh on its
+   datum as __threeObjPoint, so one mesh is scaled instead of re-digesting the
+   whole layer (4,039 points in the trend field). */
+const HOVER_GROWTH = 1.85;
+const HOVER_AREA_DEG = 1.6;
+const HALO_INNER = 1.15;
+const HALO_OUTER = 2.2;
+const HALO_HOVER_SCALE = 1.8;
+const HALO_ALTITUDE = 0.006;
 
-function handlePointHover(point) {
+function haloObject(point) {
+  const material = new MeshBasicMaterial({
+    color: pointColor(point),
+    transparent: true,
+    opacity: haloOpacity(point),
+    side: DoubleSide,
+    depthWrite: false,
+  });
+  const mesh = new Mesh(new RingGeometry(HALO_INNER, HALO_OUTER, 44), material);
+  mesh.renderOrder = 2;
+  point.__halo = mesh;
+  return mesh;
+}
+
+function haloUpdate(mesh, point) {
+  const coords = globe.getCoords(point.lat, point.lon, HALO_ALTITUDE);
+  mesh.position.set(coords.x, coords.y, coords.z);
+  mesh.quaternion.setFromUnitVectors(new Vector3(0, 0, 1), mesh.position.clone().normalize());
+}
+
+function haloOpacity(point) {
+  return isSelected(point) ? 0.4 : 0.18;
+}
+
+function refreshHalos() {
+  for (const point of state.points) {
+    const halo = point.__halo;
+    if (!halo) continue;
+    halo.material.color.set(pointColor(point));
+    halo.material.opacity = haloOpacity(point);
+    halo.scale.setScalar(state.hovered === point ? HALO_HOVER_SCALE : 1);
+  }
+}
+
+function setHoveredPoint(point) {
+  if (state.hovered === point) return;
   restoreHoveredPoint();
+  state.hovered = point || null;
+  if (els.globe) els.globe.style.cursor = point ? "pointer" : "";
   if (!point) return;
   const mesh = point.__threeObjPoint;
-  if (!mesh || !mesh.scale) return;
-  hoveredMesh = mesh;
-  hoveredScale = { x: mesh.scale.x, y: mesh.scale.y };
-  mesh.scale.x = hoveredScale.x * HOVER_GROWTH;
-  mesh.scale.y = hoveredScale.y * HOVER_GROWTH;
+  if (mesh?.scale) {
+    hoveredMesh = mesh;
+    hoveredScale = { x: mesh.scale.x, y: mesh.scale.y };
+    mesh.scale.x = hoveredScale.x * HOVER_GROWTH;
+    mesh.scale.y = hoveredScale.y * HOVER_GROWTH;
+  }
+  const halo = point.__halo;
+  if (halo) {
+    hoveredHalo = halo;
+    hoveredHaloPoint = point;
+    halo.scale.setScalar(HALO_HOVER_SCALE);
+    halo.material.opacity = 0.55;
+  }
 }
 
 function restoreHoveredPoint() {
@@ -227,8 +327,44 @@ function restoreHoveredPoint() {
     hoveredMesh.scale.x = hoveredScale.x;
     hoveredMesh.scale.y = hoveredScale.y;
   }
+  if (hoveredHalo) {
+    hoveredHalo.scale.setScalar(1);
+    hoveredHalo.material.opacity = haloOpacity(hoveredHaloPoint);
+  }
   hoveredMesh = null;
   hoveredScale = null;
+  hoveredHalo = null;
+  hoveredHaloPoint = null;
+}
+
+function nearestWithin(lat, lng, maxDegrees) {
+  let best = null;
+  let bestDegrees = maxDegrees;
+  for (const point of state.points) {
+    const degrees = haversineKm(lat, lng, point.lat, point.lon) / 111.32;
+    if (degrees < bestDegrees) {
+      bestDegrees = degrees;
+      best = point;
+    }
+  }
+  return best;
+}
+
+function handleCanvasPointerMove(event) {
+  if (state.layer !== "cities" || event.buttons !== 0) return;
+  const rect = globe.renderer().domElement.getBoundingClientRect();
+  pendingPointer = { x: event.clientX - rect.left, y: event.clientY - rect.top };
+  if (hoverFrame) return;
+  hoverFrame = requestAnimationFrame(() => {
+    hoverFrame = 0;
+    if (!pendingPointer) return;
+    const coords = globe.toGlobeCoords(pendingPointer.x, pendingPointer.y);
+    if (!coords) {
+      setHoveredPoint(null);
+      return;
+    }
+    setHoveredPoint(nearestWithin(coords.lat, coords.lng, HOVER_AREA_DEG));
+  });
 }
 
 function pointLabel(point) {
@@ -253,13 +389,24 @@ function refreshLayer() {
   // Points are re-scaled by the layer update, so drop any hover growth with it.
   hoveredMesh = null;
   hoveredScale = null;
+  hoveredHalo = null;
+  hoveredHaloPoint = null;
+  state.hovered = null;
   const data = state.layer === "field" ? state.gridPoints : state.points;
   globe.pointsData(data);
+  if (state.layer === "cities") {
+    globe.customLayerData(state.points);
+  } else {
+    for (const point of state.points) delete point.__halo;
+    globe.customLayerData([]);
+  }
   globe.ringsData(
     state.selected && !state.selected.global
       ? [{ lat: state.selected.lat, lng: state.selected.lon }]
       : []
   );
+  refreshHalos();
+  syncMap();
   document.querySelectorAll(".layer-switch button").forEach((button) => {
     button.classList.toggle("on", button.dataset.layer === state.layer);
   });
@@ -307,7 +454,7 @@ function haversine(lat1, lon1, lat2, lon2) {
 
 /* --------------------------------------------------------------- selection */
 
-function selectPoint(point) {
+function selectPoint(point, options = {}) {
   if (!point) return;
   state.selected = point;
   state.selectedKind = point.isGrid ? "grid" : "city";
@@ -323,12 +470,18 @@ function selectPoint(point) {
   document.body.classList.add("has-case");
   renderCase();
   refreshLayer();
-  globe.pointOfView(
-    { lat: point.lat, lng: point.lon, altitude: point.isGrid ? 1.45 : 1.75 },
-    900
-  );
-  globe.controls().autoRotate = false;
-  clearTimeout(autoRotateTimer);
+  if (options.fly !== false) {
+    globe.pointOfView(
+      { lat: point.lat, lng: point.lon, altitude: point.isGrid ? 1.45 : 1.75 },
+      900
+    );
+    globe.controls().autoRotate = false;
+    clearTimeout(autoRotateTimer);
+  }
+  if (state.map && options.centerMap !== false) {
+    state.map.centerOn(point.lat, point.lon, point.isGrid ? 42 : 26);
+  }
+  syncMap();
   els.hint.textContent = point.isGrid
     ? "GISTEMP cell · click another cell"
     : `${point.name} · ${state.byCode.get(state.variable)?.short || "trend"}`;
@@ -345,6 +498,8 @@ function selectGlobal(windowKey = state.windowKey) {
   refreshLayer();
   globe.pointOfView({ lat: 12, lng: 8, altitude: 3.0 }, 900);
   globe.controls().autoRotate = true;
+  if (state.map) state.map.centerOn(12, 8, 120);
+  syncMap();
   els.hint.textContent = "Global field · click a cell or a city";
 }
 
@@ -355,6 +510,7 @@ function clearCase() {
   renderEmptyCase();
   refreshLayer();
   globe.controls().autoRotate = true;
+  syncMap();
   els.hint.textContent = "Drag to rotate · scroll to zoom · click a point";
 }
 
@@ -364,6 +520,195 @@ function openFeatured(id, code, windowKey) {
   state.variable = code;
   state.windowKey = windowKey || state.meta.windows[0];
   selectPoint(point);
+}
+
+/* --------------------------------------------------------------------- map */
+
+// Country outlines already loaded for the globe give an offline geocoder for
+// country names: the centroid of the country's largest ring is the target, and
+// the nearest record is what the case shows.
+function buildCountryCentroids() {
+  const map = new Map();
+  for (const country of countryFeatures || []) {
+    const label = country.properties?.name;
+    if (!label) continue;
+    const centre = largestRingCentroid(country.geometry);
+    if (centre) map.set(normalize(label), { ...centre, label });
+  }
+  return map;
+}
+
+function largestRingCentroid(geometry) {
+  if (!geometry) return null;
+  const polygons = geometry.type === "Polygon" ? [geometry.coordinates] : geometry.coordinates || [];
+  let best = null;
+  for (const rings of polygons) {
+    const ring = rings?.[0];
+    if (!ring || ring.length < 4) continue;
+    let twiceArea = 0;
+    let cx = 0;
+    let cy = 0;
+    for (let index = 0; index < ring.length - 1; index += 1) {
+      const [x1, y1] = ring[index];
+      const [x2, y2] = ring[index + 1];
+      const cross = x1 * y2 - x2 * y1;
+      twiceArea += cross;
+      cx += (x1 + x2) * cross;
+      cy += (y1 + y2) * cross;
+    }
+    const area = twiceArea / 2;
+    if (Math.abs(area) < 1e-6) continue;
+    if (!best || Math.abs(area) > best.area) {
+      best = { lat: cy / (6 * area), lon: cx / (6 * area), area: Math.abs(area) };
+    }
+  }
+  return best ? { lat: best.lat, lon: best.lon } : null;
+}
+
+function countryCentroid(name) {
+  if (!countryShapes) countryShapes = buildCountryCentroids();
+  return countryShapes.get(normalize(name)) || null;
+}
+
+function buildMap() {
+  if (!els.mapCanvas) return;
+  state.map = new MapView({
+    canvas: els.mapCanvas,
+    textureUrl: assetUrl("/textures/earth-blue-marble.jpg"),
+    points: state.points,
+    colorFor: (point) => pointColor(point),
+    onPick: (lat, lon) => locateFromInput(`${lat.toFixed(4)}, ${lon.toFixed(4)}`, { centerMap: false }),
+  });
+  syncMap();
+}
+
+function locateFromInput(text, { centerMap = true } = {}) {
+  const raw = String(text ?? "").trim();
+  if (!raw) return;
+  const result = resolveLocation(raw, { points: state.points, countryCentroid });
+  if (!result.ok) {
+    state.locate = { target: null, nearest: null, cell: null, error: result.reason };
+    syncMap();
+    showToast("No match in the offline place index.");
+    return;
+  }
+  applyLocation(result, { centerMap });
+}
+
+function applyLocation(result, { centerMap = true } = {}) {
+  const cell = nearestCell(result.target.lat, result.target.lon, state.gridPoints);
+  state.locate = { target: result.target, nearest: result.nearest, cell, error: null };
+  if (result.nearest?.point) {
+    selectPoint(result.nearest.point, { centerMap });
+  } else {
+    if (centerMap && globe) {
+      globe.pointOfView({ lat: result.target.lat, lng: result.target.lon, altitude: 2.2 }, 900);
+    }
+    syncMap();
+  }
+  if (result.target.kind === "coordinates" && result.nearest) {
+    showToast(
+      `${distanceText(result.nearest.km)} to ${result.nearest.point.name} — the nearest record for this area.`
+    );
+  }
+}
+
+function syncMap() {
+  if (!state.map) return;
+  const selected = state.selected && !state.selected.global ? state.selected : null;
+  const nearest = state.locate?.nearest?.point ? state.locate.nearest : null;
+  state.map.setPoints(state.points);
+  state.map.setSelected(selected);
+  state.map.setTarget(state.locate?.target || null, nearest, state.locate?.cell || null);
+  state.map.draw();
+  renderMapReadout();
+  const anchor = state.locate?.target || selected;
+  if (els.mapExternal && anchor) {
+    els.mapExternal.href = googleMapsUrl(anchor.lat, anchor.lon);
+    els.mapExternal.removeAttribute("aria-disabled");
+  }
+}
+
+function renderMapReadout() {
+  if (!els.mapReadout) return;
+  const locate = state.locate;
+  const selected = state.selected && !state.selected.global ? state.selected : null;
+  const rows = [];
+
+  if (locate?.error) {
+    rows.push(`<div class="map-point is-miss"><span>Not found</span>${escapeHtml(locate.error)}</div>`);
+    els.mapReadout.innerHTML = rows.join("");
+    return;
+  }
+
+  if (locate?.target) {
+    rows.push(
+      `<div class="map-point is-target"><span>Search</span><b>${escapeHtml(
+        locate.target.label
+      )}</b>${escapeHtml(formatLatLon(locate.target.lat, locate.target.lon))}</div>`
+    );
+    const nearest = locate.nearest;
+    if (nearest?.point) {
+      const offset = nearest.km > 1 ? ` ${escapeHtml(nearest.direction)}` : "";
+      rows.push(
+        `<div class="map-point"><span>Nearest station</span><b>${escapeHtml(
+          nearest.point.name
+        )}</b>${distanceText(nearest.km)}${offset}<button type="button" data-action="open-nearest">Open</button></div>`
+      );
+    } else {
+      rows.push(`<div class="map-point"><span>Nearest station</span>none in the bundle</div>`);
+    }
+    const cell = locate.cell;
+    if (cell && (!nearest || cell.km < nearest.km - 1)) {
+      rows.push(
+        `<div class="map-point"><span>GISTEMP cell</span><b>${escapeHtml(
+          cell.cell.name
+        )}</b>${distanceText(cell.km)}<button type="button" data-action="open-cell">Open</button></div>`
+      );
+    }
+    if (nearest && nearest.km > 150) {
+      rows.push(
+        `<p class="map-note">Closest record to this point, not an interpolation: the trend is the station's own series.</p>`
+      );
+    } else {
+      rows.push(`<p class="map-note">Drag the map, scroll to zoom, click anywhere to search that spot.</p>`);
+    }
+  } else if (selected) {
+    rows.push(
+      `<div class="map-point"><span>Selected</span><b>${escapeHtml(
+        selected.name || "Point"
+      )}</b>${escapeHtml(formatLatLon(selected.lat, selected.lon))}</div>`
+    );
+    rows.push(`<p class="map-note">Drag the map, scroll to zoom, click anywhere to search that spot.</p>`);
+  } else {
+    rows.push(
+      `<div class="map-empty">Click the map or enter a place to compare it with the nearest record.</div>`
+    );
+  }
+
+  els.mapReadout.innerHTML = rows.join("");
+}
+
+function distanceText(km) {
+  if (!Number.isFinite(km)) return "";
+  if (km < 1) return "< 1 km";
+  if (km < 10) return `${km.toFixed(1)} km`;
+  return `${Math.round(km).toLocaleString()} km`;
+}
+
+function renderLocateSuggestions() {
+  if (!els.locateSuggestions) return;
+  const names = new Set();
+  for (const point of state.points) {
+    names.add(point.name);
+    if (point.country && point.country !== point.continent) names.add(point.country);
+    for (const alias of point.aliases || []) names.add(alias);
+  }
+  for (const [name] of GAZETTEER) names.add(name);
+  els.locateSuggestions.innerHTML = [...names]
+    .sort((a, b) => a.localeCompare(b))
+    .map((name) => `<option value="${escapeHtml(name)}"></option>`)
+    .join("");
 }
 
 /* ------------------------------------------------------------------- cases */
@@ -1146,5 +1491,36 @@ function bindStaticEvents() {
   els.methodDone.addEventListener("click", () => els.methodDialog.close());
   els.methodDialog.addEventListener("click", (event) => {
     if (event.target === els.methodDialog) els.methodDialog.close();
+  });
+
+  els.locateForm?.addEventListener("submit", (event) => {
+    event.preventDefault();
+    locateFromInput(els.locateInput.value);
+  });
+
+  // On a short viewport the map panel is the second panel in the column; bring it
+  // into view as soon as the visitor starts using it.
+  els.locateInput?.addEventListener("focus", () => {
+    els.mapPanel?.scrollIntoView({ block: "nearest", behavior: "smooth" });
+  });
+
+  els.mapPanel?.addEventListener("click", (event) => {
+    const action = event.target.closest("[data-action], [data-map-action]");
+    if (!action || !els.mapPanel.contains(action)) return;
+    if (action.dataset.mapAction === "zoom-in") {
+      state.map?.zoomBy(0.7);
+      return;
+    }
+    if (action.dataset.mapAction === "zoom-out") {
+      state.map?.zoomBy(1.4);
+      return;
+    }
+    if (action.dataset.action === "open-nearest" && state.locate?.nearest?.point) {
+      selectPoint(state.locate.nearest.point, { centerMap: false });
+      return;
+    }
+    if (action.dataset.action === "open-cell" && state.locate?.cell?.cell) {
+      selectPoint(state.locate.cell.cell, { centerMap: false });
+    }
   });
 }

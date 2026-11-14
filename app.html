@@ -28,6 +28,7 @@
       <button class="ghost-btn" id="method-btn" type="button">Method</button>
     </header>
 
+    <div class="left-stack" id="left-stack">
     <aside class="panel ask-panel" id="ask-panel">
       <div class="panel-kicker">Intake</div>
       <h1>What do you want to investigate?</h1>
@@ -50,6 +51,53 @@
       <div id="plan" class="plan-wrap" aria-live="polite"></div>
       <div class="panel-foot">Local vector retrieval · every number comes from code</div>
     </aside>
+
+    <aside class="panel map-panel" id="map-panel" aria-labelledby="map-title">
+      <div class="panel-kicker">Map link</div>
+      <h2 id="map-title">Nearest case to a place</h2>
+      <form id="locate-form" autocomplete="off">
+        <label class="sr-only" for="locate-input">Place name or coordinates</label>
+        <input
+          id="locate-input"
+          name="place"
+          type="text"
+          list="locate-suggestions"
+          placeholder="Nairobi or -1.29, 36.82"
+          maxlength="80"
+        />
+        <datalist id="locate-suggestions"></datalist>
+        <button class="primary-btn" type="submit">Locate</button>
+      </form>
+      <div class="map-frame">
+        <canvas
+          id="map-canvas"
+          width="640"
+          height="380"
+          role="img"
+          aria-label="Map of the search area with the available stations"
+        ></canvas>
+        <div class="map-tools">
+          <button type="button" data-map-action="zoom-in" aria-label="Zoom in">+</button>
+          <button type="button" data-map-action="zoom-out" aria-label="Zoom out">−</button>
+        </div>
+      </div>
+      <div class="map-readout" id="map-readout" aria-live="polite">
+        <div class="map-empty">Click the map or enter a place to compare it with the nearest record.</div>
+      </div>
+      <div class="map-actions">
+        <a
+          class="ghost-btn"
+          id="map-external"
+          href="./app.html"
+          aria-disabled="true"
+          target="_blank"
+          rel="noopener noreferrer"
+          >Google Maps</a
+        >
+        <span class="map-note">Offline base map · Blue Marble</span>
+      </div>
+    </aside>
+    </div>
 
     <aside class="panel case-panel" id="case-panel" aria-live="polite">
       <div class="empty-state">
