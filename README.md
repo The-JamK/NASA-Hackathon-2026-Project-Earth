@@ -1,6 +1,6 @@
 # NASA Hackathon 2026 - Project Earth 
 
-Case Files — an Earth system trend detective for NASA Space Apps 2026.
+Case Files — an Earth system trend detective for NASA Space Apps 2026. 
 
 ## Run locally
 
