@@ -457,6 +457,37 @@ body.has-case .case-panel { display: block; }
   line-height: 1.5;
 }
 
+.plan-cities,
+.case-cities {
+  margin-top: 10px;
+  display: grid;
+  gap: 6px;
+}
+
+.plan-cities-label {
+  font-size: 9px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--dim);
+}
+
+.city-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.chip-small {
+  padding: 4px 8px;
+  font-size: 9px;
+}
+
+.chip.is-active {
+  color: var(--text);
+  border-color: rgba(95, 211, 224, 0.55);
+  background: rgba(95, 211, 224, 0.12);
+}
+
 /* ---------- case file ---------- */
 
 .case-head {

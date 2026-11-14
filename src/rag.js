@@ -79,6 +79,24 @@ export function resolvePlace(question, rag, points) {
   return { place: { global: true, name: "Global", lat: 0, lon: 0 }, resolved: false, alias: null };
 }
 
+/**
+ * A country name is not a station: it asks for the average across that country.
+ * Longest alias wins so "United States" beats a stray "us".
+ */
+export function resolveCountry(question, countries) {
+  if (!countries?.length) return null;
+  const text = String(question || "").toLowerCase();
+  let best = null;
+  for (const country of countries) {
+    for (const alias of country.aliases || []) {
+      if (!alias || alias.length < 3) continue;
+      if (!aliasRegex(alias).test(text)) continue;
+      if (!best || alias.length > best.alias.length) best = { country, alias };
+    }
+  }
+  return best;
+}
+
 export function parseTime(question) {
   const text = String(question || "");
   let start = 1990;
@@ -144,12 +162,20 @@ function matchedTerms(question, variable) {
   return tokenize(question).filter((token) => haystack.includes(token)).slice(0, 4);
 }
 
-export function planCase(question, { rag, points, variables }) {
+export function planCase(question, { rag, points, variables, countries }) {
   const clean = String(question || "").trim();
   if (!clean) return null;
 
   const ranked = rankVariables(clean, rag);
-  const { place, resolved, alias } = resolvePlace(clean, rag, points);
+  const city = resolvePlace(clean, rag, points);
+  const countryHit = resolveCountry(clean, countries);
+  // A country name should answer the country question, not silently pick its
+  // biggest city. A city name still wins when it is the more specific match.
+  const useCountry =
+    Boolean(countryHit) && (!city.resolved || countryHit.alias.length >= (city.alias || "").length);
+  const place = useCountry ? countryHit.country : city.place;
+  const resolved = useCountry || city.resolved;
+  const alias = useCountry ? countryHit.alias : city.alias;
   const time = parseTime(clean);
   const code = chooseVariable(clean, place, ranked);
   const variable = variables.find((item) => item.code === code) || variables[0];
@@ -158,7 +184,11 @@ export function planCase(question, { rag, points, variables }) {
   const terms = matchedTerms(clean, variable);
   const placePhrase = place.global
     ? "no city was named, so the plan uses the global field"
-    : `${alias ? `"${alias}"` : "the named place"} resolves to ${place.name}`;
+    : useCountry
+      ? `"${alias}" is a country, so this is the mean of its ${place.stations} station${
+          place.stations === 1 ? "" : "s"
+        }`
+      : `${alias ? `"${alias}"` : "the named place"} resolves to ${place.name}`;
   const termPhrase = terms.length
     ? `matched ${terms.map((term) => `"${term}"`).join(", ")} to ${variable.short.toLowerCase()}`
     : `the closest supported variable is ${variable.short.toLowerCase()}`;
@@ -174,7 +204,15 @@ export function planCase(question, { rag, points, variables }) {
     windowKey,
     confidence,
     explanation: `${termPhrase}; ${placePhrase}; using the ${windowKey.replace("-", "–")} record.`,
-    sources: `${variable.source} · ${place.global ? "GISTEMP global field" : `${place.name}, ${place.country}`}`,
+    kind: useCountry ? "country" : place.global ? "global" : "city",
+    cities: useCountry ? place.cities || [] : [],
+    sources: `${variable.source} · ${
+      place.global
+        ? "GISTEMP global field"
+        : useCountry
+          ? `${place.stations}-station mean, ${place.name}`
+          : `${place.name}, ${place.country}`
+    }`,
     alternatives: ranked
       .filter((item) => item.id !== code)
       .slice(0, 2)

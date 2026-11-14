@@ -11,6 +11,8 @@ import { formatLatLon, haversineKm, nearestCell, nearestRecord } from "./geo.js"
 const state = {
   variables: [],
   points: [],
+  countries: [],
+  countriesById: new Map(),
   meta: null,
   grid: null,
   gridPoints: [],
@@ -75,11 +77,12 @@ init();
 async function init() {
   bindStaticEvents();
   try {
-    const [variables, points, grid, rag, sources] = await Promise.all([
+    const [variables, points, grid, rag, countries, sources] = await Promise.all([
       loadJson(assetUrl("/data/variables.json")),
       loadJson(assetUrl("/data/points.json")),
       loadJson(assetUrl("/data/grid.json")),
       loadJson(assetUrl("/data/rag_index.json")),
+      loadJson(assetUrl("/data/countries.json")),
       loadJson(assetUrl("/data/sources.json")),
     ]);
 
@@ -88,6 +91,8 @@ async function init() {
     state.meta = points.meta;
     state.grid = grid;
     state.rag = rag;
+    state.countries = countries.countries;
+    state.countriesById = new Map(state.countries.map((country) => [country.id, country]));
     state.sources = sources.sources;
     state.windowKey = points.meta.windows[0];
     state.byCode = new Map(state.variables.map((variable) => [variable.code, variable]));
@@ -677,8 +682,111 @@ function distanceText(km) {
 function renderCase() {
   if (state.selectedKind === "global") return renderGlobalCase();
   if (state.selectedKind === "grid") return renderGridCase();
+  if (state.selectedKind === "country") return renderCountryCase();
   if (state.selectedKind === "city") return renderCityCase();
   renderEmptyCase();
+}
+
+function selectCountry(country) {
+  if (!country) return;
+  clearRecommendation();
+  state.selected = country;
+  state.selectedKind = "country";
+  state.layer = "cities";
+  if (!country.trends?.[state.variable]?.[state.windowKey]) {
+    state.variable = country.trends?.T2M ? "T2M" : Object.keys(country.trends || {})[0] || "T2M";
+  }
+  document.body.classList.add("has-case");
+  renderCase();
+  refreshLayer();
+  globe.pointOfView({ lat: country.lat, lng: country.lon, altitude: 2.15 }, 900);
+  globe.controls().autoRotate = false;
+  clearTimeout(autoRotateTimer);
+  els.hint.textContent = `${country.name} · mean of ${country.stations} stations`;
+}
+
+function countryNarrative(country, variable, trend, windowKey) {
+  if (!trend) {
+    return `No ${variable.short.toLowerCase()} series is available for ${country.name} in the ${windowKey.replace("-", "–")} window.`;
+  }
+  const direction = trend.slope_per_decade >= 0 ? "rose" : "fell";
+  const correction = trend.significant
+    ? ` It survives the Benjamini–Hochberg correction across ${state.countries.length} country averages (q = ${formatP(
+        trend.q_value
+      )}).`
+    : trend.p_value < 0.05
+      ? ` It is locally significant but does not survive the correction across ${state.countries.length} country averages (q = ${formatP(
+          trend.q_value
+        )}).`
+      : ` It does not survive the HAC test at the 5% level (q = ${formatP(trend.q_value)}).`;
+  return `Averaged over the ${country.stations} ${country.name} station${
+    country.stations === 1 ? "" : "s"
+  } in this bundle, annual ${variable.short.toLowerCase()} ${direction} by <strong>${signed(
+    trend.slope_per_decade
+  )} ${variable.units} per decade</strong> over ${windowKey.replace(
+    "-",
+    "–"
+  )} (95% CI ${signed(trend.ci_low_per_decade)} to ${signed(
+    trend.ci_high_per_decade
+  )}; n = ${trend.n}; HAC p ${pText(trend.p_value)}).${correction} A country mean describes the stations, not every square kilometre: they cluster where people live, so desert and mountain interiors are represented only as far as the network reaches. This is a trend detection, not an attribution.`;
+}
+
+function renderCountryCase() {
+  const country = state.selected;
+  const code = state.variable === "GISTEMP" ? "T2M" : state.variable;
+  const variable = state.byCode.get(code) || state.variables[0];
+  const trend = country.trends?.[code]?.[state.windowKey] || null;
+  const series = country.series?.[code] || [];
+  const window = seriesWindow(series, state.meta.years, state.windowKey);
+  const info = verdictInfo(trend, variable);
+  const id = caseId(`${country.id}:${code}:${state.windowKey}`);
+
+  els.casePanel.innerHTML = `
+    <div class="case-head">
+      <div class="case-id">${id}</div>
+      <button class="case-close" data-action="close-case" type="button">Close</button>
+    </div>
+    <h2 class="place-title">${escapeHtml(country.name)}</h2>
+    <p class="place-sub">Country average · ${country.stations} station${
+      country.stations === 1 ? "" : "s"
+    } · ${escapeHtml(country.continent)}</p>
+    ${variableChips(variable, false)}
+    ${windowChips()}
+    <p class="narrative">${countryNarrative(country, variable, trend, state.windowKey)}</p>
+    ${verdictBlock(trend, variable, info)}
+    ${caveatBlock(trend, variable, false)}
+    <div class="chart" id="case-chart"></div>
+    <dl class="facts">
+      <div><dt>Stations averaged</dt><dd>${country.stations}</dd></div>
+      <div><dt>With all four variables</dt><dd>${country.full_coverage}</dd></div>
+      <div><dt>Series</dt><dd>${state.windowKey.replace("-", "–")} · n = ${
+        window.years.length
+      }</dd></div>
+      <div><dt>Source</dt><dd>NASA POWER (MERRA-2 derived) · station mean</dd></div>
+    </dl>
+    ${caseSources(null, variable)}
+    <div class="case-cities">
+      <div class="plan-cities-label">Open a city in ${escapeHtml(country.name)}</div>
+      <div class="city-chips">${country.cities
+        .map(
+          (city) =>
+            `<button class="chip chip-small" type="button" data-action="open-city" data-city-id="${escapeHtml(
+              city.id
+            )}">${escapeHtml(city.name)}</button>`
+        )
+        .join("")}</div>
+    </div>
+    ${workBlock("point")}
+  `;
+  renderSeriesChart(document.getElementById("case-chart"), {
+    years: window.years,
+    values: window.values,
+    trend,
+    variable,
+    xLabel: state.windowKey.replace("-", "–"),
+    yLabel: variable.units,
+  });
+  els.casePanel.scrollTop = 0;
 }
 
 function renderCityCase() {
@@ -1112,15 +1220,31 @@ function renderPlan(plan) {
       <span class="panel-kicker">Case plan</span>
       <span class="plan-confidence">${confidence}% match</span>
     </div>
-    <div class="plan-title">${escapeHtml(plan.variable.label)}</div>
-    <div class="plan-meta">${escapeHtml(plan.place.name)} · ${plan.windowKey.replace(
-      "-",
-      "–"
-    )} · ${escapeHtml(plan.variable.units)}</div>
+    <div class="plan-title">${escapeHtml(
+      plan.kind === "country" ? `${plan.place.name} average` : plan.variable.label
+    )}</div>
+    <div class="plan-meta">${escapeHtml(plan.place.name)}${
+      plan.kind === "country" ? ` · ${plan.place.stations} stations` : ""
+    } · ${plan.windowKey.replace("-", "–")} · ${escapeHtml(plan.variable.units)}</div>
     <p class="plan-why">${escapeHtml(plan.explanation)}</p>
     <div class="plan-sources">${escapeHtml(plan.sources)}${
       plan.note ? `<br>${escapeHtml(plan.note)}` : ""
     }</div>
+    ${
+      plan.cities?.length
+        ? `<div class="plan-cities">
+      <div class="plan-cities-label">Or open a city in ${escapeHtml(plan.place.name)}</div>
+      <div class="city-chips">${plan.cities
+        .map(
+          (city) =>
+            `<button class="chip chip-small" type="button" data-action="plan-city" data-city-id="${escapeHtml(
+              city.id
+            )}">${escapeHtml(city.name)}</button>`
+        )
+        .join("")}</div>
+    </div>`
+        : ""
+    }
     <div class="plan-actions">
       <button class="primary-btn" type="button" data-action="run-plan">Run this case</button>
       <button class="ghost-btn" type="button" data-action="clear-plan">Clear</button>
@@ -1140,7 +1264,27 @@ function handleAsk(question) {
     rag: state.rag,
     points: state.points,
     variables: state.variables,
+    countries: state.countries,
   });
+  state.plan = plan;
+  renderPlan(plan);
+}
+
+function planForCity(cityId) {
+  const point = state.byId.get(cityId);
+  const base = state.plan;
+  if (!point || !base) return;
+  const plan = {
+    ...base,
+    kind: "city",
+    place: point,
+    cities: [],
+    sources: `${base.variable.source} · ${point.name}, ${point.country}`,
+    explanation: `"${point.name.toLowerCase()}" resolves to ${point.name}; using the ${base.windowKey.replace(
+      "-",
+      "–"
+    )} record.`,
+  };
   state.plan = plan;
   renderPlan(plan);
 }
@@ -1149,6 +1293,11 @@ function runPlan() {
   const plan = state.plan;
   if (!plan) return;
   state.windowKey = plan.windowKey;
+  if (plan.kind === "country") {
+    selectCountry(plan.place);
+    showToast(`Case opened: ${plan.variable.short} · ${plan.place.name} average`);
+    return;
+  }
   if (plan.place.global) {
     selectGlobal(plan.windowKey);
   } else {
@@ -1396,6 +1545,7 @@ function bindStaticEvents() {
     const action = event.target.closest("[data-action]");
     if (!action) return;
     if (action.dataset.action === "run-plan") runPlan();
+    if (action.dataset.action === "plan-city") planForCity(action.dataset.cityId);
     if (action.dataset.action === "clear-plan") {
       state.plan = null;
       renderPlan(null);
@@ -1408,6 +1558,11 @@ function bindStaticEvents() {
     const name = action.dataset.action;
     if (name === "close-case") {
       clearCase();
+      return;
+    }
+    if (name === "open-city") {
+      const point = state.byId.get(action.dataset.cityId);
+      if (point) selectPoint(point);
       return;
     }
     if (name === "select-variable") {

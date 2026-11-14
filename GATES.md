@@ -182,6 +182,31 @@ Last verified: 2026-11-14
 
 ## Status
 
-MET: 35
+- [x] G36: Every country in the bundle has a country-average record: a mean annual series, trends for every variable and window, and its stations accounted for.
+  CHECK: uv run python scripts/verify_countries.py
+  EXPECT: countries verified
+  EVIDENCE: `build_countries` groups the 688 stations into 222 countries, averages each annual value across that country's stations, and runs the same estimator at country scale with Benjamini–Hochberg applied across the 222 averages. The verifier recomputes every mean value from the member stations and requires it to sit inside the station range: `countries: 222 · stations: 688 · 175 averaged over several stations`. Antarctica carries three variables rather than four because McMurdo has no root-zone soil moisture, and the checker requires exactly the variables its stations carry.
+
+- [x] G37: A country question plans a country-average case and offers that country's cities, while city and global questions keep their current plans.
+  CHECK: node scripts/verify_country_plan.mjs
+  EXPECT: country plan verified
+  EVIDENCE: `resolveCountry` matches country names and short spellings with word boundaries and prefers the longer match, so "Is France warming?" plans the country average even though Paris carries a "france" alias, while Nairobi, Delhi, London, Yakutsk and the Sahel question still plan their city cases and "Is the world warming?" still plans the global field. The runner plans all 222 countries: `country plans: 222 · city regressions: 5 · global: 1 · aliases: 226`.
+
+- [x] G38: The plan card lists the country's cities and the country case renders its station count (manual browser check).
+  CHECK: manual
+  EXPECT: the country plan shows an average line plus clickable city suggestions, and opening it renders a case with the station count.
+  EVIDENCE: On the dev server, "Is France warming?" produced a plan card reading `France average · France · 3 stations · 1990–2025 · °C` with Paris, Lyon and Marseille as chips; clicking a chip re-planned that city (Paris, city case). "Is India warming?" opened a country case headed `COUNTRY AVERAGE · 9 STATIONS · ASIA` with the mean series, `Stations averaged 9`, and eight city chips. Clicking Paris opened the city case. Screenshot captured at the India country average: +0.037 °C per decade, `NOT PROVEN`.
+
+- [x] G39: The full check suite still passes with country averages in the bundle.
+  CHECK: bash scripts/verify_all.sh
+  EXPECT: all checks passed
+  EVIDENCE: Ran `bash scripts/verify_all.sh`; every check passed and the run ended with `all checks passed`. The new bundle is 688 points, 222 country averages, 4,039 grid cells, 620 city suggestions, with `countries.json` 2.0 MB made from the same station series.
+
+- [x] G40: The country-average feature is pushed, deployed and resolves on the live site.
+  CHECK: bash scripts/verify_live.sh
+  EXPECT: live verified
+  EVIDENCE: Pushed and confirmed with `bash scripts/verify_live.sh`: `points.json`, `rag_index.json` and `countries.json` all match `dist`, and the deployed bundle plans all 222 country averages plus the city spot checks (`live plan verified`).
+
+MET: 40
 UNMET: 0
 ABANDONED: 0

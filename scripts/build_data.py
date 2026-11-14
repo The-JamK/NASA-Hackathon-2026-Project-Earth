@@ -17,6 +17,7 @@ import json
 import math
 import re
 import sys
+import unicodedata
 import time
 from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime, timezone
@@ -567,6 +568,118 @@ def build_rag(variables_payload: dict[str, Any], points_payload: dict[str, Any])
     }
 
 
+def _country_slug(name: str) -> str:
+    ascii_name = unicodedata.normalize("NFKD", name).encode("ascii", "ignore").decode("ascii")
+    slug = re.sub(r"[^a-z0-9]+", "-", ascii_name.lower()).strip("-")
+    return f"country-{slug or 'unnamed'}"
+
+
+def build_countries(points_payload: dict[str, Any]) -> dict[str, Any]:
+    """One average record per country: the mean of its stations, year by year.
+
+    A country answer needs a series rather than a slope average: averaging the
+    annual values keeps the year-to-year shape, so the same trend code that
+    reads a city reads a country. Slopes would otherwise be averaged without
+    the years they came from.
+    """
+
+    meta = points_payload.get("meta", {})
+    years = list(meta.get("years") or range(START, END + 1))
+    groups: dict[str, list[dict[str, Any]]] = {}
+    for point in points_payload["points"]:
+        groups.setdefault(point["country"], []).append(point)
+
+    countries: list[dict[str, Any]] = []
+    for name in sorted(groups):
+        members = groups[name]
+        series: dict[str, list[float | None]] = {}
+        for code in POWER_CODES:
+            arrays = [
+                member["series"][code]
+                for member in members
+                if code in (member.get("series") or {})
+            ]
+            if not arrays:
+                continue
+            mean_values: list[float | None] = []
+            for index in range(len(years)):
+                values = [
+                    array[index]
+                    for array in arrays
+                    if index < len(array)
+                    and isinstance(array[index], (int, float))
+                    and math.isfinite(array[index])
+                ]
+                mean_values.append(round(sum(values) / len(values), 4) if values else None)
+            if all(value is None for value in mean_values):
+                # Antarctica's McMurdo has no root-zone soil moisture at all, so
+                # the country simply has no series for that variable.
+                continue
+            series[code] = mean_values
+
+        trends: dict[str, dict[str, Any]] = {}
+        for code, values in series.items():
+            pairs = [
+                (years[index], value)
+                for index, value in enumerate(values)
+                if isinstance(value, (int, float)) and math.isfinite(value)
+            ]
+            trends[code] = {}
+            for window_start, window_end, key in WINDOWS:
+                window_pairs = [(year, value) for year, value in pairs if window_start <= year <= window_end]
+                trends[code][key] = compute_trend(
+                    [year for year, _ in window_pairs], [value for _, value in window_pairs]
+                )
+
+        weights = [member.get("population") or 1 for member in members]
+        total_weight = sum(weights) or 1
+        lat = sum(member["lat"] * weight for member, weight in zip(members, weights)) / total_weight
+        lon = sum(member["lon"] * weight for member, weight in zip(members, weights)) / total_weight
+        ranked = sorted(members, key=lambda member: member.get("population") or 0, reverse=True)
+        continents = [member["continent"] for member in members if member.get("continent")]
+        continent = max(set(continents), key=continents.count) if continents else ""
+        aliases = [name.lower(), *COUNTRY_SPELLINGS.get(name, ())]
+
+        countries.append(
+            {
+                "id": _country_slug(name),
+                "name": name,
+                "continent": continent,
+                "lat": round(lat, 4),
+                "lon": round(lon, 4),
+                "stations": len(members),
+                "full_coverage": sum(1 for member in members if _coverage(member["series"]) == len(POWER_CODES)),
+                "aliases": aliases,
+                "series": series,
+                "trends": trends,
+                "cities": [
+                    {
+                        "id": member["id"],
+                        "name": member["name"],
+                        "population": int(member.get("population") or 0),
+                    }
+                    for member in ranked[:8]
+                ],
+            }
+        )
+
+    # Same false-discovery control the grid uses, applied across country averages
+    # so "significant" means the same thing at both scales.
+    for code in POWER_CODES:
+        for _, _, key in WINDOWS:
+            refs = [country for country in countries if country["trends"].get(code, {}).get(key)]
+            if not refs:
+                continue
+            q_values, significant = benjamini_hochberg(
+                [country["trends"][code][key]["p_value"] for country in refs], q=0.05
+            )
+            for country, q_value, is_significant in zip(refs, q_values, significant):
+                country["trends"][code][key]["q_value"] = _round(float(q_value), 6)
+                country["trends"][code][key]["significant"] = bool(is_significant)
+
+    return {"meta": {"start_year": START, "end_year": END, "years": years}, "countries": countries}
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--env-file", default=str(ROOT / ".env"))
@@ -666,6 +779,12 @@ def main() -> int:
     rag_payload = build_rag(variables_payload, points_payload)
     (PUBLIC / "rag_index.json").write_text(json.dumps(rag_payload, ensure_ascii=False, separators=(",", ":")), encoding="utf-8")
 
+    countries_payload = build_countries(points_payload)
+    (PUBLIC / "countries.json").write_text(
+        json.dumps(countries_payload, ensure_ascii=False, separators=(",", ":")), encoding="utf-8"
+    )
+    print(f"  countries.json       {len(countries_payload['countries']):7d} countries")
+
     if args.skip_imagery:
         sources.append(
             existing_sources.get("blue-marble")
@@ -691,7 +810,14 @@ def main() -> int:
     )
 
     print("\nwrote:")
-    for name in ("variables.json", "points.json", "grid.json", "rag_index.json", "sources.json"):
+    for name in (
+        "variables.json",
+        "points.json",
+        "grid.json",
+        "rag_index.json",
+        "countries.json",
+        "sources.json",
+    ):
         path = PUBLIC / name
         print(f"  {name:18s} {path.stat().st_size / 1024:8.1f} KB")
     print(f"  points: {len(points_payload['points'])} · grid cells: {len(grid_payload['cells'])}")

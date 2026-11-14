@@ -59,6 +59,17 @@ const rag = await json("/data/rag_index.json");
 if (rag.docs.length < 5) fail("retrieval documents missing");
 if (rag.places.length !== points.points.length) fail("retrieval places do not match points");
 
+const countries = await json("/data/countries.json");
+if (countries.countries.length !== new Set(points.points.map((point) => point.country)).size) {
+  fail("the country averages do not cover every country");
+}
+if (countries.countries.some((country) => !country.cities?.length)) {
+  fail("a country ships without city suggestions");
+}
+if (countries.countries.reduce((total, country) => total + country.stations, 0) !== points.points.length) {
+  fail("the country station counts do not add up to the stations");
+}
+
 const sources = await json("/data/sources.json");
 if (sources.sources.length !== 6) fail("expected six source checks");
 if (sources.sources.some((source) => source.status !== "ok")) fail("a source is not ok");
@@ -88,6 +99,8 @@ if (!main.includes("new Globe")) fail("main.js does not mount the globe");
 if (!main.includes("planCase")) fail("main.js is not wired to the retrieval planner");
 if (!main.includes("recommendAt")) fail("main.js does not recommend the nearest record on tap");
 if (!main.includes("nearestCell")) fail("main.js does not look up the nearest GISTEMP cell");
+if (!main.includes("renderCountryCase")) fail("main.js does not render the country average case");
+if (!main.includes("plan-city")) fail("the plan card does not offer city suggestions");
 
 // Chrome copy that was removed on purpose: the tagline, the dot inside the
 // wordmark, the intake label and the case board wording must not come back.
@@ -132,4 +145,5 @@ console.log(`assets: 3 textures · ${points.points.filter((point) => point.image
 console.log("recommendation: overlay element served and wired to the tap handler");
 console.log("chrome: tagline, brand dot, Intake label and case board wording removed");
 console.log("case layout: narrative paragraph above the verdict block");
+console.log(`country averages: ${countries.countries.length} · cities suggested: ${countries.countries.reduce((total, country) => total + country.cities.length, 0)}`);
 console.log("app verified");
