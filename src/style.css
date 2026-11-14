@@ -127,6 +127,20 @@ button { color: inherit; }
   white-space: nowrap;
 }
 
+a.source-pill {
+  text-decoration: none;
+  cursor: pointer;
+  transition: border-color 0.15s ease, color 0.15s ease, background 0.15s ease;
+}
+
+a.source-pill:hover,
+a.source-pill:focus-visible {
+  border-color: var(--line-strong);
+  background: rgba(14, 24, 34, 0.8);
+  color: var(--text);
+  outline: none;
+}
+
 .source-pill i {
   width: 4px;
   height: 4px;
