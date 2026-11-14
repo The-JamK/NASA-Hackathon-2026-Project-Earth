@@ -55,7 +55,15 @@ export function resolvePlace(question, rag, points) {
       if (alias && alias.length > 1) candidates.push({ alias, place });
     }
   }
-  candidates.sort((a, b) => b.alias.length - a.alias.length);
+  // Longest alias wins (“united states” over “us”); within one alias, every
+  // station of a country matches, so prefer the hand-curated case, then the
+  // largest population, so “USA” and “United States” land on the same station.
+  candidates.sort(
+    (a, b) =>
+      b.alias.length - a.alias.length ||
+      (b.place.primary ? 1 : 0) - (a.place.primary ? 1 : 0) ||
+      (b.place.weight || 0) - (a.place.weight || 0)
+  );
 
   for (const { alias, place } of candidates) {
     if (aliasRegex(alias).test(text)) {

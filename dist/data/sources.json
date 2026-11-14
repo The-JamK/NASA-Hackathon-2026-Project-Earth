@@ -1,12 +1,12 @@
 {
- "generated_utc": "2026-11-14T07:27:35+00:00",
+ "generated_utc": "2026-11-14T07:39:51+00:00",
  "sources": [
   {
    "id": "earthdata",
    "name": "NASA Earthdata",
    "kind": "auth",
    "status": "ok",
-   "detail": "Authenticated; MERRA-2 M2TMNXSLV search returned 1 granule(s) · verified in an earlier build; credentials are not set in this environment · verified in an earlier build; credentials are not set in this environment · verified in an earlier build; credentials are not set in this environment · verified in an earlier build; credentials are not set in this environment · verified in an earlier build; credentials are not set in this environment · verified in an earlier build; credentials are not set in this environment · verified in an earlier build; credentials are not set in this environment · verified in an earlier build; credentials are not set in this environment · verified in an earlier build; credentials are not set in this environment · verified in an earlier build; credentials are not set in this environment",
+   "detail": "Authenticated; MERRA-2 M2TMNXSLV search returned 1 granule(s) · verified in an earlier build; credentials are not set in this environment · verified in an earlier build; credentials are not set in this environment · verified in an earlier build; credentials are not set in this environment · verified in an earlier build; credentials are not set in this environment · verified in an earlier build; credentials are not set in this environment · verified in an earlier build; credentials are not set in this environment · verified in an earlier build; credentials are not set in this environment · verified in an earlier build; credentials are not set in this environment · verified in an earlier build; credentials are not set in this environment · verified in an earlier build; credentials are not set in this environment · verified in an earlier build; credentials are not set in this environment · verified in an earlier build; credentials are not set in this environment · verified in an earlier build; credentials are not set in this environment",
    "granules": 1
   },
   {

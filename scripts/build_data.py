@@ -323,6 +323,15 @@ def build_grid(env: dict[str, str], sources: list[dict[str, Any]]) -> dict[str, 
     }
 
 
+# Short spellings a country answers to. They are stamped on every station of
+# that country so "USA" and "United States" reach the same case.
+COUNTRY_SPELLINGS = {
+    "United States": ("usa", "us"),
+    "United Arab Emirates": ("uae",),
+    "United Kingdom": ("uk", "britain"),
+}
+
+
 def curated_rows() -> list[dict[str, Any]]:
     return [
         {
@@ -436,6 +445,16 @@ def build_points(
             if live:
                 live_count += 1
 
+        # Every station answers to its country name, so "Is the United States
+        # warming?" reaches the same place as "Is the USA warming?". The
+        # population lets the resolver pick the principal station when several
+        # share that alias.
+        aliases = [alias for alias in row["aliases"] if alias]
+        for spelling in [row["country"], *COUNTRY_SPELLINGS.get(row["country"], ())]:
+            spelling = spelling.strip().lower()
+            if spelling and spelling not in aliases:
+                aliases.append(spelling)
+
         points.append(
             {
                 "id": slug,
@@ -444,7 +463,9 @@ def build_points(
                 "continent": row["continent"],
                 "lat": row["lat"],
                 "lon": row["lon"],
-                "aliases": row["aliases"],
+                "aliases": aliases,
+                "population": int(row.get("population") or 0),
+                "primary": bool(row.get("curated")),
                 "featured": slug in FEATURED,
                 "series": series,
                 "trends": trends,
@@ -538,6 +559,8 @@ def build_rag(variables_payload: dict[str, Any], points_payload: dict[str, Any])
                 "lat": point["lat"],
                 "lon": point["lon"],
                 "id": point["id"],
+                "weight": point.get("population", 0),
+                "primary": bool(point.get("primary")),
             }
             for point in points_payload["points"]
         ],
@@ -597,6 +620,11 @@ def main() -> int:
 
     curated = curated_rows()
     candidates = candidate_cities()
+    # The hand-curated table has no population column; borrow Natural Earth's so
+    # a country query resolves to the biggest station rather than an arbitrary one.
+    population_by_name = {row["name"].strip().lower(): row["population"] for row in candidates}
+    for row in curated:
+        row["population"] = population_by_name.get(row["name"].strip().lower(), 0)
     new_rows = [{**row, "curated": False} for row in merge_new_cities(curated, candidates)]
     sparse_rows = [
         {**row, "curated": False}

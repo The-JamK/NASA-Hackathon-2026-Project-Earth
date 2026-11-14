@@ -42,6 +42,9 @@ uv run python scripts/render_context.py --only <slug>   # Blue Marble fallback
 uv run python scripts/fetch_sentinel.py --only <slug>    # Sentinel-2 upgrade
 ```
 
+Every station answers to its country name, so "Is the United States warming?" opens the
+country's largest hand-curated case instead of falling back to the global field.
+
 The result is 688 points across 222 countries and territories: 687 carry all four
 variables, and McMurdo keeps three as the red-herring case. Russia holds 28 stations,
 northern China 12, North Africa 30, North America 96, South America 66, Australia 12,
