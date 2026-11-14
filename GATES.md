@@ -307,6 +307,19 @@ Last verified: 2026-11-14
   EVIDENCE: `finishGlobeTap` now branches before the station path: in the Ocean layer it waits for `ocean.json`, takes the nearest ocean cell within 3° (the 4° grid's half-diagonal is 2.8°), and resolves that cell with `oceanRegionAt`, which repeats the build's wrapped box test — `(lon - start) % 360 <= span` over `lat_bounds`/`lon_bounds` — and skips the aggregate, which matches every point. The verifier round-trips the first twelve cells of every basin back through `oceanRegionAt` and requires the same basin, pins mid-Pacific → Tropical Pacific, N Atlantic (39,−39) → North Atlantic, Southern Ocean (−61,1) → Southern Ocean and Arctic (87,1) → Arctic Ocean, and requires the Sahara (19,9) to resolve to nothing. Water in no basin is handled separately: 339 cells (the tropical Atlantic, for one) resolve to null, and the tap path sends them to the global ocean with `this water is outside the named basins` rather than calling them land — the check pins that count, the null case at (−1,−31) and the fallback marker. In the browser, a synthetic pointer tap on the Atlantic opened `North Atlantic`, `Ocean region · sea surface temperature · 178 GISTEMP cells`, with the toast `Ocean case: North Atlantic · 178 cells` and no station card. A tap on land in the same layer produced `Land — the Ocean layer only shows water. Switch to Cities to ask about a station.` and opened no case, so the old nearest-city behaviour cannot fire from the water view.
   NOTE: The taps were synthesised as pointer events on the canvas at screen fractions, so they prove the handler and the mapping, not finger accuracy on a phone.
 
-MET: 57
+- [x] G59: The landing hero carries its copy in six bordered boxes and ships no leader lines or dots.
+  CHECK: node scripts/verify_app.mjs
+  EXPECT: app verified
+  EVIDENCE: The hero markup is six `<article class="hero-box">` blocks — name/tagline/NASA label, members, about, challenge, local event and data — inside `.hero-boxes`. `scripts/verify_app.mjs` now fails if any of the six strings is missing, if the box count is not six, or if `hero-line`/`hero-lines`/`hero-dot` markup returns, and it prints `hero: six copy boxes, no leader lines`. Run against the dev server it exited 0 with that line and `app verified`; `verify_offline.mjs` still passes.
+
+- [x] G60: The boxes sit behind the sphere, no box text is covered, and the phone layout stacks them around the globe.
+  MANUAL: reviewed artifacts/boxes-1440d.png, artifacts/boxes-1280.png and artifacts/boxes-390.png, plus rect measurements reported by the browser.
+  EVIDENCE: `.hero-boxes` is z-index 1 and `.hero-stage` is z-index 2, so the canvas paints over the boxes. At 1440×900 the left boxes occupy x 40–343 and the right boxes 1096–1384, with text right edges at 245/236/262 and text left edge 1112 — the sphere only takes the inner few pixels of the members and about boxes and no glyph is under it. The globe was enlarged (camera altitude 1.44 on desktop) so that edge contact is visible at all; the earlier 1.62 left a clear gap on every side. At 390×844 the order is name (y 134), globe (265–704), about, members, data, challenge, event, scroll, the stage is 331×439 and `scrollWidth` 375 ≤ 390, so nothing overflows.
+
+- [x] G61: The boxed hero keeps the globe's hover, dialog, focus and reduced-motion behaviour on the built site.
+  MANUAL: browser run against the built `dist` at 1440×900 and 390×844.
+  EVIDENCE: Hover sets `is-hovering`, shows `Click to open the case` and a pointer cursor; a click opens the native dialog; Escape closes it and focus returns to `hero-globe`; the focus ring reads `rgb(255, 107, 74)`. With `reducedMotion: reduce`, two full screenshots two seconds apart are byte-identical (rotation stopped) and `.hero-box` opacity is 1, so the copy appears without the staggered draw-in. At 390×844 a click on the globe's centre opens the dialog. That last check used a mouse click at the globe's centre, not a real touch event: this browser context has no touch support, so finger accuracy is still unproven.
+
+MET: 60
 UNMET: 1
 ABANDONED: 0

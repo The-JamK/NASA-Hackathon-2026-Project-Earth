@@ -1392,7 +1392,7 @@ html.landing body {
 .hero-stage {
   position: absolute;
   inset: 0;
-  z-index: 0;
+  z-index: 2;
 }
 
 .hero-scene {
@@ -1430,45 +1430,66 @@ html.landing body {
   outline-offset: -8px;
 }
 
-/* ---------- callouts ---------- */
+/* ---------- boxes ---------- */
 
-.callout {
+.hero {
+  --box-left: clamp(16px, 2.8vw, 48px);
+}
+
+.hero-boxes {
   position: absolute;
-  z-index: 2;
-  max-width: 302px;
+  inset: 0;
+  z-index: 1;
+  pointer-events: none;
+}
+
+.hero-box {
+  position: absolute;
+  width: clamp(248px, 20vw, 300px);
+  padding: 13px 15px 14px;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  border-radius: 2px;
+  background: rgba(4, 7, 12, 0.78);
   opacity: 0;
 }
 
-.hero.is-ready .callout {
-  animation: callout-in 0.75s ease forwards;
+.hero.is-ready .hero-box {
+  animation: hero-box-in 0.7s ease forwards;
 }
-.hero.is-ready .callout--name { animation-delay: 0.2s; }
-.hero.is-ready .callout--about { animation-delay: 0.35s; }
-.hero.is-ready .callout--data { animation-delay: 0.5s; }
+.hero.is-ready .hero-box--name { animation-delay: 0.18s; }
+.hero.is-ready .hero-box--members { animation-delay: 0.33s; }
+.hero.is-ready .hero-box--about { animation-delay: 0.48s; }
+.hero.is-ready .hero-box--challenge { animation-delay: 0.63s; }
+.hero.is-ready .hero-box--event { animation-delay: 0.78s; }
+.hero.is-ready .hero-box--data { animation-delay: 0.93s; }
 
-@keyframes callout-in {
+@keyframes hero-box-in {
   to { opacity: 1; }
 }
 
-.callout--name { left: clamp(20px, 5vw, 88px); top: 24vh; }
-.callout--about { left: clamp(20px, 5vw, 88px); bottom: 19vh; }
-.callout--data { right: clamp(20px, 5vw, 88px); bottom: 23vh; }
+/* The sphere passes in front of these, so only their inner edge is covered. */
+.hero-box--name { left: var(--box-left); top: 9vh; width: clamp(248px, 21vw, 312px); }
+.hero-box--members { left: var(--box-left); top: 47vh; }
+.hero-box--about { left: var(--box-left); bottom: 9vh; }
+.hero-box--challenge { right: var(--box-left); top: 12vh; }
+.hero-box--event { right: var(--box-left); top: 45vh; }
+.hero-box--data { right: var(--box-left); bottom: 11vh; }
 
 .hero-name {
   margin: 0 0 8px;
   font-family: Fraunces, "Iowan Old Style", "Palatino Linotype", Georgia, serif;
   font-weight: 350;
-  font-size: clamp(38px, 5.2vw, 74px);
-  line-height: 0.98;
+  font-size: clamp(32px, 3.4vw, 50px);
+  line-height: 1;
   letter-spacing: -0.025em;
   color: var(--paper);
 }
 
 .hero-tagline {
-  margin: 0 0 12px;
+  margin: 0 0 10px;
   font-family: Fraunces, Georgia, serif;
   font-style: italic;
-  font-size: clamp(17px, 1.6vw, 22px);
+  font-size: clamp(16px, 1.25vw, 20px);
   font-weight: 350;
   letter-spacing: 0.01em;
   color: #d9cfc0;
@@ -1483,48 +1504,15 @@ html.landing body {
   color: var(--paper-dim);
 }
 
-.callout-text {
+.hero-box-text {
   margin: 0;
-  max-width: 30ch;
-  font-size: 13px;
+  max-width: 32ch;
+  font-size: 12.5px;
   line-height: 1.62;
   color: var(--paper-dim);
 }
 
-.callout--data .hero-label { margin-bottom: 8px; }
-
-/* ---------- leader lines ---------- */
-
-.hero-lines {
-  position: absolute;
-  inset: 0;
-  z-index: 1;
-  width: 100%;
-  height: 100%;
-  overflow: visible;
-  pointer-events: none;
-}
-
-.hero-line {
-  fill: none;
-  stroke: #ff6b4a;
-  stroke-width: 1;
-  stroke-linecap: round;
-  stroke-dasharray: 1;
-  stroke-dashoffset: 1;
-  transition: stroke-dashoffset 0.9s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.3s linear;
-}
-
-.hero.is-ready .hero-line { stroke-dashoffset: 0; }
-.hero.is-ready .hero-line[data-callout="name"] { transition-delay: 0.25s, 0s; }
-.hero.is-ready .hero-line[data-callout="about"] { transition-delay: 0.4s, 0s; }
-.hero.is-ready .hero-line[data-callout="data"] { transition-delay: 0.55s, 0s; }
-
-.hero-dot {
-  fill: #ff6b4a;
-  opacity: 0;
-  transition: opacity 0.3s linear;
-}
+.hero-box--data .hero-label { margin-bottom: 8px; }
 
 /* ---------- cursor label + scroll hint ---------- */
 
@@ -1893,14 +1881,17 @@ html.landing body {
   }
   .hero-scene { position: absolute; inset: 0; }
   .hero-hit { width: 100%; height: 100%; }
-  .hero-lines { display: none; }
-  .callout { position: static; width: min(100%, 640px); max-width: none; }
-  .callout--name { order: 1; }
-  .callout--about { order: 3; }
-  .callout--data { order: 4; }
+  .hero-boxes { display: contents; }
+  .hero-box { position: static; width: min(100%, 640px); padding: 14px 16px; }
+  .hero-box--name { order: 1; }
+  .hero-box--about { order: 3; }
+  .hero-box--members { order: 4; }
+  .hero-box--data { order: 5; }
+  .hero-box--challenge { order: 6; }
+  .hero-box--event { order: 7; }
   .hero-name { font-size: clamp(34px, 9.4vw, 46px); }
-  .callout-text { max-width: 36ch; }
-  .hero-scroll { position: static; transform: none; order: 5; margin-top: 10px; }
+  .hero-box-text { max-width: 42ch; }
+  .hero-scroll { position: static; transform: none; order: 8; margin-top: 10px; }
   .hero-scroll span { display: none; }
   .hero-cursor { display: none; }
   .hero-dialog { padding: 20px; }
@@ -1912,8 +1903,7 @@ html.landing body {
 
 @media (prefers-reduced-motion: reduce) {
   .hero-scene { opacity: 1; transform: none; }
-  .callout { opacity: 1; }
-  .hero-line { stroke-dashoffset: 0; }
+  .hero-box { opacity: 1; }
 
   *,
   *::before,

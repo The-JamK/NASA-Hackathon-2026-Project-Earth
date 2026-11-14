@@ -29,6 +29,25 @@ for (const marker of ['id="sample-case"', 'href="./app.html"']) {
   if (!landing.includes(marker)) fail(`the landing page is missing ${marker}`);
 }
 
+// The hero copy lives in six bordered boxes behind the globe; the leader lines
+// that used to tie each callout to a surface anchor are gone for good.
+for (const copy of [
+  "Members: Dhruv G, James H and Henry Z.",
+  "Ask a question about a place.",
+  "The AI explains, the code computes.",
+  "Be an Earth Trend Detective!",
+  "Local event: Gold Coast - Australia (participated remotely).",
+  "NASA GISTEMP v4, POWER (MERRA-2), Blue Marble, Sentinel-2",
+]) {
+  if (!landing.includes(copy)) fail(`the landing hero is missing "${copy}"`);
+}
+if ((landing.match(/class="hero-box /g) || []).length !== 6) {
+  fail("expected six hero boxes");
+}
+if (/hero-line|hero-lines|hero-dot/.test(landing)) {
+  fail("the hero still ships leader lines or dots");
+}
+
 const html = await (await get("/app.html", "text/html")).text();
 for (const marker of [
   'id="globe"',
@@ -148,6 +167,7 @@ console.log(`points: ${points.points.length} · grid: ${grid.cells.length} · so
 console.log(`assets: 3 textures · ${points.points.filter((point) => point.imagery).length} context images`);
 console.log("recommendation: overlay element served and wired to the tap handler");
 console.log("chrome: tagline, brand dot, Intake label and case board wording removed");
+console.log("hero: six copy boxes, no leader lines");
 console.log("case layout: narrative paragraph above the verdict block");
 console.log(`country averages: ${countries.countries.length} · cities suggested: ${countries.countries.reduce((total, country) => total + country.cities.length, 0)}`);
 console.log("app verified");
