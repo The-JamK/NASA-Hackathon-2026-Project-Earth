@@ -26,6 +26,12 @@ places of every country and territory, ranked by Natural Earth's `POP_MAX`:
 - `scripts/build_data.py` merges those candidates with the curated table: one that
   is already a case, or within 15 km of one (the same conurbation), is skipped, and
   a candidate is kept only when NASA POWER returns all four variables for it.
+- A third pass fills regions the top-three rule leaves thin — Russia, northern
+  China, the Sahara and Sahel, North America, South America, Australia, Southeast
+  Asia, the Middle East, the Indian interior, Central Asia and the Amazon interior —
+  with the largest city that no existing point covers within 500 km (minimum
+  population 20,000), so a huge country is not represented by three metro areas
+  while Europe carries a hundred.
 - `--skip-grid` reuses the committed GISTEMP grid and `--skip-imagery` reuses the
   committed context imagery, so a city change does not rebuild the 4,039-cell
   field or refetch every Sentinel-2 mosaic:
@@ -36,8 +42,11 @@ uv run python scripts/render_context.py --only <slug>   # Blue Marble fallback
 uv run python scripts/fetch_sentinel.py --only <slug>    # Sentinel-2 upgrade
 ```
 
-The result is 554 points across 224 countries and territories: 553 carry all four
-variables, and McMurdo keeps three as the red-herring case. Islands and ice shelves
+The result is 688 points across 222 countries and territories: 687 carry all four
+variables, and McMurdo keeps three as the red-herring case. Russia holds 28 stations,
+northern China 12, North Africa 30, North America 96, South America 66, Australia 12,
+Southeast Asia 38, the Middle East 43, India 9, Central Asia 18, the Amazon interior 19
+and the Sahel 18, against 126 across Europe and the Mediterranean. Islands and ice shelves
 where MERRA-2 masks root-zone soil moisture are left out rather than filled with an
 interpolated or mask value.
 

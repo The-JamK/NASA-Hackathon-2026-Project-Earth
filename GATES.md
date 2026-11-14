@@ -8,7 +8,7 @@ Last verified: 2026-11-14
 - [x] G1: The data build produces a bundle with at least 25 points, at least 2,000 global grid cells, and four variables, all from real cached sources.
   CHECK: uv run python scripts/verify_data.py
   EXPECT: data verified
-  EVIDENCE: 554 points across 224 countries and territories · 14 featured · 6 live · 553 points with all four variables · 4,039 grid cells · 6 source checks ok · global 1990–2025 slope +0.2362 °C/decade.
+  EVIDENCE: 688 points across 222 countries and territories · 14 featured · 6 live · 687 points with all four variables · 4,039 grid cells · 6 source checks ok · global 1990–2025 slope +0.2362 °C/decade.
 
 - [x] G2: The statistics engine reproduces known-answer fixtures for OLS/HAC, Sen's slope, and Mann–Kendall within tolerance.
   CHECK: uv run --with pytest pytest -q
@@ -145,15 +145,37 @@ Last verified: 2026-11-14
 - [x] G29: Every country and territory contributes its three largest populated places, conurbations are not duplicated, and a point ships only with all four NASA POWER variables.
   CHECK: uv run python scripts/build_data.py --skip-grid --skip-imagery; uv run python scripts/verify_data.py
   EXPECT: data verified
-  EVIDENCE: Natural Earth populated places (7,342 rows, public domain) ranked by `POP_MAX` per `ADM0NAME`: 568 candidates across 228 units, 64 of which hold fewer than three places. 53 candidates matched the curated 45 (same name or <15 km), 14 conurbations were merged (Giza/Cairo 6.1 km, Piraeus/Athens 4.5 km, Callao/Lima 10.4 km) and 6 were dropped for a masked root-zone soil moisture series (Majuro, Funafuti, Malé, Atafu, Esperanza Base, Casey Station). Result: 45 curated + 509 new = 554 points, 553 with four variables and McMurdo with three. `points.json` is 4.7 MB, `rag_index.json` 58 KB with 554 places, 14 Sentinel-2 mosaics, and 6 Meteomatics snapshots carried from `data/cache`. Earthdata could not be re-authenticated because every value in the local `.env` is empty, so `sources.json` keeps the earlier verification and says so in the detail line.
+  EVIDENCE: Natural Earth populated places (7,342 rows, public domain) ranked by `POP_MAX` per `ADM0NAME`: 568 candidates across 228 units, 64 of which hold fewer than three places. 53 candidates matched the curated 45 (same name or <15 km), 14 conurbations were merged (Giza/Cairo 6.1 km, Piraeus/Athens 4.5 km, Callao/Lima 10.4 km) and 6 were dropped for a masked root-zone soil moisture series (Majuro, Funafuti, Malé, Atafu, Esperanza Base, Casey Station). Result after the sparse-region passes in G31, G33 and G34: 45 curated + 509 top-city + 134 sparse = 688 points, 687 with four variables and McMurdo with three. `points.json` is 5.9 MB, `rag_index.json` 73 KB with 684 places, 14 Sentinel-2 mosaics, and 6 Meteomatics snapshots carried from `data/cache`. Earthdata could not be re-authenticated because every value in the local `.env` is empty, so `sources.json` keeps the earlier verification and says so in the detail line.
 
 - [x] G30: The expanded bundle and its pipeline are pushed to `main` on GitHub.
   CHECK: git rev-parse HEAD and git rev-parse origin/main agree after fetching `main`.
   EXPECT: identical hashes
   EVIDENCE: pushed `c78898d..62dc704 HEAD -> main`; `git rev-parse HEAD` and `origin/main` both returned `62dc704dd619c6dd7c2305f5e87dcfad7923f404`. The ledger follow-up advanced `main` afterwards.
 
+- [x] G31: Regions the per-country rule leaves thin gain the largest city that no existing point covers within 500 km, so station density follows land area rather than country count.
+  CHECK: uv run python scripts/build_data.py --skip-grid --skip-imagery; uv run python scripts/verify_data.py
+  EXPECT: data verified
+  EVIDENCE: `fill_sparse_regions` scans Natural Earth's 7,342 places for Russia, northern China (lat ≥ 35), the Sahara belt (lat ≥ 15), North America, South America and Australia and accepts a place only when it is at least 500 km from every existing or newly accepted station and holds at least 20,000 people. Result: across the six original regions 109 were added — North America 29, South America 29, Russia 25, northern China 11, Australia 8, North Africa 7 — taking Russia from 3 to 28 stations, northern China from 1 to 12, North Africa from 23 to 30, North America from 67 to 96, South America from 37 to 66 and Australia from 4 to 12 (Darwin and Adelaide included), while Europe and the Mediterranean stay at 126.
+
+- [x] G33: The rule also covers Southeast Asia, the Middle East and the Indian interior, and no station is named after its own country.
+  CHECK: uv run python scripts/build_data.py --skip-grid --skip-imagery; uv run python scripts/verify_data.py
+  EXPECT: data verified
+  EVIDENCE: The same 500 km / 20,000-person rule added 21 more stations — Southeast Asia 12 (Makassar, Pontianak, Samarinda, Banda Aceh, Manado, Bengkulu, Ambon, Jayapura, Biak, Kota Waingapu, Merauke, Puerto Princesa), India 6 (Amaravati, Nagpur, Mangalore, Udaipur, Berhampur, Port Blair) and the Middle East 3 (Zahedan, Hail, Ash Shihr). Southeast Asia's worst gap falls from 1,421 km to 664 km across 26 → 38 stations; India's mean nearest-neighbour distance falls from 1,200 km to 640 km across 3 → 9 stations; the Middle East is already dense (40 → 43 stations, worst gap 845 → 736 km). Bundle is 684 points, 683 with all four variables, 222 countries.
+  NOTE: Natural Earth labels Hail, Saudi Arabia, with `NAME_EN` of "Saudi Arabia", which had put a station named after the country on the map. `_record` now falls back to `NAME` when `NAME_EN` duplicates the country, so Hail appears under its own name; the earlier flat "name equals country" filter was reverted because it also deleted Monaco, Luxembourg and Djibouti City, dropping three countries from the bundle.
+
+- [x] G34: The rule extends to Central Asia, the Amazon interior and the Sahel, and the remaining thin regions are reported by spacing rather than station count.
+  CHECK: uv run python scripts/build_data.py --skip-grid --skip-imagery; uv run python scripts/verify_data.py
+  EXPECT: data verified
+  EVIDENCE: Central Asia (Kazakhstan, Kyrgyzstan, Tajikistan, Turkmenistan, Uzbekistan) gained 3 stations — Oskemen, Atyrau, Baikonur — taking it 15 → 18; the Sahel belt (10–18°N from Senegal to Sudan) gained 1, Nyala, taking it 17 → 18 and cutting its worst nearest-neighbour gap from 1,926 km to 914 km; the Amazon interior (basin countries, 16°S–6°N, 75–44°W) needed none, because the South America pass had already left every settlement of 20,000-plus within 500 km of a station and the 945 km worst gap falls over unpopulated forest. Central Asia's worst gap stays large (785 → 866 km) for the same reason the rule is defined that way: a station is only placed where nothing is within 500 km, so a desert filling point is itself remote.
+  NOTE: Spacing is the honest metric here, not counts. Adding stations can raise the mean nearest-neighbour distance whenever the new station is the remote one being added, which is why these three regions are reported with median and worst gap alongside the mean. Bundle is 688 points, 687 with all four variables, 222 countries.
+
+- [x] G32: Generated points use the hand-curated country names, so one country is never listed twice and no Natural Earth typo reaches the interface.
+  CHECK: uv run python scripts/build_data.py --skip-grid --skip-imagery; python -c "import json; p=json.load(open('public/data/points.json'))['points']; print(len({x['country'] for x in p}))"
+  EXPECT: 222
+  EVIDENCE: Before the alias table the bundle reported 225 countries, with the United States split across `United States` (5 curated) and `United States of America` (17 generated), the UAE across `UAE` and `United Arab Emirates`, and New Zealand listed as `Necw Zealand`. `COUNTRY_ALIASES` maps those three onto the curated spelling; country count is 222, the 22 US points share one label, and filtering or asking about a country returns all of its stations.
+
 ## Status
 
-MET: 30
+MET: 34
 UNMET: 0
 ABANDONED: 0

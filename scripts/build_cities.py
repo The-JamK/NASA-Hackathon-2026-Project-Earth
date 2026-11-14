@@ -159,6 +159,78 @@ def _continents() -> dict[str, str]:
     return mapping
 
 
+# Natural Earth spells a few countries differently from the hand-curated table,
+# which would otherwise list the same country twice and show "Necw Zealand".
+COUNTRY_ALIASES = {
+    "United States of America": "United States",
+    "United Arab Emirates": "UAE",
+    "Necw Zealand": "New Zealand",
+}
+
+
+def _record(place: dict[str, str], continents: dict[str, str], rank: int) -> dict[str, Any] | None:
+    """One populated place as a bundle row, or None when it has no coordinates."""
+
+    lat = _number(place.get("LATITUDE"))
+    lon = _number(place.get("LONGITUDE"))
+    name = (place.get("NAME_EN") or place.get("NAME") or "").strip()
+    country = (place.get("ADM0NAME") or "").strip()
+    if lat is None or lon is None or not name or not country:
+        return None
+    # Some Natural Earth records carry a corrupted NAME_EN — Hail, in Saudi
+    # Arabia, is labelled "Saudi Arabia" there — which would put a station named
+    # after the country on the map. Prefer the plain NAME in that case.
+    fallback = (place.get("NAME") or "").strip()
+    if fallback and _normalise(name) == _normalise(country) != _normalise(fallback):
+        name = fallback
+
+    continent = (
+        continents.get(_normalise(country))
+        or continents.get(place.get("ADM0_A3", ""))
+        or continents.get(place.get("SOV_A3", ""))
+        or ("Antarctica" if lat < -45 else "")
+        or country
+    )
+    # Natural Earth files the whole of Russia under Europe. The country is
+    # transcontinental, so a Siberian case should not read "Russia · Europe".
+    if country == "Russia" and lon > 60.0:
+        continent = "Asia"
+    country = COUNTRY_ALIASES.get(country, country)
+    iso2 = (place.get("ISO_A2") or "").strip()
+    aliases: list[str] = []
+    # Only a country's largest city carries the country name, the way the
+    # hand-curated table does ("Is Brazil warming?" -> São Paulo).
+    if rank == 0 and _normalise(country) != _normalise(name):
+        aliases.append(country.lower())
+
+    return {
+        "name": name,
+        "country": country,
+        "continent": continent,
+        "lat": round(lat, 4),
+        "lon": round(lon, 4),
+        "population": int(_number(place.get("POP_MAX")) or 0),
+        "rank": rank,
+        "iso2": iso2 if len(iso2) == 2 else "",
+        "iso3": (place.get("ADM0_A3") or "").strip(),
+        "aliases": aliases,
+    }
+
+
+def _unique_slug(name: str, row: dict[str, Any], used: set[str]) -> str:
+    slug = slugify(name)
+    if slug in used:
+        suffix = (row.get("iso2") or row.get("iso3") or "").lower()
+        slug = f"{slug}-{suffix}" if suffix else f"{slug}-2"
+    base = slug
+    counter = 2
+    while slug in used:
+        slug = f"{base}-{counter}"
+        counter += 1
+    used.add(slug)
+    return slug
+
+
 def candidate_cities(limit: int = LIMIT) -> list[dict[str, Any]]:
     """The `limit` largest populated places of every country, by POP_MAX."""
     places = _dbf_rows(_download(PLACES_URL, PLACES_ZIP), "populated_places")
@@ -171,44 +243,12 @@ def candidate_cities(limit: int = LIMIT) -> list[dict[str, Any]]:
             by_country.setdefault(country, []).append(place)
 
     candidates: list[dict[str, Any]] = []
-    for country, rows in by_country.items():
+    for rows in by_country.values():
         rows.sort(key=lambda row: _number(row.get("POP_MAX")) or 0.0, reverse=True)
         for rank, row in enumerate(rows[:limit]):
-            lat = _number(row.get("LATITUDE"))
-            lon = _number(row.get("LONGITUDE"))
-            if lat is None or lon is None:
-                continue
-            name = (row.get("NAME_EN") or row.get("NAME") or "").strip()
-            if not name:
-                continue
-            continent = (
-                continents.get(_normalise(country))
-                or continents.get(row.get("ADM0_A3", ""))
-                or continents.get(row.get("SOV_A3", ""))
-                or ("Antarctica" if lat < -45 else "")
-                or country
-            )
-            iso2 = (row.get("ISO_A2") or "").strip()
-            iso3 = (row.get("ADM0_A3") or "").strip()
-            aliases: list[str] = []
-            # Only the largest city carries the country name, the way the
-            # hand-curated table does ("Is Brazil warming?" -> São Paulo).
-            if rank == 0 and _normalise(country) != _normalise(name):
-                aliases.append(country.lower())
-            candidates.append(
-                {
-                    "name": name,
-                    "country": country,
-                    "continent": continent,
-                    "lat": round(lat, 4),
-                    "lon": round(lon, 4),
-                    "population": int(_number(row.get("POP_MAX")) or 0),
-                    "rank": rank,
-                    "iso2": iso2 if len(iso2) == 2 else "",
-                    "iso3": iso3,
-                    "aliases": aliases,
-                }
-            )
+            record = _record(row, continents, rank)
+            if record:
+                candidates.append(record)
     return candidates
 
 
@@ -239,18 +279,155 @@ def merge_new_cities(
         ):
             continue
 
-        slug = slugify(candidate["name"])
-        if slug in used_slugs:
-            suffix = (candidate.get("iso2") or candidate.get("iso3") or "").lower()
-            slug = f"{slug}-{suffix}" if suffix else f"{slug}-2"
-        base = slug
-        counter = 2
-        while slug in used_slugs:
-            slug = f"{base}-{counter}"
-            counter += 1
-        used_slugs.add(slug)
-
+        slug = _unique_slug(candidate["name"], candidate, used_slugs)
         accepted.append({**candidate, "slug": slug})
+
+    accepted.sort(key=lambda row: row["population"], reverse=True)
+    return accepted
+
+
+SAHARA_COUNTRIES = {
+    "Algeria",
+    "Chad",
+    "Egypt",
+    "Libya",
+    "Mali",
+    "Mauritania",
+    "Morocco",
+    "Niger",
+    "Sudan",
+    "Tunisia",
+    "Western Sahara",
+}
+
+SOUTHEAST_ASIA = {
+    "Brunei",
+    "Cambodia",
+    "East Timor",
+    "Indonesia",
+    "Laos",
+    "Malaysia",
+    "Myanmar",
+    "Philippines",
+    "Singapore",
+    "Thailand",
+    "Vietnam",
+}
+
+CENTRAL_ASIA = {
+    "Kazakhstan",
+    "Kyrgyzstan",
+    "Tajikistan",
+    "Turkmenistan",
+    "Uzbekistan",
+}
+
+AMAZON_COUNTRIES = {
+    "Bolivia",
+    "Brazil",
+    "Colombia",
+    "Ecuador",
+    "French Guiana",
+    "Guyana",
+    "Peru",
+    "Suriname",
+    "Venezuela",
+}
+
+SAHEL_COUNTRIES = {
+    "Burkina Faso",
+    "Cameroon",
+    "Central African Republic",
+    "Chad",
+    "Mali",
+    "Mauritania",
+    "Niger",
+    "Nigeria",
+    "Senegal",
+    "Sudan",
+}
+
+MIDDLE_EAST = {
+    "Bahrain",
+    "Iran",
+    "Iraq",
+    "Israel",
+    "Jordan",
+    "Kuwait",
+    "Lebanon",
+    "Oman",
+    "Palestine",
+    "Qatar",
+    "Saudi Arabia",
+    "Syria",
+    "Turkey",
+    "UAE",
+    "Yemen",
+}
+
+# Regions the top-three rule leaves thin: huge countries and continents where a
+# handful of metro areas would otherwise cover millions of square kilometres.
+SPARSE_REGIONS: tuple[tuple[str, Any], ...] = (
+    ("Russia", lambda row: row["country"] == "Russia"),
+    ("North Africa", lambda row: row["country"] in SAHARA_COUNTRIES and row["lat"] >= 15),
+    ("North China", lambda row: row["country"] == "China" and row["lat"] >= 35),
+    ("North America", lambda row: row["continent"] == "North America"),
+    ("South America", lambda row: row["continent"] == "South America"),
+    ("Australia", lambda row: row["country"] == "Australia"),
+    ("Southeast Asia", lambda row: row["country"] in SOUTHEAST_ASIA),
+    ("Middle East", lambda row: row["country"] in MIDDLE_EAST),
+    ("India", lambda row: row["country"] == "India"),
+    ("Central Asia", lambda row: row["country"] in CENTRAL_ASIA),
+    (
+        "Amazon",
+        lambda row: row["country"] in AMAZON_COUNTRIES
+        and -16.0 <= row["lat"] <= 6.0
+        and -75.0 <= row["lon"] <= -44.0,
+    ),
+    ("Sahel", lambda row: row["country"] in SAHEL_COUNTRIES and 10.0 <= row["lat"] <= 18.0),
+)
+GAP_FILL_KM = 500.0
+GAP_FILL_MIN_POP = 20_000
+
+
+def fill_sparse_regions(
+    existing: Iterable[dict[str, Any]],
+    taken_slugs: Iterable[str] = (),
+    min_km: float = GAP_FILL_KM,
+    min_pop: int = GAP_FILL_MIN_POP,
+) -> list[dict[str, Any]]:
+    """Add the largest cities that no existing point covers within `min_km`.
+
+    Only the sparse regions are considered, so a dense continent keeps the
+    cities it already has instead of gaining more dots.
+    """
+
+    places = _dbf_rows(_download(PLACES_URL, PLACES_ZIP), "populated_places")
+    continents = _continents()
+    anchors = [(row["lat"], row["lon"]) for row in existing]
+    used_slugs = set(taken_slugs)
+    taken_names = {_normalise(row["name"]) for row in existing}
+
+    pool: list[dict[str, Any]] = []
+    for place in places:
+        record = _record(place, continents, rank=1)
+        if not record:
+            continue
+        key = _normalise(record["name"])
+        if key in taken_names:
+            continue
+        taken_names.add(key)
+        pool.append(record)
+
+    accepted: list[dict[str, Any]] = []
+    for region, matches in SPARSE_REGIONS:
+        candidates = [row for row in pool if matches(row) and row["population"] >= min_pop]
+        for record in sorted(candidates, key=lambda row: row["population"], reverse=True):
+            if any(distance_km(record["lat"], record["lon"], lat, lon) < min_km for lat, lon in anchors):
+                continue
+            anchors.append((record["lat"], record["lon"]))
+            slug = _unique_slug(record["name"], record, used_slugs)
+            accepted.append({**record, "slug": slug, "region": region})
 
     accepted.sort(key=lambda row: row["population"], reverse=True)
     return accepted

@@ -28,7 +28,7 @@ import numpy as np
 if __package__ in (None, ""):
     sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
-from scripts.build_cities import candidate_cities, merge_new_cities
+from scripts.build_cities import candidate_cities, fill_sparse_regions, merge_new_cities
 from scripts.envfile import load_env
 from scripts.fetch_sources import (
     POWER_CODES,
@@ -598,9 +598,19 @@ def main() -> int:
     curated = curated_rows()
     candidates = candidate_cities()
     new_rows = [{**row, "curated": False} for row in merge_new_cities(curated, candidates)]
-    print(f"· cities: {len(curated)} curated + {len(new_rows)} largest-city candidates")
+    sparse_rows = [
+        {**row, "curated": False}
+        for row in fill_sparse_regions(
+            [*curated, *new_rows],
+            taken_slugs={row["slug"] for row in curated} | {row["slug"] for row in new_rows},
+        )
+    ]
+    print(
+        f"· cities: {len(curated)} curated + {len(new_rows)} largest-city candidates "
+        f"+ {len(sparse_rows)} sparse-region points"
+    )
 
-    points_payload = build_points(env, sources, [*curated, *new_rows], existing_points)
+    points_payload = build_points(env, sources, [*curated, *new_rows, *sparse_rows], existing_points)
     points_path.write_text(json.dumps(points_payload, ensure_ascii=False, separators=(",", ":")), encoding="utf-8")
 
     grid_path = PUBLIC / "grid.json"
