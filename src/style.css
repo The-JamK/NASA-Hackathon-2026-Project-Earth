@@ -911,27 +911,86 @@ body.has-case .case-panel { display: block; }
   color: var(--muted);
 }
 
+/* ---------- the statistics ---------- */
+
+/* One flat list of equal rows made the two tests that decide the verdict read
+   like the units note. The numbers now sit in a framed block, under three
+   labels, with the decisive p-values lifted out of the muted body colour. */
+.stats {
+  margin: 0 0 13px;
+  padding: 11px 12px 12px;
+  border: 1px solid var(--line);
+  border-radius: 3px;
+  background: rgba(255, 255, 255, 0.022);
+}
+
+.stats-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 10px;
+  padding-bottom: 7px;
+  border-bottom: 1px solid var(--line-strong);
+}
+
+.stats-title {
+  font-size: 9px;
+  font-weight: 650;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  color: var(--accent);
+}
+
+.stats-hint {
+  font-size: 8.5px;
+  letter-spacing: 0.04em;
+  color: var(--dim);
+  text-align: right;
+}
+
+.stats-label {
+  margin: 10px 0 2px;
+  font-size: 8px;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--dim);
+}
+
 .facts {
   display: grid;
-  grid-template-columns: 1fr 1fr;
+  grid-template-columns: minmax(0, 1fr) auto;
   gap: 0 14px;
-  margin: 0 0 12px;
-  font-size: 10px;
+  margin: 0;
+  font-size: 10.5px;
 }
 
 .facts dt {
-  color: var(--dim);
-  padding: 4px 0;
+  color: var(--muted);
+  padding: 5px 0;
   border-top: 1px solid var(--line);
 }
 
 .facts dd {
   margin: 0;
-  padding: 4px 0;
+  max-width: 28ch;
+  padding: 5px 0;
   border-top: 1px solid var(--line);
-  color: var(--muted);
+  color: var(--text);
   text-align: right;
   font-variant-numeric: tabular-nums;
+}
+
+.facts dt:first-of-type,
+.facts dd:first-of-type {
+  padding-top: 1px;
+  border-top: 0;
+}
+
+/* HAC p, the Hamed–Rao Mann–Kendall p and the BH q are the numbers the verdict
+   turns on, so they carry the accent rather than the body colour. */
+.facts dd.key {
+  color: var(--accent);
+  font-weight: 600;
 }
 
 .narrative {

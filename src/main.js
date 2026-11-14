@@ -328,6 +328,63 @@ function buildGlobe() {
 
   buildOverlay();
   refreshLayer();
+  // three-globe builds its globe layer on the first frame, so the patch has to
+  // wait for it; it is idempotent and re-tries until it lands.
+  requestAnimationFrame(() => cheapGlobePicking());
+  if (typeof globe.onGlobeReady === "function") globe.onGlobeReady(() => cheapGlobePicking());
+}
+
+/* Picking the globe is the app's hottest pointer path: every move asks
+   three-globe for the coordinates under the cursor, and the mesh it hits is a
+   7,920-triangle sphere sitting behind a 32,040-triangle starfield and a
+   7,920-triangle atmosphere, all of which get tested too — about 21 ms per move,
+   which is what made the globe stutter under the cursor on a machine that
+   otherwise drew it at 60 fps. The starfield, the atmosphere and the graticules
+   cannot be picked at all, and the sphere answers analytically instead of a
+   triangle at a time, for the same coordinates to within a rounding step. */
+const globePickPoint = new Vector3();
+let pickingPatched = false;
+
+function cheapGlobePicking() {
+  if (pickingPatched || !globe) return;
+  let globeObject = null;
+  globe.scene().traverse((object) => {
+    if (object.__globeObjType === "globe") globeObject = object;
+  });
+  if (!globeObject) return;
+
+  // The layer beside the globe holds only decoration: stars, atmosphere, graticules.
+  const layer = globeObject.parent;
+  for (const child of layer.children) {
+    if (child === globeObject) continue;
+    child.traverse((object) => {
+      if (object.isMesh || object.isLine || object.isLineSegments) object.raycast = () => {};
+    });
+  }
+
+  let sphereMesh = null;
+  globeObject.traverse((object) => {
+    if (object.isMesh && object.geometry) sphereMesh = object;
+  });
+  if (!sphereMesh) return;
+
+  const geometry = sphereMesh.geometry;
+  if (!geometry.boundingSphere) geometry.computeBoundingSphere();
+  const localSphere = geometry.boundingSphere.clone();
+  const inverse = new Matrix4();
+
+  sphereMesh.raycast = function raycastSphere(raycaster, intersects) {
+    inverse.copy(this.matrixWorld).invert();
+    const ray = raycaster.ray.clone().applyMatrix4(inverse);
+    const hit = ray.intersectSphere(localSphere, globePickPoint);
+    if (!hit) return;
+    hit.applyMatrix4(this.matrixWorld);
+    const distance = raycaster.ray.origin.distanceTo(hit);
+    if (distance < raycaster.near || distance > raycaster.far) return;
+    intersects.push({ distance, point: hit.clone(), object: this });
+  };
+
+  pickingPatched = true;
 }
 
 function pointAltitude(point) {
@@ -1125,14 +1182,21 @@ function renderCountryCase() {
     ${verdictBlock(trend, variable, info)}
     ${caveatBlock(trend, variable, false)}
     <div class="chart" id="case-chart"></div>
-    <dl class="facts">
-      <div><dt>Stations averaged</dt><dd>${country.stations}</dd></div>
-      <div><dt>With all four variables</dt><dd>${country.full_coverage}</dd></div>
-      <div><dt>Series</dt><dd>${state.windowKey.replace("-", "–")} · n = ${
-        window.years.length
-      }</dd></div>
-      <div><dt>Source</dt><dd>NASA POWER (MERRA-2 derived) · station mean</dd></div>
-    </dl>
+    ${statsBlock(
+      [
+        [
+          "The record",
+          [
+            ["Stations averaged", country.stations],
+            ["With all four variables", country.full_coverage],
+            ["Series", `${state.windowKey.replace("-", "–")} · n = ${window.years.length}`],
+            ["Source", "NASA POWER (MERRA-2 derived) · station mean"],
+          ],
+        ],
+      ],
+      "country average",
+      "The record"
+    )}
     ${caseSources(null, variable)}
     <div class="case-cities">
       <div class="plan-cities-label">Open a city in ${escapeHtml(country.name)}</div>
@@ -1217,32 +1281,43 @@ function oceanNarrative(region, trend, windowKey) {
 }
 
 function oceanFacts(region, trend, window) {
-  const rows = [
+  const record = [
     ["Cells averaged", region.cells.toLocaleString()],
     ["Extent", region.extent],
     ["Weighting", state.oceanMeta?.weighting || "cos(lat) area weight"],
     ["Series", `${state.windowKey.replace("-", "–")} · n = ${window.years.length}`],
   ];
+  const fit = [];
+  const robust = [];
   if (trend) {
-    rows.push(["HAC p-value", formatP(trend.p_value)]);
-    rows.push([
+    fit.push(["HAC p-value", formatP(trend.p_value), true]);
+    fit.push([
       "95% interval",
       `${signed(trend.ci_low_per_decade, 2)} to ${signed(trend.ci_high_per_decade, 2)}`,
     ]);
     if (Number.isFinite(trend.sen_slope_per_decade)) {
-      rows.push(["Sen's slope", signed(trend.sen_slope_per_decade, 2)]);
+      robust.push(["Sen's slope", signed(trend.sen_slope_per_decade, 2)]);
     }
     if (Number.isFinite(trend.mk_p_corrected)) {
-      rows.push(["MK p (Hamed–Rao)", formatP(trend.mk_p_corrected)]);
+      robust.push(["MK p (Hamed–Rao)", formatP(trend.mk_p_corrected), true]);
     }
-    rows.push([
+    robust.push([
       region.family === "aggregate" ? "Correction" : "BH q (8 basins)",
       region.family === "aggregate" ? "outside the basin family" : formatP(trend.q_value),
     ]);
   }
-  rows.push(["Variable", "Sea surface temperature (ERSST-based)"]);
-  rows.push(["Source", "NASA GISTEMP v4 ocean cells · baseline 1951–1980"]);
-  return rows.map(([term, value]) => `<dt>${escapeHtml(term)}</dt><dd>${escapeHtml(String(value))}</dd>`).join("");
+  return [
+    ["The basin", record],
+    ["The fit", fit],
+    ["Robustness", robust],
+    [
+      "Reading it",
+      [
+        ["Variable", "Sea surface temperature (ERSST-based)"],
+        ["Source", "NASA GISTEMP v4 ocean cells · baseline 1951–1980"],
+      ],
+    ],
+  ];
 }
 
 function renderOceanCase() {
@@ -1279,7 +1354,7 @@ function renderOceanCase() {
     ${verdictBlock(trend, variable, info)}
     ${caveatBlock(trend, variable, true)}
     <div class="chart" id="case-chart"></div>
-    <dl class="facts">${oceanFacts(region, trend, window)}</dl>
+    ${statsBlock(oceanFacts(region, trend, window), "cos(lat) weighted cells · OLS + HAC")}
     ${caseSources(null, variable)}
     <div class="case-cities">
       <div class="plan-cities-label">Compare a neighbouring basin</div>
@@ -1364,29 +1439,40 @@ function seaIceNarrative(record, trend, windowKey, variable) {
 }
 
 function seaIceFacts(record, trend, window, variable) {
-  const rows = [
+  const series = [
     ["Months averaged", "12 per year"],
     ["Record", `1979–present · window ${state.windowKey.replace("-", "–")}`],
     ["Series", `n = ${window.years.length} annual means`],
   ];
+  const fit = [];
+  const robust = [];
   if (trend) {
-    rows.push(["HAC p-value", formatP(trend.p_value)]);
-    rows.push([
+    fit.push(["HAC p-value", formatP(trend.p_value), true]);
+    fit.push([
       "95% interval",
       `${signed(trend.ci_low_per_decade, 2)} to ${signed(trend.ci_high_per_decade, 2)}`,
     ]);
     if (Number.isFinite(trend.sen_slope_per_decade)) {
-      rows.push(["Sen's slope", signed(trend.sen_slope_per_decade, 2)]);
+      robust.push(["Sen's slope", signed(trend.sen_slope_per_decade, 2)]);
     }
     if (Number.isFinite(trend.mk_p_corrected)) {
-      rows.push(["MK p (Hamed–Rao)", formatP(trend.mk_p_corrected)]);
+      robust.push(["MK p (Hamed–Rao)", formatP(trend.mk_p_corrected), true]);
     }
-    rows.push(["BH q (3 records)", formatP(trend.q_value)]);
+    robust.push(["BH q (3 records)", formatP(trend.q_value), true]);
   }
-  rows.push(["Measure", variable.code === "SEAICECONC" ? "100 × area ÷ extent" : "area with ≥15% ice cover"]);
-  rows.push(["Variable", `${variable.label} (${variable.units})`]);
-  rows.push(["Source", "NSIDC/NOAA Sea Ice Index G02135, via NOAA PSL"]);
-  return rows.map(([term, value]) => `<dt>${escapeHtml(term)}</dt><dd>${escapeHtml(String(value))}</dd>`).join("");
+  return [
+    ["The record", series],
+    ["The fit", fit],
+    ["Robustness", robust],
+    [
+      "Reading it",
+      [
+        ["Measure", variable.code === "SEAICECONC" ? "100 × area ÷ extent" : "area with ≥15% ice cover"],
+        ["Variable", `${variable.label} (${variable.units})`],
+        ["Source", "NSIDC/NOAA Sea Ice Index G02135, via NOAA PSL"],
+      ],
+    ],
+  ];
 }
 
 // Extent and concentration are one click apart, and the case always shows both
@@ -1476,7 +1562,7 @@ function renderSeaIceCase() {
       <span class="legend-note">both indexed to the window's first year = 100</span>
     </div>
     ${measureCompare(record)}
-    <dl class="facts">${seaIceFacts(record, trend, window, variable)}</dl>
+    ${statsBlock(seaIceFacts(record, trend, window, variable), "12 monthly extents → annual mean · OLS + HAC")}
     ${caseSources(null, variable)}
     <div class="case-cities">
       <div class="plan-cities-label">Compare the other hemisphere</div>
@@ -1545,7 +1631,7 @@ function renderCityCase() {
     ${verdictBlock(trend, variable, info)}
     ${caveatBlock(trend, variable, false)}
     <div class="chart" id="case-chart"></div>
-    <dl class="facts">${facts(trend, variable, false)}</dl>
+    ${statsBlock(facts(trend, variable, false))}
     ${caseSources(point, variable)}
     ${workBlock("point")}
   `;
@@ -1595,7 +1681,7 @@ function renderGridCase() {
     ${verdictBlock(trend, variable, info)}
     ${caveatBlock(trend, variable, true)}
     <div class="chart" id="case-chart"></div>
-    <dl class="facts">${facts(trend, variable, true)}</dl>
+    ${statsBlock(facts(trend, variable, true), "grid cell series · OLS + HAC")}
     ${caseSources(null, variable)}
     ${workBlock("grid")}
   `;
@@ -1647,7 +1733,7 @@ function renderGlobalCase() {
       are not a second opinion on the global slope.
     </div>
     <div class="chart" id="case-chart"></div>
-    <dl class="facts">${facts(trend, variable, false, counts)}</dl>
+    ${statsBlock(facts(trend, variable, false, counts))}
     ${caseSources(null, variable)}
     ${workBlock("global")}
   `;
@@ -1750,41 +1836,84 @@ function caveatBlock(trend, variable, isGrid) {
   return "";
 }
 
+// The numbers were one flat list of equal rows, which made the two tests that
+// decide the verdict read like everything else. They now sit under three labels,
+// with the decisive p-values emphasised and the reading notes kept apart.
+function statsBlock(groups, hint = "annual means · OLS + HAC", title = "The statistics") {
+  const body = groups
+    .filter(([, rows]) => rows.length)
+    .map(
+      ([label, rows]) => `<p class="stats-label">${escapeHtml(label)}</p><dl class="facts">${rows
+        .map(
+          ([term, value, key]) =>
+            `<dt>${escapeHtml(term)}</dt><dd${key ? ' class="key"' : ""}>${escapeHtml(
+              String(value)
+            )}</dd>`
+        )
+        .join("")}</dl>`
+    )
+    .join("");
+  return `<section class="stats">
+    <div class="stats-head">
+      <span class="stats-title">${escapeHtml(title)}</span>
+      <span class="stats-hint">${escapeHtml(hint)}</span>
+    </div>
+    ${body}
+  </section>`;
+}
+
+// (term, value, isDecisive) rows, grouped for statsBlock.
 function facts(trend, variable, isGrid, counts = null) {
   if (!trend) {
-    return `<dt>Series</dt><dd>unavailable</dd><dt>Units</dt><dd>${escapeHtml(
-      variable.units
-    )}</dd><dt>Source</dt><dd>${escapeHtml(variable.source)}</dd>`;
+    return [
+      [
+        "Reading it",
+        [
+          ["Series", "unavailable"],
+          ["Units", variable.units],
+          ["Source", variable.source],
+        ],
+      ],
+    ];
   }
-  const rows = [
+  const fit = [
     ["Sample size", `${trend.n} annual means`],
     ["HAC lag", trend.maxlag ?? "—"],
-    ["HAC p-value", formatP(trend.p_value)],
+    ["HAC p-value", formatP(trend.p_value), true],
   ];
-  if (isGrid) rows.push(["BH q-value", formatP(trend.q_value)]);
   if (Number.isFinite(trend.ci_low_per_decade) && Number.isFinite(trend.ci_high_per_decade)) {
-    rows.push([
+    fit.push([
       "95% interval",
       `${signed(trend.ci_low_per_decade, 2)} to ${signed(trend.ci_high_per_decade, 2)}`,
     ]);
   }
+  if (Number.isFinite(trend.r_squared)) fit.push(["R²", trend.r_squared.toFixed(2)]);
+
+  const robust = [];
   if (Number.isFinite(trend.sen_slope_per_decade)) {
-    rows.push(["Sen's slope", signed(trend.sen_slope_per_decade, 2)]);
+    robust.push(["Sen's slope", signed(trend.sen_slope_per_decade, 2)]);
   }
-  if (Number.isFinite(trend.mk_tau)) rows.push(["Mann–Kendall", `${signed(trend.mk_tau, 2)} τ`]);
-  if (Number.isFinite(trend.mk_p)) rows.push(["MK p (i.i.d.)", formatP(trend.mk_p)]);
+  if (Number.isFinite(trend.mk_tau)) robust.push(["Mann–Kendall", `${signed(trend.mk_tau, 2)} τ`]);
+  if (Number.isFinite(trend.mk_p)) robust.push(["MK p (i.i.d.)", formatP(trend.mk_p)]);
   if (Number.isFinite(trend.mk_p_corrected)) {
-    rows.push(["MK p (Hamed–Rao)", formatP(trend.mk_p_corrected)]);
+    robust.push(["MK p (Hamed–Rao)", formatP(trend.mk_p_corrected), true]);
   }
-  if (Number.isFinite(trend.r_squared)) rows.push(["R²", trend.r_squared.toFixed(2)]);
-  rows.push(["Units", variable.units]);
-  rows.push(["Baseline", variable.baseline]);
+  if (isGrid) robust.push(["BH q-value", formatP(trend.q_value), true]);
+
+  const reading = [
+    ["Units", variable.units],
+    ["Baseline", variable.baseline],
+  ];
   if (counts) {
-    rows.push(["Significant ↑", counts.significant_increasing.toLocaleString()]);
-    rows.push(["Significant ↓", counts.significant_decreasing.toLocaleString()]);
-    rows.push(["Not significant", counts.not_significant.toLocaleString()]);
+    reading.push(["Significant ↑", counts.significant_increasing.toLocaleString()]);
+    reading.push(["Significant ↓", counts.significant_decreasing.toLocaleString()]);
+    reading.push(["Not significant", counts.not_significant.toLocaleString()]);
   }
-  return rows.map(([term, value]) => `<dt>${escapeHtml(term)}</dt><dd>${escapeHtml(String(value))}</dd>`).join("");
+  return [
+    ["The fit", fit],
+    ["Robustness", robust],
+    ["Reading it", reading],
+  ];
 }
 
 function liveChip(point) {
