@@ -90,8 +90,8 @@
             <h3>Fit and test</h3>
             <p>
               OLS with Newey–West HAC standard errors, a 95% interval from the same errors,
-              and Sen’s slope as a robust second opinion. Mann–Kendall is reported next to
-              the verdict, not used to set it.
+              and Sen’s slope as a robust second opinion. A second, autocorrelation-corrected
+              Mann–Kendall test has to agree before anything is called significant.
             </p>
           </li>
           <li class="step">
@@ -168,12 +168,14 @@
             verdict is set at HAC p &lt; 0.05, using the sign of the slope.
           </li>
           <li>
-            Sen’s slope is a second opinion. Mann–Kendall is descriptive only, so it cannot
-            promote a case the HAC test would not.
+            Sen’s slope is a second opinion. Mann–Kendall is rerun with the Hamed–Rao
+            autocorrelation correction, and a case is only significant when the two tests
+            agree.
           </li>
           <li>
-            Map cells must survive a Benjamini–Hochberg correction at q = 0.05 across the
-            grid, so one lucky cell is not called a trend.
+            Map cells must survive a Benjamini–Hochberg FDR correction at q = 0.05 across
+            the grid, so one lucky cell is not called a trend. Neighbouring cells are
+            correlated, so the correction is approximate.
           </li>
           <li>
             Under 20 annual means the case is labelled exploratory. There is no causal

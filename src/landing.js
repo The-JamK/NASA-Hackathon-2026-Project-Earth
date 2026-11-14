@@ -104,7 +104,7 @@ function paint(root, point, variable, trend, meta) {
     </div>
     <details class="work">
       <summary>Show your work</summary>
-      <p>Annual means only. OLS with Newey–West HAC standard errors; verdict at p &lt; 0.05; 95% interval with Student-t on n − 2 df; Sen's slope as a robust check; Mann–Kendall descriptive only. The AI proposed the variable and wrote the narrative; it did not compute a number.</p>
+      <p>Annual means only. OLS with Newey–West HAC standard errors; 95% interval with Student-t on n − 2 df; Sen's slope as a robust check. A verdict needs the HAC p &lt; 0.05 and the Hamed–Rao corrected Mann–Kendall p &lt; 0.05, in the same direction. The AI proposed the variable and wrote the narrative; it did not compute a number.</p>
     </details>
   `;
 
@@ -152,6 +152,10 @@ function factsRows(trend, variable) {
     rows.push(["Sen's slope", signed(trend.sen_slope_per_decade, 2)]);
   }
   if (Number.isFinite(trend.mk_tau)) rows.push(["Mann–Kendall", `${signed(trend.mk_tau, 2)} τ`]);
+  if (Number.isFinite(trend.mk_p)) rows.push(["MK p (i.i.d.)", formatP(trend.mk_p)]);
+  if (Number.isFinite(trend.mk_p_corrected)) {
+    rows.push(["MK p (Hamed–Rao)", formatP(trend.mk_p_corrected)]);
+  }
   if (Number.isFinite(trend.r_squared)) rows.push(["R²", trend.r_squared.toFixed(2)]);
   rows.push(["Units", variable.units]);
   rows.push(["Baseline", variable.baseline]);

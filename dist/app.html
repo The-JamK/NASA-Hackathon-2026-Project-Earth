@@ -101,11 +101,13 @@
             <li>OLS slope with Newey–West HAC standard errors.</li>
             <li>HAC lag <code>L = max(1, floor(4 · (n/100)<sup>2/9</sup>))</code>.</li>
             <li>Verdict at HAC p &lt; 0.05, using the sign of the slope.</li>
+            <li>A verdict also needs the corrected Mann–Kendall test to agree at 5%, in the same direction.</li>
             <li>95% interval from the HAC SE with Student-t on n − 2 df.</li>
             <li>Sen's slope as a robust second opinion.</li>
-            <li>Mann–Kendall reported descriptively only.</li>
+            <li>Mann–Kendall with the Hamed–Rao (1998) autocorrelation correction, computed on the Sen-detrended series.</li>
             <li>Below 20 annual means: <strong>exploratory</strong>, no significance claim.</li>
-            <li>Map cells use Benjamini–Hochberg q = 0.05 across the grid.</li>
+            <li>Map cells use Benjamini–Hochberg FDR correction at q = 0.05 across the grid.</li>
+            <li>Neighbouring cells are correlated, so that correction is approximate.</li>
           </ul>
         </section>
         <section>

@@ -12,8 +12,10 @@ __pycache__/
 *.py[cod]
 .pytest_cache/
 
-# Build output (dist/ is committed on purpose: GitHub Pages serves this
-# repository folder, so the built site has to live in Git)
+# Build output. dist/ is committed on purpose because GitHub Pages serves this
+# repository folder, so the built site lives in Git; it is listed here anyway so
+# a rebuild cannot add stray untracked files. Tracked build files still update.
+dist/
 build/
 .next/
 data/cache/

@@ -784,9 +784,10 @@ function renderGlobalCase() {
     <p class="narrative">${globalNarrative(trend, variable, state.windowKey, counts)}</p>
     ${verdictBlock(trend, variable, info)}
     <div class="caveat">
-      The global series is an anomaly relative to 1951–1980. The cell counts use
-      Benjamini–Hochberg q = 0.05 across the grid; they are not a second opinion on the
-      global slope.
+      The global series is an anomaly relative to 1951–1980. The cell counts are the
+      cells that survive Benjamini–Hochberg FDR correction at q = 0.05 across the grid;
+      neighbouring cells are correlated, so that correction is approximate. The counts
+      are not a second opinion on the global slope.
     </div>
     <div class="chart" id="case-chart"></div>
     <dl class="facts">${facts(trend, variable, false, counts)}</dl>
@@ -863,6 +864,22 @@ function caveatBlock(trend, variable, isGrid) {
   if (trend.exploratory || (trend.n && trend.n < 20)) {
     return `<div class="caveat">Only ${trend.n} annual means. Below 20 the app refuses a significance claim and labels the result exploratory.</div>`;
   }
+  if (!isGrid && trend.mk_p_corrected != null) {
+    if (trend.p_value < 0.05 && trend.mk_p_corrected >= 0.05) {
+      return `<div class="caveat">The HAC slope test is significant (p ${pText(
+        trend.p_value
+      )}), but the autocorrelation-corrected Mann–Kendall test is not (p ${pText(
+        trend.mk_p_corrected
+      )}). A verdict needs both, so this case is not proven.</div>`;
+    }
+    if (
+      trend.p_value < 0.05 &&
+      trend.mk_p_corrected < 0.05 &&
+      trend.verdict === "no significant trend"
+    ) {
+      return `<div class="caveat">Both tests are significant, but they point in opposite directions, so the app does not call this a trend.</div>`;
+    }
+  }
   if (isGrid && trend.q_value != null && trend.q_value > 0.05 && trend.p_value != null && trend.p_value < 0.05) {
     return `<div class="caveat">This cell is locally significant (p ${pText(
       trend.p_value
@@ -898,6 +915,10 @@ function facts(trend, variable, isGrid, counts = null) {
     rows.push(["Sen's slope", signed(trend.sen_slope_per_decade, 2)]);
   }
   if (Number.isFinite(trend.mk_tau)) rows.push(["Mann–Kendall", `${signed(trend.mk_tau, 2)} τ`]);
+  if (Number.isFinite(trend.mk_p)) rows.push(["MK p (i.i.d.)", formatP(trend.mk_p)]);
+  if (Number.isFinite(trend.mk_p_corrected)) {
+    rows.push(["MK p (Hamed–Rao)", formatP(trend.mk_p_corrected)]);
+  }
   if (Number.isFinite(trend.r_squared)) rows.push(["R²", trend.r_squared.toFixed(2)]);
   rows.push(["Units", variable.units]);
   rows.push(["Baseline", variable.baseline]);
@@ -965,17 +986,17 @@ function caseSources(point, variable) {
     const attribution = meta.attribution ? ` — ${escapeHtml(meta.attribution)}` : "";
     bits.push(`<b>Imagery:</b> ${escapeHtml(label)}${attribution}`);
   }
-  if (variable.kind === "grid") bits.push("<b>Grid:</b> GISTEMP v4, 4° subsample, BH q = 0.05");
+  if (variable.kind === "grid") bits.push("<b>Grid:</b> GISTEMP v4, 4° subsample, BH FDR q = 0.05");
   return `<div class="case-sources">${bits.join("<br>")}</div>`;
 }
 
 function workBlock(kind) {
   const text =
     kind === "grid"
-      ? "Annual GISTEMP anomalies are fitted with OLS and Newey–West HAC standard errors. The map uses a 4° subsample and Benjamini–Hochberg q = 0.05. The baseline is the published 1951–1980 anomaly. No attribution is claimed."
+      ? "Annual GISTEMP anomalies are fitted with OLS and Newey–West HAC standard errors. Cells count as significant only after Benjamini–Hochberg FDR correction at q = 0.05 across the 4° subsample. Neighbouring cells are correlated, so that correction is approximate. The baseline is the published 1951–1980 anomaly. No attribution is claimed."
       : kind === "global"
-        ? "The global series is the published GISTEMP annual anomaly. The cell counts come from the same 4° subsample and HAC contract, corrected with Benjamini–Hochberg q = 0.05. The global slope is not an area-weighted average of the cells."
-        : "Annual means only. OLS with Newey–West HAC standard errors; verdict at p < 0.05; 95% interval with Student-t on n − 2 df; Sen's slope as a robust check; Mann–Kendall descriptive only. The AI proposed the variable and wrote the narrative; it did not compute a number.";
+        ? "The global series is the published GISTEMP annual anomaly. The cell counts come from the same 4° subsample and HAC contract, corrected with Benjamini–Hochberg FDR at q = 0.05; neighbouring cells are correlated, so the correction is approximate. The global slope is not an area-weighted average of the cells."
+        : "Annual means only. OLS with Newey–West HAC standard errors; 95% interval with Student-t on n − 2 df; Sen's slope as a robust check. A verdict needs the HAC p < 0.05 and the Hamed–Rao corrected Mann–Kendall p < 0.05 with the same direction. The AI proposed the variable and wrote the narrative; it did not compute a number.";
   return `<details class="work"><summary>Show your work</summary><p>${escapeHtml(text)}</p></details>`;
 }
 
@@ -996,10 +1017,14 @@ function cityNarrative(point, variable, trend, windowKey) {
   const sentence = trend.exploratory
     ? `Only ${trend.n} annual means are available, so the result is labelled exploratory and no significance claim is made.`
     : trend.verdict === "significant increasing" || trend.verdict === "significant decreasing"
-      ? `The slope survives the HAC significance test at the 5% level (p ${pText(trend.p_value)}).`
-      : `The fitted slope does not survive the HAC significance test at the 5% level (p ${pText(
+      ? `The HAC slope test (p ${pText(
           trend.p_value
-        )}), so the app does not call it a trend.`;
+        )}) and the corrected Mann–Kendall test (p ${pText(
+          trend.mk_p_corrected
+        )}) are both significant at the 5% level and agree on direction.`
+      : `The app calls a trend only when the HAC slope test and the corrected Mann–Kendall test both pass at the 5% level; here HAC p ${pText(
+          trend.p_value
+        )} and corrected Mann–Kendall p ${pText(trend.mk_p_corrected)}.`;
   return `${escapeHtml(point.name)}'s annual ${escapeHtml(
     variable.short.toLowerCase()
   )} ${direction} by <strong>${signed(trend.slope_per_decade)} ${escapeHtml(
@@ -1010,7 +1035,9 @@ function cityNarrative(point, variable, trend, windowKey) {
     trend.p_value
   )}). ${sentence} Sen's slope is ${signed(
     trend.sen_slope_per_decade
-  )} ${escapeHtml(variable.units)}/decade. Mann–Kendall is a descriptive cross-check only. This is a trend detection, not an attribution.`;
+  )} ${escapeHtml(
+    variable.units
+  )}/decade. The Mann–Kendall p-value uses the Hamed–Rao variance correction for autocorrelation, computed on the Sen-detrended series. This is a trend detection, not an attribution.`;
 }
 
 function gridNarrative(cell, trend, variable, windowKey) {
@@ -1055,7 +1082,7 @@ function globalNarrative(trend, variable, windowKey, counts) {
     "–"
   )} (95% CI ${signed(trend.ci_low_per_decade)} to ${signed(
     trend.ci_high_per_decade
-  )}; n = ${trend.n}; HAC p ${pText(trend.p_value)}). Across the 4° grid, ${counts.significant_increasing.toLocaleString()} cells show a significant increase after Benjamini–Hochberg correction, ${counts.significant_decreasing.toLocaleString()} a significant decrease, and ${counts.not_significant.toLocaleString()} are not significant. This is a trend detection, not an attribution.`;
+  )}; n = ${trend.n}; HAC p ${pText(trend.p_value)}). Across the 4° grid, ${counts.significant_increasing.toLocaleString()} cells survive Benjamini–Hochberg FDR correction at q = 0.05 as increases, ${counts.significant_decreasing.toLocaleString()} as decreases, and ${counts.not_significant.toLocaleString()} are not significant. Neighbouring cells are correlated, so that correction is approximate. This is a trend detection, not an attribution.`;
 }
 
 /* --------------------------------------------------------------- intake UI */
