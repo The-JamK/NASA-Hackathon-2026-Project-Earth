@@ -5,11 +5,13 @@ import world from "world-atlas/countries-110m.json";
 import "./style.css";
 import { oceanRegionAt, oceanVariable, planCase, seaIceVariable } from "./rag.js";
 import { renderCompareChart, renderSeriesChart, trendColor } from "./chart.js";
+import { caseSlug, downloadCsv, reportRows, seriesRows, toCsv } from "./export.js";
 import { SOURCE_LINKS } from "./sources.js";
 import { formatLatLon, haversineKm, nearestCell, nearestRecord } from "./geo.js";
 import { deriveSteepUnproven } from "./herring.js";
 
 const state = {
+  exportData: null,
   variables: [],
   points: [],
   countries: [],
@@ -657,6 +659,7 @@ async function selectGlobal(windowKey = state.windowKey) {
 function clearCase() {
   state.selected = null;
   state.selectedKind = null;
+  state.exportData = null;
   document.body.classList.remove("has-case");
   renderEmptyCase();
   refreshLayer();
@@ -830,7 +833,31 @@ function distanceText(km) {
 
 /* ------------------------------------------------------------------- cases */
 
+// The export describes exactly what is on screen: same place, same variable or
+// measure, same window, same trend object the verdict was built from.
+function setExport(payload) {
+  state.exportData = payload?.trend ? payload : null;
+}
+
+function mountExport() {
+  const data = state.exportData;
+  if (!data) return;
+  const box = document.createElement("div");
+  box.className = "export-box";
+  // Sits directly under the verdict, not at the end of the panel: the buttons are
+  // for checking the number above them, and at the bottom of a 1,300px scroll they
+  // were three panel-heights away from it.
+  box.innerHTML = `
+    <div class="export-head">Check the numbers <span>CSV · Excel, R or pandas</span></div>
+    <div class="export-actions">
+      <button class="ghost-btn" type="button" data-action="export-series">Series CSV</button>
+      <button class="ghost-btn" type="button" data-action="export-report">Statistics CSV</button>
+    </div>`;
+  els.casePanel.append(box);
+}
+
 function renderCase() {
+  state.exportData = null;
   if (state.selectedKind === "global") renderGlobalCase();
   else if (state.selectedKind === "grid") renderGridCase();
   else if (state.selectedKind === "country") renderCountryCase();
@@ -838,6 +865,7 @@ function renderCase() {
   else if (state.selectedKind === "seaice") renderSeaIceCase();
   else if (state.selectedKind === "city") renderCityCase();
   else renderEmptyCase();
+  mountExport();
   // A click that opens a case can leave the browser holding a scroll offset for
   // the button it just removed, so the panel is pinned to the top on the next
   // frame as well.
@@ -900,6 +928,15 @@ function renderCountryCase() {
   const window = seriesWindow(series, state.meta.years, state.windowKey);
   const info = verdictInfo(trend, variable);
   const id = caseId(`${country.id}:${code}:${state.windowKey}`);
+  setExport({
+    title: country.name,
+    detail: `Country average · ${country.stations} stations · ${country.continent}`,
+    variable,
+    trend,
+    windowKey: state.windowKey,
+    years: window.years,
+    values: window.values,
+  });
 
   els.casePanel.innerHTML = `
     <div class="case-head">
@@ -1046,6 +1083,15 @@ function renderOceanCase() {
   const window = seriesWindow(series, years, state.windowKey);
   const info = verdictInfo(trend, variable);
   const id = caseId(`ocean:${region.id}:${state.windowKey}`);
+  setExport({
+    title: region.name,
+    detail: `Ocean region · ${region.cells} GISTEMP cells · ${region.extent}`,
+    variable,
+    trend,
+    windowKey: state.windowKey,
+    years: window.years,
+    values: window.values,
+  });
   const neighbours = state.ocean.filter((item) => item.id !== region.id && item.family === "basins").slice(0, 5);
 
   els.casePanel.innerHTML = `
@@ -1226,6 +1272,15 @@ function renderSeaIceCase() {
   const concWindow = seriesWindow(record.series?.SEAICECONC || [], years, state.windowKey);
   const info = verdictInfo(trend, variable);
   const id = caseId(`ice:${record.id}:${code}:${state.windowKey}`);
+  setExport({
+    title: record.name,
+    detail: `${variable.label} · annual mean of 12 monthly values · ${variable.units}`,
+    variable,
+    trend,
+    windowKey: state.windowKey,
+    years: window.years,
+    values: window.values,
+  });
   const siblings = state.seaIce.filter((item) => item.id !== record.id);
 
   els.casePanel.innerHTML = `
@@ -1291,6 +1346,15 @@ function renderCityCase() {
   const id = caseId(`${point.id}:${code}:${state.windowKey}`);
   const lat = `${Math.abs(point.lat).toFixed(2)}°${point.lat >= 0 ? "N" : "S"}`;
   const lon = `${Math.abs(point.lon).toFixed(2)}°${point.lon >= 0 ? "E" : "W"}`;
+  setExport({
+    title: point.name,
+    detail: `${point.country} · ${lat} ${lon} · station ${point.id}`,
+    variable,
+    trend,
+    windowKey: state.windowKey,
+    years: window.years,
+    values: window.values,
+  });
 
   els.casePanel.innerHTML = `
     <div class="case-head">
@@ -1334,6 +1398,15 @@ function renderGridCase() {
   const id = caseId(`grid:${cell.lat}:${cell.lon}:${state.windowKey}`);
   const lat = `${Math.abs(cell.lat).toFixed(1)}°${cell.lat >= 0 ? "N" : "S"}`;
   const lon = `${Math.abs(cell.lon).toFixed(1)}°${cell.lon >= 0 ? "E" : "W"}`;
+  setExport({
+    title: `Grid cell ${lat} ${lon}`,
+    detail: `GISTEMP v4 · ${cell.is_ocean ? "ocean" : "land"} · baseline 1951–1980`,
+    variable,
+    trend,
+    windowKey: state.windowKey,
+    years: window.years,
+    values: window.values,
+  });
 
   els.casePanel.innerHTML = `
     <div class="case-head">
@@ -1374,6 +1447,15 @@ function renderGlobalCase() {
   const counts = meta.counts_by_window?.[state.windowKey] || meta.counts;
   const info = verdictInfo(trend, variable);
   const id = caseId(`global:${state.windowKey}`);
+  setExport({
+    title: "Global mean",
+    detail: `GISTEMP v4 · 4° grid · ${counts.cells.toLocaleString()} cells · baseline 1951–1980`,
+    variable,
+    trend,
+    windowKey: state.windowKey,
+    years: window.years,
+    values: window.values,
+  });
 
   els.casePanel.innerHTML = `
     <div class="case-head">
@@ -2128,6 +2210,19 @@ function bindStaticEvents() {
     if (name === "open-ocean") {
       const region = state.oceanById.get(action.dataset.regionId);
       if (region) selectOcean(region);
+      return;
+    }
+    if (name === "export-series" || name === "export-report") {
+      const data = state.exportData;
+      if (!data) return;
+      const slug = caseSlug(data);
+      if (name === "export-series") {
+        downloadCsv(`${slug}-series.csv`, toCsv(seriesRows(data.years, data.values, data.trend)));
+        showToast(`Exported ${data.years.length} annual means as CSV`);
+      } else {
+        downloadCsv(`${slug}-statistics.csv`, toCsv(reportRows(data)));
+        showToast("Exported the statistics as CSV");
+      }
       return;
     }
     if (name === "open-seaice") {

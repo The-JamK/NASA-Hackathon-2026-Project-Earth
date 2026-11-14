@@ -7,6 +7,28 @@ cd "$(dirname "$0")/.."
 BASE="${1:-${BASE_URL:-https://the-jamk.github.io/NASA-Hackathon-2026-Project-Earth}}"
 echo "live: $BASE"
 
+# The site must be the build, at its own root. If /app.html is the Vite source
+# shell, GitHub is publishing the repository instead of the workflow's artifact;
+# if /dist/ answers, the site is nested one level down again.
+app_page=$(curl -fsS --max-time 30 "$BASE/app.html")
+case "$app_page" in
+  *"src/main.js"*)
+    echo "FAIL: $BASE/app.html is the Vite source, not the build (Pages is set to deploy from a branch)"
+    exit 1
+    ;;
+  *"assets/app.js"*) ;;
+  *)
+    echo "FAIL: $BASE/app.html does not reference the built bundle"
+    exit 1
+    ;;
+esac
+nested=$(curl -s -o /dev/null -w '%{http_code}' --max-time 20 "$BASE/dist/index.html")
+if [ "$nested" != "404" ]; then
+  echo "FAIL: /dist/index.html answers $nested (the site is published from a dist/ folder)"
+  exit 1
+fi
+echo "  served from the site root, no /dist"
+
 for file in points.json rag_index.json countries.json; do
   local_hash=$(shasum -a 256 "dist/data/$file" | awk '{print $1}')
   live_hash=$(curl -fsS --max-time 30 "$BASE/data/$file" | shasum -a 256 | awk '{print $1}')
