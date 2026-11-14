@@ -167,6 +167,31 @@ CITIES = [
     ("perth", "Perth", "Australia", "Oceania", -31.9505, 115.8605, []),
     ("suva", "Suva", "Fiji", "Oceania", -18.1416, 178.4419, ["fiji"]),
     ("mcmurdo", "McMurdo", "Antarctica", "Antarctica", -77.8419, 166.6863, ["antarctica"]),
+    # The poles were the thinnest part of the map: seven stations above the
+    # Arctic Circle, one below it. Natural Earth has almost no Antarctic
+    # settlements and its Arctic villages are too small for the population
+    # rule, so both belts are listed here, roughly 1,000 km apart, at places
+    # with a continuous NASA POWER record.
+    ("utqiagvik", "Utqiaġvik", "United States", "North America", 71.2906, -156.7886, ["barrow", "alaska"]),
+    ("inuvik", "Inuvik", "Canada", "North America", 68.3607, -133.7230, ["northwest territories"]),
+    ("cambridge-bay", "Cambridge Bay", "Canada", "North America", 69.1169, -105.0597, ["iqaluktuuttiaq", "nunavut"]),
+    ("resolute", "Resolute", "Canada", "North America", 74.6975, -94.8297, ["resolute bay", "qausuittuq"]),
+    ("ittoqqortoormiit", "Ittoqqortoormiit", "Greenland", "North America", 70.4853, -21.9667, ["scoresbysund"]),
+    ("nord", "Nord", "Greenland", "North America", 81.6000, -16.6700, ["station nord"]),
+    ("khatanga", "Khatanga", "Russia", "Asia", 72.0417, 102.4653, []),
+    ("tiksi", "Tiksi", "Russia", "Asia", 71.6269, 128.8686, []),
+    ("pevek", "Pevek", "Russia", "Asia", 69.7029, 170.2992, []),
+    ("srednekolymsk", "Srednekolymsk", "Russia", "Asia", 67.4500, 153.7100, []),
+    ("vostok", "Vostok", "Antarctica", "Antarctica", -78.4644, 106.8350, ["vostok station"]),
+    ("concordia", "Concordia", "Antarctica", "Antarctica", -75.1000, 123.3900, ["dome c", "concordia station"]),
+    ("casey", "Casey", "Antarctica", "Antarctica", -66.2817, 110.5283, ["casey station"]),
+    ("dumont-durville", "Dumont d'Urville", "Antarctica", "Antarctica", -66.6667, 140.0017, ["dumont durville"]),
+    ("davis", "Davis", "Antarctica", "Antarctica", -68.5764, 77.9686, ["davis station"]),
+    ("mawson", "Mawson", "Antarctica", "Antarctica", -67.6028, 62.8731, ["mawson station"]),
+    ("syowa", "Syowa", "Antarctica", "Antarctica", -69.0044, 39.5808, ["showa", "syowa station"]),
+    ("neumayer", "Neumayer", "Antarctica", "Antarctica", -70.6500, -8.2500, ["neumayer station"]),
+    ("halley", "Halley", "Antarctica", "Antarctica", -75.5800, -26.5000, ["halley bay", "halley station"]),
+    ("rothera", "Rothera", "Antarctica", "Antarctica", -67.5686, -68.1239, ["rothera station"]),
 ]
 
 FEATURED = {

@@ -8,7 +8,7 @@ Last verified: 2026-11-14
 - [x] G1: The data build produces a bundle with at least 25 points, at least 2,000 global grid cells, and four variables, all from real cached sources.
   CHECK: uv run python scripts/verify_data.py
   EXPECT: data verified
-  EVIDENCE: 688 points across 222 countries and territories · 14 featured · 6 live · 687 points with all four variables · 4,039 grid cells · 6 source checks ok · global 1990–2025 slope +0.2362 °C/decade.
+  EVIDENCE: 708 points across 222 countries and territories · 14 featured · 6 live · 696 points with all four variables · 4,039 grid cells · 6 source checks ok · global 1990–2025 slope +0.2362 °C/decade.
 
 - [x] G2: The statistics engine reproduces known-answer fixtures for OLS/HAC, Sen's slope, and Mann–Kendall within tolerance.
   CHECK: uv run --with pytest pytest -q
@@ -145,7 +145,7 @@ Last verified: 2026-11-14
 - [x] G29: Every country and territory contributes its three largest populated places, conurbations are not duplicated, and a point ships only with all four NASA POWER variables.
   CHECK: uv run python scripts/build_data.py --skip-grid --skip-imagery; uv run python scripts/verify_data.py
   EXPECT: data verified
-  EVIDENCE: Natural Earth populated places (7,342 rows, public domain) ranked by `POP_MAX` per `ADM0NAME`: 568 candidates across 228 units, 64 of which hold fewer than three places. 53 candidates matched the curated 45 (same name or <15 km), 14 conurbations were merged (Giza/Cairo 6.1 km, Piraeus/Athens 4.5 km, Callao/Lima 10.4 km) and 6 were dropped for a masked root-zone soil moisture series (Majuro, Funafuti, Malé, Atafu, Esperanza Base, Casey Station). Result after the sparse-region passes in G31, G33 and G34: 45 curated + 509 top-city + 134 sparse = 688 points, 687 with four variables and McMurdo with three. `points.json` is 5.9 MB, `rag_index.json` 73 KB with 684 places, 14 Sentinel-2 mosaics, and 6 Meteomatics snapshots carried from `data/cache`. Earthdata could not be re-authenticated because every value in the local `.env` is empty, so `sources.json` keeps the earlier verification and says so in the detail line.
+  EVIDENCE: Natural Earth populated places (7,342 rows, public domain) ranked by `POP_MAX` per `ADM0NAME`: 568 candidates across 228 units, 64 of which hold fewer than three places. 53 candidates matched the curated 45 (same name or <15 km), 14 conurbations were merged (Giza/Cairo 6.1 km, Piraeus/Athens 4.5 km, Callao/Lima 10.4 km) and 6 were dropped for a masked root-zone soil moisture series (Majuro, Funafuti, Malé, Atafu, Esperanza Base, Casey Station). Result after the sparse-region passes in G31, G33, G34 and the polar list in G43: 65 curated + 509 top-city + 134 sparse = 708 points, 696 with four variables and twelve with three. `points.json` is 6.1 MB, `rag_index.json` 101 KB with 708 places, 14 Sentinel-2 mosaics, and 6 Meteomatics snapshots carried from `data/cache`. Earthdata could not be re-authenticated because every value in the local `.env` is empty, so `sources.json` keeps the earlier verification and says so in the detail line.
 
 - [x] G30: The expanded bundle and its pipeline are pushed to `main` on GitHub.
   CHECK: git rev-parse HEAD and git rev-parse origin/main agree after fetching `main`.
@@ -170,10 +170,10 @@ Last verified: 2026-11-14
 - [x] G35: A country name reaches that country's principal station from every spelling, not the global field.
   CHECK: uv run python scripts/build_data.py --skip-grid --skip-imagery; node scripts/verify_rag.mjs
   EXPECT: rag verified
-  EVIDENCE: All 688 stations now carry their country name as an alias, and `COUNTRY_SPELLINGS` stamps usa/us, uae and uk/britain on the stations of those countries. `resolvePlace` breaks ties by alias length, then the hand-curated flag, then population, so "United States", "USA" and "US" all resolve to Los Angeles (the largest hand-curated US case), "UAE" to Dubai and "UK" to London, while city questions are unchanged (Yakutsk → Yakutsk, Nairobi → Nairobi, Delhi → Delhi). Before this, "Is the United States warming?" fell through to the global GISTEMP field because the retrieval index knew the country only as "usa" and "us".
+  EVIDENCE: All 708 stations now carry their country name as an alias, and `COUNTRY_SPELLINGS` stamps usa/us, uae and uk/britain on the stations of those countries. `resolvePlace` breaks ties by alias length, then the hand-curated flag, then population, so "United States", "USA" and "US" all resolve to Los Angeles (the largest hand-curated US case), "UAE" to Dubai and "UK" to London, while city questions are unchanged (Yakutsk → Yakutsk, Nairobi → Nairobi, Delhi → Delhi). Before this, "Is the United States warming?" fell through to the global GISTEMP field because the retrieval index knew the country only as "usa" and "us".
   NOTE: The tie-break matters. With the country alias on every station, a country query matches 22 US entries; without an ordering rule the winner was whichever entry came first in the index.
 
-  NOTE: Spacing is the honest metric here, not counts. Adding stations can raise the mean nearest-neighbour distance whenever the new station is the remote one being added, which is why these three regions are reported with median and worst gap alongside the mean. Bundle is 688 points, 687 with all four variables, 222 countries.
+  NOTE: Spacing is the honest metric here, not counts. Adding stations can raise the mean nearest-neighbour distance whenever the new station is the remote one being added, which is why these three regions are reported with median and worst gap alongside the mean. Bundle is 708 points, 696 with all four variables, 222 countries.
 
 - [x] G32: Generated points use the hand-curated country names, so one country is never listed twice and no Natural Earth typo reaches the interface.
   CHECK: uv run python scripts/build_data.py --skip-grid --skip-imagery; python -c "import json; p=json.load(open('public/data/points.json'))['points']; print(len({x['country'] for x in p}))"
@@ -185,7 +185,7 @@ Last verified: 2026-11-14
 - [x] G36: Every country in the bundle has a country-average record: a mean annual series, trends for every variable and window, and its stations accounted for.
   CHECK: uv run python scripts/verify_countries.py
   EXPECT: countries verified
-  EVIDENCE: `build_countries` groups the 688 stations into 222 countries, averages each annual value across that country's stations, and runs the same estimator at country scale with Benjamini–Hochberg applied across the 222 averages. The verifier recomputes every mean value from the member stations and requires it to sit inside the station range: `countries: 222 · stations: 688 · 175 averaged over several stations`. Antarctica carries three variables rather than four because McMurdo has no root-zone soil moisture, and the checker requires exactly the variables its stations carry.
+  EVIDENCE: `build_countries` groups the 708 stations into 222 countries, averages each annual value across that country's stations, and runs the same estimator at country scale with Benjamini–Hochberg applied across the 222 averages. The verifier recomputes every mean value from the member stations and requires it to sit inside the station range: `countries: 222 · stations: 708 · 176 averaged over several stations`. Antarctica carries three variables rather than four because McMurdo has no root-zone soil moisture, and the checker requires exactly the variables its stations carry.
 
 - [x] G37: A country question plans a country-average case and offers that country's cities, while city and global questions keep their current plans.
   CHECK: node scripts/verify_country_plan.mjs
@@ -200,7 +200,7 @@ Last verified: 2026-11-14
 - [x] G39: The full check suite still passes with country averages in the bundle.
   CHECK: bash scripts/verify_all.sh
   EXPECT: all checks passed
-  EVIDENCE: Ran `bash scripts/verify_all.sh`; every check passed and the run ended with `all checks passed`. The new bundle is 688 points, 222 country averages, 4,039 grid cells, 620 city suggestions, with `countries.json` 2.0 MB made from the same station series.
+  EVIDENCE: Ran `bash scripts/verify_all.sh`; every check passed and the run ended with `all checks passed`. The new bundle is 708 points, 222 country averages, 4,039 grid cells, 629 city suggestions, with `countries.json` 2.0 MB made from the same station series.
 
 - [x] G40: The country-average feature is pushed, deployed and resolves on the live site.
   CHECK: bash scripts/verify_live.sh
@@ -217,6 +217,12 @@ Last verified: 2026-11-14
   EXPECT: textures verified
   EVIDENCE: The bump map was a 2048×1024 PNG (0.38 MB) at 15 texels per degree while the skin had moved to 30. It is now ASTER GDEM greyscale shaded relief at 4096×2048 JPEG (0.36 MB), so the shading matches the skin and the download is 20 KB smaller. `verify_textures.mjs` requires at least 4096×2048 for this file and still enforces the 2:1 equirectangular aspect; the suite reports `textures verified` and `all checks passed`. Visual check on the dev server: terrain relief reads cleanly with no double-shadowing artefacts.
 
-MET: 42
+- [x] G43: Both polar belts carry a real network instead of a token station.
+  CHECK: uv run python scripts/verify_data.py && node scripts/verify_country_plan.mjs
+  EXPECT: data verified
+  EVIDENCE: The Arctic had 7 stations above 66.5°N and Antarctica exactly one, McMurdo. Ten Arctic sites were added roughly 1,000 km apart — Utqiaġvik, Inuvik, Cambridge Bay, Resolute, Ittoqqortoormiit, Nord (81.6°N), Khatanga, Tiksi, Pevek, Srednekolymsk — taking the Arctic to 17, and ten Antarctic research stations — Vostok, Concordia, Casey, Dumont d'Urville, Davis, Mawson, Syowa, Neumayer, Halley, Rothera — taking Antarctica to 11. Natural Earth was not usable here: it has no Antarctic settlements and its Arctic villages are below the 20,000-person fill rule, so both belts are explicit entries in the curated table with a continuous NASA POWER record, which the build verifies.
+  NOTE: All ten Antarctic stations return three of the four variables, because MERRA-2 masks root-zone soil moisture over ice; that is why the bundle now has 12 three-variable stations rather than one. Some polar trends are negative and significant — Cambridge Bay −0.60, Nord −0.61, Resolute −0.40 °C/decade — and those are the reanalysis values for this 1990–2025 window, checked against the raw annual series rather than assumed to be an artefact.
+
+MET: 43
 UNMET: 0
 ABANDONED: 0

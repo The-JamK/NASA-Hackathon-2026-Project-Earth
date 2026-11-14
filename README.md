@@ -47,11 +47,12 @@ average record of its own. Ask "Is France warming?" and the plan offers the mean
 France's stations alongside a list of its cities, so a country question is answered
 by the country rather than silently by its biggest city.
 
-The result is 688 points across 222 countries and territories: 687 carry all four
-variables, and McMurdo keeps three as the red-herring case. Russia holds 28 stations,
-northern China 12, North Africa 30, North America 96, South America 66, Australia 12,
-Southeast Asia 38, the Middle East 43, India 9, Central Asia 18, the Amazon interior 19
-and the Sahel 18, against 126 across Europe and the Mediterranean. Islands and ice shelves
+The result is 708 points across 222 countries and territories: 696 carry all four
+variables and twelve keep three — the eleven Antarctic stations and Greenland's
+Ittoqqortoormiit, where MERRA-2 masks root-zone soil moisture over ice. The Arctic holds
+17 stations and Antarctica 11, up from 7 and 1; Russia 32, North America 102, northern
+China 12, North Africa 30, South America 66, Australia 12, Southeast Asia 38, the Middle
+East 43, India 9, Central Asia 18, the Amazon interior 19 and the Sahel 18. Islands and ice shelves
 where MERRA-2 masks root-zone soil moisture are left out rather than filled with an
 interpolated or mask value.
 
