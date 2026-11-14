@@ -220,16 +220,6 @@
       </footer>
     </main>
 
-    <script>
-      // GitHub Pages serves this folder as-is, so the Vite source reaches the
-      // browser. When the bundle has not applied (no stylesheet at all), hand the
-      // visitor to the built copy committed in ./dist.
-      window.addEventListener("load", function () {
-        if (document.styleSheets.length || location.pathname.indexOf("/dist/") !== -1) return;
-        var page = location.pathname.split("/").pop() || "index.html";
-        location.replace("./dist/" + page + location.search + location.hash);
-      });
-    </script>
     <script type="module" src="./src/landing.js"></script>
   </body>
 </html>
