@@ -139,11 +139,13 @@ def fetch_meteomatics(
     password: str,
     cache: Path = CACHE,
 ) -> dict[str, Any] | None:
-    if not username or not password:
-        return None
+    # A cached snapshot needs no credentials, so it is served first: the build
+    # can still ship current conditions on a machine that has no API key.
     path = cache / "meteomatics" / f"{slug}.json"
     if path.exists() and path.stat().st_size > 0:
         return json.loads(path.read_text(encoding="utf-8"))
+    if not username or not password:
+        return None
 
     valid_time = datetime.now(timezone.utc).replace(minute=0, second=0, microsecond=0)
     stamp = valid_time.strftime("%Y-%m-%dT%H:00:00Z")

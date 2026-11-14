@@ -1,5 +1,5 @@
 {
- "generated_utc": "2026-11-14T02:15:20+00:00",
+ "generated_utc": "2026-11-14T07:00:26+00:00",
  "collection": "sentinel-2-l2a",
  "asset": "visual",
  "sign_endpoint": "https://planetarycomputer.microsoft.com/api/sas/v1/sign",
@@ -51,7 +51,7 @@
    ]
   }
  },
- "sentinel_points": 11,
+ "sentinel_points": 14,
  "fallback_points": 0,
  "points": [
   {
@@ -1956,6 +1956,525 @@
    "bytes": 67729,
    "label": "Sentinel-2 L2A · mosaic",
    "attribution": "Contains modified Copernicus Sentinel data 2024, processed by Microsoft Planetary Computer. Low-cloud L2A mosaic; primary scene 2024-12-20."
+  },
+  {
+   "slug": "shanghai",
+   "name": "Shanghai",
+   "search": {
+    "datetime": "2024-10-01/2024-12-31",
+    "bbox": [
+     121.3846,
+     31.1684,
+     121.4846,
+     31.2684
+    ],
+    "url": "https://planetarycomputer.microsoft.com/api/stac/v1/search",
+    "status": 200,
+    "features": 8
+   },
+   "mosaic": {
+    "register_url": "https://planetarycomputer.microsoft.com/api/data/v1/mosaic/register",
+    "register_body": {
+     "collections": [
+      "sentinel-2-l2a"
+     ],
+     "bbox": [
+      121.08460000000001,
+      30.868399999999998,
+      121.7846,
+      31.5684
+     ],
+     "datetime": "2024-10-01T00:00:00Z/2024-12-31T23:59:59Z",
+     "filter-lang": "cql2-json",
+     "filter": {
+      "op": "<=",
+      "args": [
+       {
+        "property": "eo:cloud_cover"
+       },
+       35
+      ]
+     },
+     "sortby": [
+      {
+       "field": "eo:cloud_cover",
+       "direction": "asc"
+      }
+     ]
+    },
+    "register_status": 200,
+    "search_id": "pc1.1794725981.68584319f97541f2b7ee8109d6dd3673",
+    "zoom": 12,
+    "tile_center": [
+     3429,
+     1673
+    ],
+    "tile_url_template": "https://planetarycomputer.microsoft.com/api/data/v1/mosaic/pc1.1794725981.68584319f97541f2b7ee8109d6dd3673/tiles/WebMercatorQuad/12/{x}/{y}@2x.png",
+    "params": {
+     "assets": "visual",
+     "asset_bidx": "visual|1,2,3",
+     "nodata": "0",
+     "collection": "sentinel-2-l2a",
+     "pixel_selection": "first"
+    },
+    "tile_statuses": [
+     {
+      "tile": [
+       3428,
+       1672
+      ],
+      "url": "https://planetarycomputer.microsoft.com/api/data/v1/mosaic/pc1.1794725981.68584319f97541f2b7ee8109d6dd3673/tiles/WebMercatorQuad/12/3428/1672@2x.png",
+      "status": 200
+     },
+     {
+      "tile": [
+       3429,
+       1672
+      ],
+      "url": "https://planetarycomputer.microsoft.com/api/data/v1/mosaic/pc1.1794725981.68584319f97541f2b7ee8109d6dd3673/tiles/WebMercatorQuad/12/3429/1672@2x.png",
+      "status": 200
+     },
+     {
+      "tile": [
+       3430,
+       1672
+      ],
+      "url": "https://planetarycomputer.microsoft.com/api/data/v1/mosaic/pc1.1794725981.68584319f97541f2b7ee8109d6dd3673/tiles/WebMercatorQuad/12/3430/1672@2x.png",
+      "status": 200
+     },
+     {
+      "tile": [
+       3428,
+       1673
+      ],
+      "url": "https://planetarycomputer.microsoft.com/api/data/v1/mosaic/pc1.1794725981.68584319f97541f2b7ee8109d6dd3673/tiles/WebMercatorQuad/12/3428/1673@2x.png",
+      "status": 200
+     },
+     {
+      "tile": [
+       3429,
+       1673
+      ],
+      "url": "https://planetarycomputer.microsoft.com/api/data/v1/mosaic/pc1.1794725981.68584319f97541f2b7ee8109d6dd3673/tiles/WebMercatorQuad/12/3429/1673@2x.png",
+      "status": 200
+     },
+     {
+      "tile": [
+       3430,
+       1673
+      ],
+      "url": "https://planetarycomputer.microsoft.com/api/data/v1/mosaic/pc1.1794725981.68584319f97541f2b7ee8109d6dd3673/tiles/WebMercatorQuad/12/3430/1673@2x.png",
+      "status": 200
+     },
+     {
+      "tile": [
+       3428,
+       1674
+      ],
+      "url": "https://planetarycomputer.microsoft.com/api/data/v1/mosaic/pc1.1794725981.68584319f97541f2b7ee8109d6dd3673/tiles/WebMercatorQuad/12/3428/1674@2x.png",
+      "status": 200
+     },
+     {
+      "tile": [
+       3429,
+       1674
+      ],
+      "url": "https://planetarycomputer.microsoft.com/api/data/v1/mosaic/pc1.1794725981.68584319f97541f2b7ee8109d6dd3673/tiles/WebMercatorQuad/12/3429/1674@2x.png",
+      "status": 200
+     },
+     {
+      "tile": [
+       3430,
+       1674
+      ],
+      "url": "https://planetarycomputer.microsoft.com/api/data/v1/mosaic/pc1.1794725981.68584319f97541f2b7ee8109d6dd3673/tiles/WebMercatorQuad/12/3430/1674@2x.png",
+      "status": 200
+     }
+    ],
+    "tiles_ok": 9,
+    "transparent_fraction": 0.0,
+    "extrema": [
+     [
+      1,
+      255
+     ],
+     [
+      8,
+      255
+     ],
+     [
+      1,
+      255
+     ]
+    ],
+    "stddev": [
+     45.95,
+     38.63,
+     34.62
+    ]
+   },
+   "selected": {
+    "item_id": "S2B_MSIL2A_20241230T023019_R046_T51RUQ_20241230T040634",
+    "datetime": "2024-12-30T02:30:19.024000Z",
+    "cloud_cover": 0.106401,
+    "bbox": [
+     121.2311194,
+     30.6317724,
+     122.0586861,
+     31.6320042
+    ]
+   },
+   "fallback": false,
+   "output": "/data/imagery/shanghai-sentinel.jpg",
+   "bytes": 130584,
+   "label": "Sentinel-2 L2A · mosaic",
+   "attribution": "Contains modified Copernicus Sentinel data 2024, processed by Microsoft Planetary Computer. Low-cloud L2A mosaic; primary scene 2024-12-30."
+  },
+  {
+   "slug": "dhaka",
+   "name": "Dhaka",
+   "search": {
+    "datetime": "2024-11-01/2025-01-31",
+    "bbox": [
+     90.3566,
+     23.675,
+     90.4566,
+     23.775000000000002
+    ],
+    "url": "https://planetarycomputer.microsoft.com/api/stac/v1/search",
+    "status": 200,
+    "features": 8
+   },
+   "mosaic": {
+    "register_url": "https://planetarycomputer.microsoft.com/api/data/v1/mosaic/register",
+    "register_body": {
+     "collections": [
+      "sentinel-2-l2a"
+     ],
+     "bbox": [
+      90.0566,
+      23.375,
+      90.75659999999999,
+      24.075000000000003
+     ],
+     "datetime": "2024-11-01T00:00:00Z/2025-01-31T23:59:59Z",
+     "filter-lang": "cql2-json",
+     "filter": {
+      "op": "<=",
+      "args": [
+       {
+        "property": "eo:cloud_cover"
+       },
+       35
+      ]
+     },
+     "sortby": [
+      {
+       "field": "eo:cloud_cover",
+       "direction": "asc"
+      }
+     ]
+    },
+    "register_status": 200,
+    "search_id": "pc1.1794726001.2b96f68659354953b12650e234fffa4d",
+    "zoom": 12,
+    "tile_center": [
+     3076,
+     1770
+    ],
+    "tile_url_template": "https://planetarycomputer.microsoft.com/api/data/v1/mosaic/pc1.1794726001.2b96f68659354953b12650e234fffa4d/tiles/WebMercatorQuad/12/{x}/{y}@2x.png",
+    "params": {
+     "assets": "visual",
+     "asset_bidx": "visual|1,2,3",
+     "nodata": "0",
+     "collection": "sentinel-2-l2a",
+     "pixel_selection": "first"
+    },
+    "tile_statuses": [
+     {
+      "tile": [
+       3075,
+       1769
+      ],
+      "url": "https://planetarycomputer.microsoft.com/api/data/v1/mosaic/pc1.1794726001.2b96f68659354953b12650e234fffa4d/tiles/WebMercatorQuad/12/3075/1769@2x.png",
+      "status": 200
+     },
+     {
+      "tile": [
+       3076,
+       1769
+      ],
+      "url": "https://planetarycomputer.microsoft.com/api/data/v1/mosaic/pc1.1794726001.2b96f68659354953b12650e234fffa4d/tiles/WebMercatorQuad/12/3076/1769@2x.png",
+      "status": 200
+     },
+     {
+      "tile": [
+       3077,
+       1769
+      ],
+      "url": "https://planetarycomputer.microsoft.com/api/data/v1/mosaic/pc1.1794726001.2b96f68659354953b12650e234fffa4d/tiles/WebMercatorQuad/12/3077/1769@2x.png",
+      "status": 200
+     },
+     {
+      "tile": [
+       3075,
+       1770
+      ],
+      "url": "https://planetarycomputer.microsoft.com/api/data/v1/mosaic/pc1.1794726001.2b96f68659354953b12650e234fffa4d/tiles/WebMercatorQuad/12/3075/1770@2x.png",
+      "status": 200
+     },
+     {
+      "tile": [
+       3076,
+       1770
+      ],
+      "url": "https://planetarycomputer.microsoft.com/api/data/v1/mosaic/pc1.1794726001.2b96f68659354953b12650e234fffa4d/tiles/WebMercatorQuad/12/3076/1770@2x.png",
+      "status": 200
+     },
+     {
+      "tile": [
+       3077,
+       1770
+      ],
+      "url": "https://planetarycomputer.microsoft.com/api/data/v1/mosaic/pc1.1794726001.2b96f68659354953b12650e234fffa4d/tiles/WebMercatorQuad/12/3077/1770@2x.png",
+      "status": 200
+     },
+     {
+      "tile": [
+       3075,
+       1771
+      ],
+      "url": "https://planetarycomputer.microsoft.com/api/data/v1/mosaic/pc1.1794726001.2b96f68659354953b12650e234fffa4d/tiles/WebMercatorQuad/12/3075/1771@2x.png",
+      "status": 200
+     },
+     {
+      "tile": [
+       3076,
+       1771
+      ],
+      "url": "https://planetarycomputer.microsoft.com/api/data/v1/mosaic/pc1.1794726001.2b96f68659354953b12650e234fffa4d/tiles/WebMercatorQuad/12/3076/1771@2x.png",
+      "status": 200
+     },
+     {
+      "tile": [
+       3077,
+       1771
+      ],
+      "url": "https://planetarycomputer.microsoft.com/api/data/v1/mosaic/pc1.1794726001.2b96f68659354953b12650e234fffa4d/tiles/WebMercatorQuad/12/3077/1771@2x.png",
+      "status": 200
+     }
+    ],
+    "tiles_ok": 9,
+    "transparent_fraction": 0.0,
+    "extrema": [
+     [
+      13,
+      255
+     ],
+     [
+      20,
+      255
+     ],
+     [
+      23,
+      255
+     ]
+    ],
+    "stddev": [
+     35.17,
+     26.32,
+     22.83
+    ]
+   },
+   "selected": {
+    "item_id": "S2B_MSIL2A_20241226T043119_R133_T46QBM_20241226T063518",
+    "datetime": "2024-12-26T04:31:19.024000Z",
+    "cloud_cover": 0.11417,
+    "bbox": [
+     90.0422865,
+     23.3940929,
+     91.1384076,
+     24.4018062
+    ]
+   },
+   "fallback": false,
+   "output": "/data/imagery/dhaka-sentinel.jpg",
+   "bytes": 112593,
+   "label": "Sentinel-2 L2A · mosaic",
+   "attribution": "Contains modified Copernicus Sentinel data 2024, processed by Microsoft Planetary Computer. Low-cloud L2A mosaic; primary scene 2024-12-26."
+  },
+  {
+   "slug": "reykjavik",
+   "name": "Reykjavík",
+   "search": {
+    "datetime": "2024-06-01/2024-08-31",
+    "bbox": [
+     -22.0,
+     64.10000000000001,
+     -21.9,
+     64.2
+    ],
+    "url": "https://planetarycomputer.microsoft.com/api/stac/v1/search",
+    "status": 200,
+    "features": 1
+   },
+   "mosaic": {
+    "register_url": "https://planetarycomputer.microsoft.com/api/data/v1/mosaic/register",
+    "register_body": {
+     "collections": [
+      "sentinel-2-l2a"
+     ],
+     "bbox": [
+      -22.3,
+      63.800000000000004,
+      -21.599999999999998,
+      64.5
+     ],
+     "datetime": "2024-06-01T00:00:00Z/2024-08-31T23:59:59Z",
+     "filter-lang": "cql2-json",
+     "filter": {
+      "op": "<=",
+      "args": [
+       {
+        "property": "eo:cloud_cover"
+       },
+       35
+      ]
+     },
+     "sortby": [
+      {
+       "field": "eo:cloud_cover",
+       "direction": "asc"
+      }
+     ]
+    },
+    "register_status": 200,
+    "search_id": "pc1.1794726015.0e7d631127cd420f81eeee68f2225860",
+    "zoom": 11,
+    "tile_center": [
+     899,
+     544
+    ],
+    "tile_url_template": "https://planetarycomputer.microsoft.com/api/data/v1/mosaic/pc1.1794726015.0e7d631127cd420f81eeee68f2225860/tiles/WebMercatorQuad/11/{x}/{y}@2x.png",
+    "params": {
+     "assets": "visual",
+     "asset_bidx": "visual|1,2,3",
+     "nodata": "0",
+     "collection": "sentinel-2-l2a",
+     "pixel_selection": "first"
+    },
+    "tile_statuses": [
+     {
+      "tile": [
+       898,
+       543
+      ],
+      "url": "https://planetarycomputer.microsoft.com/api/data/v1/mosaic/pc1.1794726015.0e7d631127cd420f81eeee68f2225860/tiles/WebMercatorQuad/11/898/543@2x.png",
+      "status": 200
+     },
+     {
+      "tile": [
+       899,
+       543
+      ],
+      "url": "https://planetarycomputer.microsoft.com/api/data/v1/mosaic/pc1.1794726015.0e7d631127cd420f81eeee68f2225860/tiles/WebMercatorQuad/11/899/543@2x.png",
+      "status": 200
+     },
+     {
+      "tile": [
+       900,
+       543
+      ],
+      "url": "https://planetarycomputer.microsoft.com/api/data/v1/mosaic/pc1.1794726015.0e7d631127cd420f81eeee68f2225860/tiles/WebMercatorQuad/11/900/543@2x.png",
+      "status": 200
+     },
+     {
+      "tile": [
+       898,
+       544
+      ],
+      "url": "https://planetarycomputer.microsoft.com/api/data/v1/mosaic/pc1.1794726015.0e7d631127cd420f81eeee68f2225860/tiles/WebMercatorQuad/11/898/544@2x.png",
+      "status": 200
+     },
+     {
+      "tile": [
+       899,
+       544
+      ],
+      "url": "https://planetarycomputer.microsoft.com/api/data/v1/mosaic/pc1.1794726015.0e7d631127cd420f81eeee68f2225860/tiles/WebMercatorQuad/11/899/544@2x.png",
+      "status": 200
+     },
+     {
+      "tile": [
+       900,
+       544
+      ],
+      "url": "https://planetarycomputer.microsoft.com/api/data/v1/mosaic/pc1.1794726015.0e7d631127cd420f81eeee68f2225860/tiles/WebMercatorQuad/11/900/544@2x.png",
+      "status": 200
+     },
+     {
+      "tile": [
+       898,
+       545
+      ],
+      "url": "https://planetarycomputer.microsoft.com/api/data/v1/mosaic/pc1.1794726015.0e7d631127cd420f81eeee68f2225860/tiles/WebMercatorQuad/11/898/545@2x.png",
+      "status": 200
+     },
+     {
+      "tile": [
+       899,
+       545
+      ],
+      "url": "https://planetarycomputer.microsoft.com/api/data/v1/mosaic/pc1.1794726015.0e7d631127cd420f81eeee68f2225860/tiles/WebMercatorQuad/11/899/545@2x.png",
+      "status": 200
+     },
+     {
+      "tile": [
+       900,
+       545
+      ],
+      "url": "https://planetarycomputer.microsoft.com/api/data/v1/mosaic/pc1.1794726015.0e7d631127cd420f81eeee68f2225860/tiles/WebMercatorQuad/11/900/545@2x.png",
+      "status": 200
+     }
+    ],
+    "tiles_ok": 9,
+    "transparent_fraction": 0.0,
+    "extrema": [
+     [
+      0,
+      255
+     ],
+     [
+      0,
+      255
+     ],
+     [
+      0,
+      255
+     ]
+    ],
+    "stddev": [
+     63.84,
+     59.5,
+     57.93
+    ]
+   },
+   "selected": {
+    "item_id": "S2A_MSIL2A_20240826T130301_R038_T27WVM_20240826T171944",
+    "datetime": "2024-08-26T13:03:01.024000Z",
+    "cloud_cover": 5.727358,
+    "bbox": [
+     -23.102136,
+     63.9244911,
+     -20.797394,
+     64.7448454
+    ]
+   },
+   "fallback": false,
+   "output": "/data/imagery/reykjavik-sentinel.jpg",
+   "bytes": 61521,
+   "label": "Sentinel-2 L2A · mosaic",
+   "attribution": "Contains modified Copernicus Sentinel data 2024, processed by Microsoft Planetary Computer. Low-cloud L2A mosaic; primary scene 2024-08-26."
   }
  ]
 }

@@ -3,14 +3,23 @@ import { CircleGeometry, DoubleSide, Group, Mesh, MeshBasicMaterial, RingGeometr
 import { feature } from "topojson-client";
 import world from "world-atlas/countries-110m.json";
 import "./style.css";
-import { planCase } from "./rag.js";
-import { renderSeriesChart, trendColor } from "./chart.js";
+import { oceanRegionAt, oceanVariable, planCase, seaIceVariable } from "./rag.js";
+import { renderCompareChart, renderSeriesChart, trendColor } from "./chart.js";
 import { SOURCE_LINKS } from "./sources.js";
 import { formatLatLon, haversineKm, nearestCell, nearestRecord } from "./geo.js";
+import { deriveSteepUnproven } from "./herring.js";
 
 const state = {
   variables: [],
   points: [],
+  countries: [],
+  countriesById: new Map(),
+  ocean: [],
+  oceanById: new Map(),
+  oceanMeta: null,
+  seaIce: [],
+  seaIceById: new Map(),
+  seaIceMeta: null,
   meta: null,
   grid: null,
   gridPoints: [],
@@ -30,6 +39,16 @@ const state = {
 
 const BASE_URL = import.meta.env.BASE_URL || "/";
 const LIVE_REFRESH_MS = 10 * 60 * 1000;
+
+// Readings fetched from the live proxy, keyed by station id. The build snapshot
+// on the point stays untouched, so a failed refresh falls back to a labelled
+// Snapshot rather than to a stale reading wearing a Live badge.
+const liveReadings = new Map();
+
+function liveFor(point) {
+  if (!point?.id) return null;
+  return liveReadings.get(point.id) || point.live || null;
+}
 
 function assetUrl(path) {
   if (!path || /^(?:[a-z]+:)?\/\//i.test(path) || path.startsWith("data:") || path.startsWith("blob:")) {
@@ -56,6 +75,7 @@ const els = {
   closeMethod: document.getElementById("close-method"),
   methodDone: document.getElementById("method-done"),
   recommendation: document.getElementById("recommendation"),
+  oceanLegend: document.getElementById("ocean-legend"),
 };
 
 let globe;
@@ -75,10 +95,13 @@ init();
 async function init() {
   bindStaticEvents();
   try {
-    const [variables, points, grid, rag, sources] = await Promise.all([
+    // Only the bundles a first case needs sit on the critical path. The 3.3 MB
+    // trend field and the 2.0 MB country averages are loaded on first use by
+    // ensureGrid()/ensureCountries(), so the globe is not held behind 11.3 MB of
+    // JSON on a venue network.
+    const [variables, points, rag, sources] = await Promise.all([
       loadJson(assetUrl("/data/variables.json")),
       loadJson(assetUrl("/data/points.json")),
-      loadJson(assetUrl("/data/grid.json")),
       loadJson(assetUrl("/data/rag_index.json")),
       loadJson(assetUrl("/data/sources.json")),
     ]);
@@ -86,20 +109,11 @@ async function init() {
     state.variables = variables.variables;
     state.points = points.points;
     state.meta = points.meta;
-    state.grid = grid;
     state.rag = rag;
     state.sources = sources.sources;
     state.windowKey = points.meta.windows[0];
     state.byCode = new Map(state.variables.map((variable) => [variable.code, variable]));
     state.byId = new Map(state.points.map((point) => [point.id, point]));
-    state.gridPoints = grid.cells.map((cell) => ({
-      ...cell,
-      isGrid: true,
-      id: `grid:${cell.lat}:${cell.lon}`,
-      name: `${Math.abs(cell.lat).toFixed(1)}°${cell.lat >= 0 ? "N" : "S"} ${Math.abs(cell.lon).toFixed(
-        1
-      )}°${cell.lon >= 0 ? "E" : "W"}`,
-    }));
 
     if (import.meta.env.DEV) {
       window.__caseFiles = {
@@ -132,6 +146,90 @@ function loadJson(path) {
   });
 }
 
+// Deferred bundles. Each has exactly one fetch and one promise, so asking twice
+// costs one request and a failed load can be retried.
+let gridPromise = null;
+let countriesPromise = null;
+let oceanPromise = null;
+let seaIcePromise = null;
+
+function ensureGrid() {
+  if (state.grid) return Promise.resolve(state.grid);
+  if (!gridPromise) {
+    gridPromise = loadJson(assetUrl("/data/grid.json"))
+      .then((grid) => {
+        state.grid = grid;
+        state.gridPoints = grid.cells.map((cell) => ({
+          ...cell,
+          isGrid: true,
+          id: `grid:${cell.lat}:${cell.lon}`,
+          name: `${Math.abs(cell.lat).toFixed(1)}°${cell.lat >= 0 ? "N" : "S"} ${Math.abs(
+            cell.lon
+          ).toFixed(1)}°${cell.lon >= 0 ? "E" : "W"}`,
+        }));
+        return grid;
+      })
+      .catch((error) => {
+        gridPromise = null;
+        throw error;
+      });
+  }
+  return gridPromise;
+}
+
+function ensureCountries() {
+  if (state.countries.length) return Promise.resolve(state.countries);
+  if (!countriesPromise) {
+    countriesPromise = loadJson(assetUrl("/data/countries.json"))
+      .then((payload) => {
+        state.countries = payload.countries;
+        state.countriesById = new Map(state.countries.map((country) => [country.id, country]));
+        return state.countries;
+      })
+      .catch((error) => {
+        countriesPromise = null;
+        throw error;
+      });
+  }
+  return countriesPromise;
+}
+
+function ensureOcean() {
+  if (state.ocean.length) return Promise.resolve(state.ocean);
+  if (!oceanPromise) {
+    oceanPromise = loadJson(assetUrl("/data/ocean.json"))
+      .then((payload) => {
+        state.ocean = payload.regions;
+        state.oceanById = new Map(state.ocean.map((region) => [region.id, region]));
+        state.oceanMeta = payload.meta;
+        return state.ocean;
+      })
+      .catch((error) => {
+        oceanPromise = null;
+        throw error;
+      });
+  }
+  return oceanPromise;
+}
+
+function ensureSeaIce() {
+  if (state.seaIce.length) return Promise.resolve(state.seaIce);
+  if (!seaIcePromise) {
+    seaIcePromise = loadJson(assetUrl("/data/seaice.json"))
+      .then((payload) => {
+        state.seaIce = payload.records;
+        state.seaIceById = new Map(state.seaIce.map((record) => [record.id, record]));
+        state.seaIceMeta = payload.meta;
+        return state.seaIce;
+      })
+      .catch((error) => {
+        seaIcePromise = null;
+        throw error;
+      });
+  }
+  return seaIcePromise;
+}
+
 /* ------------------------------------------------------------------ globe */
 
 function buildGlobe() {
@@ -140,7 +238,7 @@ function buildGlobe() {
 
   globe = new Globe(els.globe)
     .globeImageUrl(assetUrl("/textures/earth-blue-marble.jpg"))
-    .bumpImageUrl(assetUrl("/textures/earth-topology.png"))
+    .bumpImageUrl(assetUrl("/textures/earth-topology.jpg"))
     .backgroundImageUrl(assetUrl("/textures/night-sky.png"))
     .atmosphereColor("#5fd3e0")
     .atmosphereAltitude(0.18)
@@ -227,8 +325,10 @@ function pointAltitude(point) {
 }
 
 function pointRadius(point) {
-  if (isSelected(point)) return point.isGrid ? 0.25 : 0.6;
-  return point.isGrid ? 0.17 : 0.42;
+  if (isSelected(point)) return point.isGrid ? 0.25 : 0.5;
+  // The station layer now holds a case for every country, so the dots stay
+  // small enough to keep neighbouring cities apart on the globe.
+  return point.isGrid ? 0.17 : 0.2;
 }
 
 function pointColor(point) {
@@ -353,6 +453,22 @@ function restoreHoveredPoint() {
   hoveredHaloPoint = null;
 }
 
+// The ocean layer is a field of 4° cells; a tap lands within about 2.8° of a
+// cell centre (half the diagonal), so 3° is "this cell" and nothing larger.
+function nearestOceanCell(lat, lng, maxDegrees) {
+  let best = null;
+  let bestDegrees = maxDegrees;
+  for (const cell of state.gridPoints) {
+    if (!cell.is_ocean) continue;
+    const degrees = haversineKm(lat, lng, cell.lat, cell.lon) / 111.32;
+    if (degrees < bestDegrees) {
+      bestDegrees = degrees;
+      best = cell;
+    }
+  }
+  return best;
+}
+
 function nearestWithin(lat, lng, maxDegrees) {
   let best = null;
   let bestDegrees = maxDegrees;
@@ -376,7 +492,7 @@ function startGlobeTap(event) {
 // globe.gl only resolves a click when the pointer already hovered the globe, which
 // never happens on a touchscreen. Read the tap straight off the canvas instead, so
 // the first tap on the world both works and lands on the right coordinates.
-function finishGlobeTap(event) {
+async function finishGlobeTap(event) {
   const origin = tapOrigin;
   tapOrigin = null;
   if (!origin || origin.id !== event.pointerId || !globe) return;
@@ -385,6 +501,34 @@ function finishGlobeTap(event) {
   const rect = globe.renderer().domElement.getBoundingClientRect();
   const coords = globe.toGlobeCoords(event.clientX - rect.left, event.clientY - rect.top);
   if (!coords) return;
+
+  // In the Ocean layer a tap on water is a question about that basin, not a
+  // request for the nearest station or a single cell's surface temperature.
+  if (state.layer === "ocean") {
+    await ensureOcean();
+    const cell = nearestOceanCell(coords.lat, coords.lng, 3);
+    if (!cell) {
+      showToast("Land — the Ocean layer only shows water. Switch to Cities to ask about a station.");
+      return;
+    }
+    // 339 of the 2,672 ocean cells (the tropical Atlantic, for one) fall outside
+    // every named basin. That is water, so it opens the global ocean rather than
+    // being reported as land.
+    const basin = oceanRegionAt(cell.lat, cell.lon, state.ocean);
+    const region = basin || state.ocean.find((item) => item.id === "global-ocean");
+    if (!region) {
+      showToast("No ocean region is loaded for that cell.");
+      return;
+    }
+    await selectOcean(region);
+    showToast(
+      basin
+        ? `Ocean case: ${region.name} · ${region.cells} cells`
+        : "Ocean case: Global ocean · this water is outside the named basins"
+    );
+    return;
+  }
+
   const near = state.layer === "cities" ? nearestWithin(coords.lat, coords.lng, HOVER_AREA_DEG) : null;
   if (near) {
     selectPoint(near);
@@ -435,7 +579,12 @@ function refreshLayer() {
   hoveredHalo = null;
   hoveredHaloPoint = null;
   state.hovered = null;
-  const data = state.layer === "field" ? state.gridPoints : state.points;
+  const data =
+    state.layer === "ocean"
+      ? state.gridPoints.filter((cell) => cell.is_ocean)
+      : state.layer === "field"
+        ? state.gridPoints
+        : state.points;
   globe.pointsData(data);
   if (state.layer === "field") {
     for (const point of state.points) delete point.__halo;
@@ -450,6 +599,8 @@ function refreshLayer() {
   document.querySelectorAll(".layer-switch button").forEach((button) => {
     button.classList.toggle("on", button.dataset.layer === state.layer);
   });
+  // The legend only explains the ocean when the ocean is on screen.
+  if (els.oceanLegend) els.oceanLegend.hidden = state.layer !== "ocean";
 }
 
 /* --------------------------------------------------------------- selection */
@@ -471,6 +622,8 @@ function selectPoint(point, options = {}) {
   document.body.classList.add("has-case");
   renderCase();
   refreshLayer();
+  // One case, one reading: the proxy is asked for this station only.
+  if (state.selectedKind === "city") refreshLiveForCase(point);
   if (options.fly !== false) {
     globe.pointOfView(
       { lat: point.lat, lng: point.lon, altitude: point.isGrid ? 1.45 : 1.75 },
@@ -484,8 +637,10 @@ function selectPoint(point, options = {}) {
     : `${point.name} · ${state.byCode.get(state.variable)?.short || "trend"}`;
 }
 
-function selectGlobal(windowKey = state.windowKey) {
+async function selectGlobal(windowKey = state.windowKey) {
   clearRecommendation();
+  // The global case counts grid cells, so it waits for the trend field.
+  await ensureGrid();
   state.selected = { global: true, name: "Global", lat: 12, lon: 0 };
   state.selectedKind = "global";
   state.variable = "GISTEMP";
@@ -519,8 +674,10 @@ function clearCase() {
 let recommendationFrame = 0;
 let customLayerKey = "";
 
-function recommendAt(lat, lng) {
+async function recommendAt(lat, lng) {
   if (!globe) return;
+  // The nearest-cell half of the recommendation needs the trend field.
+  await ensureGrid();
   state.recommendation = {
     target: { lat, lng },
     station: nearestRecord(lat, lng, state.points),
@@ -674,10 +831,453 @@ function distanceText(km) {
 /* ------------------------------------------------------------------- cases */
 
 function renderCase() {
-  if (state.selectedKind === "global") return renderGlobalCase();
-  if (state.selectedKind === "grid") return renderGridCase();
-  if (state.selectedKind === "city") return renderCityCase();
-  renderEmptyCase();
+  if (state.selectedKind === "global") renderGlobalCase();
+  else if (state.selectedKind === "grid") renderGridCase();
+  else if (state.selectedKind === "country") renderCountryCase();
+  else if (state.selectedKind === "ocean") renderOceanCase();
+  else if (state.selectedKind === "seaice") renderSeaIceCase();
+  else if (state.selectedKind === "city") renderCityCase();
+  else renderEmptyCase();
+  // A click that opens a case can leave the browser holding a scroll offset for
+  // the button it just removed, so the panel is pinned to the top on the next
+  // frame as well.
+  els.casePanel.scrollTop = 0;
+  requestAnimationFrame(() => {
+    els.casePanel.scrollTop = 0;
+  });
+}
+
+function selectCountry(country) {
+  if (!country) return;
+  clearRecommendation();
+  state.selected = country;
+  state.selectedKind = "country";
+  state.layer = "cities";
+  if (!country.trends?.[state.variable]?.[state.windowKey]) {
+    state.variable = country.trends?.T2M ? "T2M" : Object.keys(country.trends || {})[0] || "T2M";
+  }
+  document.body.classList.add("has-case");
+  renderCase();
+  refreshLayer();
+  globe.pointOfView({ lat: country.lat, lng: country.lon, altitude: 2.15 }, 900);
+  globe.controls().autoRotate = false;
+  clearTimeout(autoRotateTimer);
+  els.hint.textContent = `${country.name} · mean of ${country.stations} stations`;
+}
+
+function countryNarrative(country, variable, trend, windowKey) {
+  if (!trend) {
+    return `No ${variable.short.toLowerCase()} series is available for ${country.name} in the ${windowKey.replace("-", "–")} window.`;
+  }
+  const direction = trend.slope_per_decade >= 0 ? "rose" : "fell";
+  const correction = trend.significant
+    ? ` It survives the Benjamini–Hochberg correction across ${state.countries.length} country averages (q = ${formatP(
+        trend.q_value
+      )}).`
+    : trend.p_value < 0.05
+      ? ` It is locally significant but does not survive the correction across ${state.countries.length} country averages (q = ${formatP(
+          trend.q_value
+        )}).`
+      : ` It does not survive the HAC test at the 5% level (q = ${formatP(trend.q_value)}).`;
+  return `Averaged over the ${country.stations} ${country.name} station${
+    country.stations === 1 ? "" : "s"
+  } in this bundle, annual ${variable.short.toLowerCase()} ${direction} by <strong>${signed(
+    trend.slope_per_decade
+  )} ${variable.units} per decade</strong> over ${windowKey.replace(
+    "-",
+    "–"
+  )} (95% CI ${signed(trend.ci_low_per_decade)} to ${signed(
+    trend.ci_high_per_decade
+  )}; n = ${trend.n}; HAC p ${pText(trend.p_value)}).${correction} A country mean describes the stations, not every square kilometre: they cluster where people live, so desert and mountain interiors are represented only as far as the network reaches. This is a trend detection, not an attribution.`;
+}
+
+function renderCountryCase() {
+  const country = state.selected;
+  const code = state.variable === "GISTEMP" ? "T2M" : state.variable;
+  const variable = state.byCode.get(code) || state.variables[0];
+  const trend = country.trends?.[code]?.[state.windowKey] || null;
+  const series = country.series?.[code] || [];
+  const window = seriesWindow(series, state.meta.years, state.windowKey);
+  const info = verdictInfo(trend, variable);
+  const id = caseId(`${country.id}:${code}:${state.windowKey}`);
+
+  els.casePanel.innerHTML = `
+    <div class="case-head">
+      <div class="case-id">${id}</div>
+      <button class="case-close" data-action="close-case" type="button">Close</button>
+    </div>
+    <h2 class="place-title">${escapeHtml(country.name)}</h2>
+    <p class="place-sub">Country average · ${country.stations} station${
+      country.stations === 1 ? "" : "s"
+    } · ${escapeHtml(country.continent)}</p>
+    ${variableChips(variable, false)}
+    ${windowChips()}
+    <p class="narrative">${countryNarrative(country, variable, trend, state.windowKey)}</p>
+    ${verdictBlock(trend, variable, info)}
+    ${caveatBlock(trend, variable, false)}
+    <div class="chart" id="case-chart"></div>
+    <dl class="facts">
+      <div><dt>Stations averaged</dt><dd>${country.stations}</dd></div>
+      <div><dt>With all four variables</dt><dd>${country.full_coverage}</dd></div>
+      <div><dt>Series</dt><dd>${state.windowKey.replace("-", "–")} · n = ${
+        window.years.length
+      }</dd></div>
+      <div><dt>Source</dt><dd>NASA POWER (MERRA-2 derived) · station mean</dd></div>
+    </dl>
+    ${caseSources(null, variable)}
+    <div class="case-cities">
+      <div class="plan-cities-label">Open a city in ${escapeHtml(country.name)}</div>
+      <div class="city-chips">${country.cities
+        .map(
+          (city) =>
+            `<button class="chip chip-small" type="button" data-action="open-city" data-city-id="${escapeHtml(
+              city.id
+            )}">${escapeHtml(city.name)}</button>`
+        )
+        .join("")}</div>
+    </div>
+    ${workBlock("point")}
+  `;
+  renderSeriesChart(document.getElementById("case-chart"), {
+    years: window.years,
+    values: window.values,
+    trend,
+    variable,
+    xLabel: state.windowKey.replace("-", "–"),
+    yLabel: variable.units,
+  });
+  els.casePanel.scrollTop = 0;
+}
+
+/* ------------------------------------------------------------------ ocean */
+
+// An ocean region is a place, not a cloud of dots: no marker is drawn for it,
+// the way no marker exists for a country average. The globe flies there, one
+// ring pulses at the centroid, and the case panel carries the area mean.
+
+async function selectOcean(region) {
+  if (!region) return;
+  clearRecommendation();
+  await ensureGrid();
+  state.selected = region;
+  state.selectedKind = "ocean";
+  state.variable = "GISTEMP";
+  if (!region.trends?.GISTEMP?.[state.windowKey]) state.windowKey = state.meta.windows[0];
+  state.layer = "ocean";
+  document.body.classList.add("has-case");
+  renderCase();
+  refreshLayer();
+  globe.pointOfView({ lat: region.lat, lng: region.lon, altitude: 2.4 }, 900);
+  globe.controls().autoRotate = false;
+  clearTimeout(autoRotateTimer);
+  els.hint.textContent = `${region.name} · ${region.cells} ocean cells · sea surface temperature`;
+}
+
+function oceanNarrative(region, trend, windowKey) {
+  if (!trend) {
+    return `No complete sea surface temperature series is available for ${escapeHtml(
+      region.name
+    )} in the ${windowKey.replace("-", "–")} window.`;
+  }
+  const direction = trend.slope_per_decade >= 0 ? "rose" : "fell";
+  const agreement = trend.exploratory
+    ? `Only ${trend.n} annual means are available, so the result is labelled exploratory and no significance claim is made.`
+    : trend.significant
+      ? `Both the HAC slope test (p ${pText(trend.p_value)}) and the corrected Mann–Kendall test (p ${pText(
+          trend.mk_p_corrected
+        )}) pass at the 5% level and agree on direction.`
+      : `The HAC slope test (p ${pText(trend.p_value)}) and the corrected Mann–Kendall test (p ${pText(
+          trend.mk_p_corrected
+        )}) do not both pass at the 5% level, so no trend is claimed.`;
+  const family =
+    region.family === "aggregate"
+      ? ` This aggregate is the mean of every ocean cell and is deliberately outside the eight-basin correction, so it reports the HAC test only.`
+      : trend.significant
+        ? ` It survives the Benjamini–Hochberg correction across the eight basins (q = ${formatP(
+            trend.q_value
+          )}).`
+        : ` It does not survive the correction across the eight basins (q = ${formatP(trend.q_value)}).`;
+  return `Across <strong>${region.cells}</strong> GISTEMP ocean cells in ${escapeHtml(
+    region.name
+  )} (${escapeHtml(region.extent)}), annual sea surface temperature ${direction} by <strong>${signed(
+    trend.slope_per_decade
+  )} °C per decade</strong> over ${windowKey.replace(
+    "-",
+    "–"
+  )} (95% CI ${signed(trend.ci_low_per_decade)} to ${signed(trend.ci_high_per_decade)}; n = ${trend.n}). ${agreement}${family} Each 4° cell counts in proportion to its area, because a cell near a pole covers less ground than one at the equator. These cells carry ERSST-based sea surface temperature, with land influence inside roughly 1,200 km of a coast. This is a trend detection, not an attribution.`;
+}
+
+function oceanFacts(region, trend, window) {
+  const rows = [
+    ["Cells averaged", region.cells.toLocaleString()],
+    ["Extent", region.extent],
+    ["Weighting", state.oceanMeta?.weighting || "cos(lat) area weight"],
+    ["Series", `${state.windowKey.replace("-", "–")} · n = ${window.years.length}`],
+  ];
+  if (trend) {
+    rows.push(["HAC p-value", formatP(trend.p_value)]);
+    rows.push([
+      "95% interval",
+      `${signed(trend.ci_low_per_decade, 2)} to ${signed(trend.ci_high_per_decade, 2)}`,
+    ]);
+    if (Number.isFinite(trend.sen_slope_per_decade)) {
+      rows.push(["Sen's slope", signed(trend.sen_slope_per_decade, 2)]);
+    }
+    if (Number.isFinite(trend.mk_p_corrected)) {
+      rows.push(["MK p (Hamed–Rao)", formatP(trend.mk_p_corrected)]);
+    }
+    rows.push([
+      region.family === "aggregate" ? "Correction" : "BH q (8 basins)",
+      region.family === "aggregate" ? "outside the basin family" : formatP(trend.q_value),
+    ]);
+  }
+  rows.push(["Variable", "Sea surface temperature (ERSST-based)"]);
+  rows.push(["Source", "NASA GISTEMP v4 ocean cells · baseline 1951–1980"]);
+  return rows.map(([term, value]) => `<dt>${escapeHtml(term)}</dt><dd>${escapeHtml(String(value))}</dd>`).join("");
+}
+
+function renderOceanCase() {
+  const region = state.selected;
+  const base = state.byCode.get("GISTEMP") || state.variables.find((item) => item.code === "GISTEMP");
+  const variable = oceanVariable(base);
+  const trend = region.trends?.GISTEMP?.[state.windowKey] || null;
+  const series = region.series?.GISTEMP || [];
+  const years = state.oceanMeta?.years || state.meta.years;
+  const window = seriesWindow(series, years, state.windowKey);
+  const info = verdictInfo(trend, variable);
+  const id = caseId(`ocean:${region.id}:${state.windowKey}`);
+  const neighbours = state.ocean.filter((item) => item.id !== region.id && item.family === "basins").slice(0, 5);
+
+  els.casePanel.innerHTML = `
+    <div class="case-head">
+      <div class="case-id">${id}</div>
+      <button class="case-close" data-action="close-case" type="button">Close</button>
+    </div>
+    <h2 class="place-title">${escapeHtml(region.name)}</h2>
+    <p class="place-sub">Ocean region · sea surface temperature · ${region.cells} GISTEMP cells</p>
+    <p class="place-sub">${escapeHtml(region.extent)}</p>
+    ${windowChips()}
+    <p class="narrative">${oceanNarrative(region, trend, state.windowKey)}</p>
+    ${verdictBlock(trend, variable, info)}
+    ${caveatBlock(trend, variable, true)}
+    <div class="chart" id="case-chart"></div>
+    <dl class="facts">${oceanFacts(region, trend, window)}</dl>
+    ${caseSources(null, variable)}
+    <div class="case-cities">
+      <div class="plan-cities-label">Compare a neighbouring basin</div>
+      <div class="city-chips">${neighbours
+        .map(
+          (item) =>
+            `<button class="chip chip-small" type="button" data-action="open-ocean" data-region-id="${escapeHtml(
+              item.id
+            )}">${escapeHtml(item.name)}</button>`
+        )
+        .join("")}</div>
+    </div>
+    ${workBlock("ocean")}
+  `;
+  renderSeriesChart(document.getElementById("case-chart"), {
+    years: window.years,
+    values: window.values,
+    trend,
+    variable,
+    xLabel: state.windowKey.replace("-", "–"),
+    yLabel: variable.units,
+  });
+  els.casePanel.scrollTop = 0;
+}
+
+/* ---------------------------------------------------------------- sea ice */
+
+// Sea ice is a hemisphere-scale record, not a place with a dot. Nothing is drawn
+// on the cap for it: the case panel carries the number and the globe flies to
+// the pole, the same way a country average flies without a marker.
+
+async function selectSeaIce(record, code = "SEAICE") {
+  if (!record) return;
+  clearRecommendation();
+  state.selected = record;
+  state.selectedKind = "seaice";
+  state.variable = "SEAICE";
+  state.iceCode = record.trends?.[code] ? code : "SEAICE";
+  if (!record.trends?.SEAICE?.[state.windowKey]) state.windowKey = state.meta.windows[0];
+  state.layer = "cities";
+  document.body.classList.add("has-case");
+  renderCase();
+  refreshLayer();
+  globe.pointOfView({ lat: record.lat, lng: record.lon, altitude: 1.9 }, 900);
+  globe.controls().autoRotate = false;
+  clearTimeout(autoRotateTimer);
+  els.hint.textContent = `${record.name} · ${seaIceVariable(
+    state.iceCode
+  ).label.toLowerCase()} · annual mean of 12 monthly values`;
+}
+
+function seaIceNarrative(record, trend, windowKey, variable) {
+  if (!trend) {
+    return `No complete sea ice series is available for ${escapeHtml(
+      record.name
+    )} in the ${windowKey.replace("-", "–")} window.`;
+  }
+  const measure = variable.code === "SEAICECONC" ? "mean concentration" : "extent";
+  const direction = trend.slope_per_decade >= 0 ? "rose" : "fell";
+  const tests = trend.exploratory
+    ? `Only ${trend.n} annual means are available, so the result is labelled exploratory and no significance claim is made.`
+    : trend.significant
+      ? `Both the HAC slope test (p ${pText(trend.p_value)}) and the corrected Mann–Kendall test (p ${pText(
+          trend.mk_p_corrected
+        )}) pass at the 5% level and agree on direction.`
+      : `The HAC slope test (p ${pText(trend.p_value)}) and the corrected Mann–Kendall test (p ${pText(
+          trend.mk_p_corrected
+        )}) do not both pass at the 5% level, so no trend is claimed.`;
+  return `${escapeHtml(record.name)} ${measure} ${direction} by <strong>${signed(
+    trend.slope_per_decade
+  )} ${escapeHtml(variable.slope_units)} per decade</strong> over ${windowKey.replace("-", "–")} (95% CI ${signed(
+    trend.ci_low_per_decade
+  )} to ${signed(trend.ci_high_per_decade)}; n = ${trend.n}; HAC p ${pText(
+    trend.p_value
+  )}). ${tests} ${trend.significant
+    ? `It survives the Benjamini–Hochberg correction across the three sea-ice records at q ${pText(trend.q_value)}.`
+    : `Corrected across the three sea-ice records it keeps q ${pText(trend.q_value)}, above the 0.05 threshold.`} Each year is the mean of twelve monthly values, so the seasonal cycle — the September minimum and the March maximum — is averaged rather than shown. ${
+    variable.code === "SEAICECONC"
+      ? "Concentration is ice area ÷ extent: how much of the ice-covered area is actually ice, not how far the ice reaches, so it can rise while the extent falls."
+      : "Extent counts every cell with at least 15% ice cover; it is not concentration, and it is not thickness."
+  } This is a trend detection, not an attribution.`;
+}
+
+function seaIceFacts(record, trend, window, variable) {
+  const rows = [
+    ["Months averaged", "12 per year"],
+    ["Record", `1979–present · window ${state.windowKey.replace("-", "–")}`],
+    ["Series", `n = ${window.years.length} annual means`],
+  ];
+  if (trend) {
+    rows.push(["HAC p-value", formatP(trend.p_value)]);
+    rows.push([
+      "95% interval",
+      `${signed(trend.ci_low_per_decade, 2)} to ${signed(trend.ci_high_per_decade, 2)}`,
+    ]);
+    if (Number.isFinite(trend.sen_slope_per_decade)) {
+      rows.push(["Sen's slope", signed(trend.sen_slope_per_decade, 2)]);
+    }
+    if (Number.isFinite(trend.mk_p_corrected)) {
+      rows.push(["MK p (Hamed–Rao)", formatP(trend.mk_p_corrected)]);
+    }
+    rows.push(["BH q (3 records)", formatP(trend.q_value)]);
+  }
+  rows.push(["Measure", variable.code === "SEAICECONC" ? "100 × area ÷ extent" : "area with ≥15% ice cover"]);
+  rows.push(["Variable", `${variable.label} (${variable.units})`]);
+  rows.push(["Source", "NSIDC/NOAA Sea Ice Index G02135, via NOAA PSL"]);
+  return rows.map(([term, value]) => `<dt>${escapeHtml(term)}</dt><dd>${escapeHtml(String(value))}</dd>`).join("");
+}
+
+// Extent and concentration are one click apart, and the case always shows both
+// verdicts: the pair is the point, so it must not depend on remembering to switch.
+function measureSwitch(activeCode) {
+  const options = [
+    ["SEAICE", "Extent"],
+    ["SEAICECONC", "Concentration"],
+  ];
+  return `<div class="var-chips measure-chips"><span class="chip-label">Measure</span>${options
+    .map(
+      ([code, label]) =>
+        `<button class="var-chip ${code === activeCode ? "on" : ""}" type="button" data-action="select-ice-code" data-code="${code}">${label}</button>`
+    )
+    .join("")}</div>`;
+}
+
+function measureCompare(record) {
+  const active = state.iceCode || "SEAICE";
+  const rows = [
+    ["SEAICE", "Extent"],
+    ["SEAICECONC", "Concentration"],
+  ]
+    .map(([code, label]) => {
+      const trend = record.trends?.[code]?.[state.windowKey];
+      if (!trend) return "";
+      const variable = seaIceVariable(code);
+      const proven = trend.verdict !== "no significant trend";
+      return `<button class="ice-measure ${code === active ? "on" : ""}" type="button" data-action="select-ice-code" data-code="${code}">
+        <span class="ice-measure-name">${label}</span>
+        <span class="ice-measure-rate">${signed(trend.slope_per_decade, 2)} <em>${escapeHtml(
+          variable.slope_units
+        )}/decade</em></span>
+        <span class="ice-measure-word ${proven ? "cool" : "flat"}">${
+          proven ? "Proven" : "Not proven"
+        }</span>
+      </button>`;
+    })
+    .join("");
+  return `<div class="ice-measures">
+    <div class="plan-cities-label">Both measures, ${state.windowKey.replace("-", "–")}</div>
+    ${rows}
+  </div>`;
+}
+
+function renderSeaIceCase() {
+  const record = state.selected;
+  const variable = seaIceVariable(state.iceCode || "SEAICE");
+  const code = variable.code;
+  const trend = record.trends?.[code]?.[state.windowKey] || null;
+  const series = record.series?.[code] || [];
+  const years = state.seaIceMeta?.years || state.meta.years;
+  const window = seriesWindow(series, years, state.windowKey);
+  const extentWindow = seriesWindow(record.series?.SEAICE || [], years, state.windowKey);
+  const concWindow = seriesWindow(record.series?.SEAICECONC || [], years, state.windowKey);
+  const info = verdictInfo(trend, variable);
+  const id = caseId(`ice:${record.id}:${code}:${state.windowKey}`);
+  const siblings = state.seaIce.filter((item) => item.id !== record.id);
+
+  els.casePanel.innerHTML = `
+    <div class="case-head">
+      <div class="case-id">${id}</div>
+      <button class="case-close" data-action="close-case" type="button">Close</button>
+    </div>
+    <h2 class="place-title">${escapeHtml(record.name)}</h2>
+    <p class="place-sub">${escapeHtml(variable.label)} · annual mean of 12 monthly values · ${escapeHtml(
+      variable.units
+    )}</p>
+    ${measureSwitch(code)}
+    ${windowChips()}
+    <p class="narrative">${seaIceNarrative(record, trend, state.windowKey, variable)}</p>
+    ${verdictBlock(trend, variable, info)}
+    ${caveatBlock(trend, variable, false)}
+    <div class="chart" id="case-chart"></div>
+    <div class="chart-legend">
+      <span><i style="background:#4f93d6"></i>Extent</span>
+      <span><i style="background:#c9a227"></i>Concentration</span>
+      <span class="legend-note">both indexed to the window's first year = 100</span>
+    </div>
+    ${measureCompare(record)}
+    <dl class="facts">${seaIceFacts(record, trend, window, variable)}</dl>
+    ${caseSources(null, variable)}
+    <div class="case-cities">
+      <div class="plan-cities-label">Compare the other hemisphere</div>
+      <div class="city-chips">${siblings
+        .map(
+          (item) =>
+            `<button class="chip chip-small" type="button" data-action="open-seaice" data-ice-id="${escapeHtml(
+              item.id
+            )}">${escapeHtml(item.name)}</button>`
+        )
+        .join("")}</div>
+    </div>
+    ${workBlock("ice")}
+  `;
+  renderCompareChart(document.getElementById("case-chart"), {
+    years: extentWindow.years,
+    series: [
+      { label: "Extent", values: extentWindow.values, color: "#4f93d6", active: code === "SEAICE" },
+      {
+        label: "Concentration",
+        values: concWindow.values,
+        color: "#c9a227",
+        active: code === "SEAICECONC",
+      },
+    ],
+    xLabel: state.windowKey.replace("-", "–"),
+  });
+  els.casePanel.scrollTop = 0;
 }
 
 function renderCityCase() {
@@ -741,7 +1341,9 @@ function renderGridCase() {
       <button class="case-close" data-action="close-case" type="button">Close</button>
     </div>
     <h2 class="place-title">Grid cell</h2>
-    <p class="place-sub">${lat} &nbsp;${lon} · GISTEMP v4 · baseline 1951–1980</p>
+    <p class="place-sub">${lat} &nbsp;${lon} · GISTEMP v4 · ${
+      cell.is_ocean ? "ocean · sea surface temperature" : "land · surface air temperature"
+    } · baseline 1951–1980</p>
     ${variableChips(variable, true)}
     ${windowChips()}
     <p class="narrative">${gridNarrative(cell, trend, variable, state.windowKey)}</p>
@@ -785,9 +1387,10 @@ function renderGlobalCase() {
     <p class="narrative">${globalNarrative(trend, variable, state.windowKey, counts)}</p>
     ${verdictBlock(trend, variable, info)}
     <div class="caveat">
-      The global series is an anomaly relative to 1951–1980. The cell counts use
-      Benjamini–Hochberg q = 0.05 across the grid; they are not a second opinion on the
-      global slope.
+      The global series is an anomaly relative to 1951–1980. The cell counts are the
+      cells that survive Benjamini–Hochberg FDR correction at q = 0.05 across the grid;
+      neighbouring cells are correlated, so that correction is approximate. The counts
+      are not a second opinion on the global slope.
     </div>
     <div class="chart" id="case-chart"></div>
     <dl class="facts">${facts(trend, variable, false, counts)}</dl>
@@ -851,7 +1454,7 @@ function verdictBlock(trend, variable, info) {
   return `<div class="verdict ${info.tone}">
     <div class="verdict-stamp">${info.stamp}</div>
     <div class="verdict-rate">${signed(trend.slope_per_decade, 2)}<span class="unit">${escapeHtml(
-      variable.units
+      variable.slope_units || variable.units
     )} / decade</span></div>
     <div class="verdict-sub"><span class="verdict-word">${info.word}</span> · ${ci} · n = ${
       trend.n
@@ -863,6 +1466,22 @@ function caveatBlock(trend, variable, isGrid) {
   if (!trend) return "";
   if (trend.exploratory || (trend.n && trend.n < 20)) {
     return `<div class="caveat">Only ${trend.n} annual means. Below 20 the app refuses a significance claim and labels the result exploratory.</div>`;
+  }
+  if (!isGrid && trend.mk_p_corrected != null) {
+    if (trend.p_value < 0.05 && trend.mk_p_corrected >= 0.05) {
+      return `<div class="caveat">The HAC slope test is significant (p ${pText(
+        trend.p_value
+      )}), but the autocorrelation-corrected Mann–Kendall test is not (p ${pText(
+        trend.mk_p_corrected
+      )}). A verdict needs both, so this case is not proven.</div>`;
+    }
+    if (
+      trend.p_value < 0.05 &&
+      trend.mk_p_corrected < 0.05 &&
+      trend.verdict === "no significant trend"
+    ) {
+      return `<div class="caveat">Both tests are significant, but they point in opposite directions, so the app does not call this a trend.</div>`;
+    }
   }
   if (isGrid && trend.q_value != null && trend.q_value > 0.05 && trend.p_value != null && trend.p_value < 0.05) {
     return `<div class="caveat">This cell is locally significant (p ${pText(
@@ -899,6 +1518,10 @@ function facts(trend, variable, isGrid, counts = null) {
     rows.push(["Sen's slope", signed(trend.sen_slope_per_decade, 2)]);
   }
   if (Number.isFinite(trend.mk_tau)) rows.push(["Mann–Kendall", `${signed(trend.mk_tau, 2)} τ`]);
+  if (Number.isFinite(trend.mk_p)) rows.push(["MK p (i.i.d.)", formatP(trend.mk_p)]);
+  if (Number.isFinite(trend.mk_p_corrected)) {
+    rows.push(["MK p (Hamed–Rao)", formatP(trend.mk_p_corrected)]);
+  }
   if (Number.isFinite(trend.r_squared)) rows.push(["R²", trend.r_squared.toFixed(2)]);
   rows.push(["Units", variable.units]);
   rows.push(["Baseline", variable.baseline]);
@@ -911,18 +1534,19 @@ function facts(trend, variable, isGrid, counts = null) {
 }
 
 function liveChip(point) {
-  if (!point.live) return "";
+  const reading = liveFor(point);
+  if (!reading) return "";
   const values = [];
-  if (Number.isFinite(point.live.t_2m)) values.push(`${point.live.t_2m.toFixed(1)} °C now`);
-  if (Number.isFinite(point.live.precip_1h)) values.push(`${point.live.precip_1h.toFixed(2)} mm/h`);
-  if (Number.isFinite(point.live.wind_speed_10m)) values.push(`${point.live.wind_speed_10m.toFixed(1)} m/s`);
+  if (Number.isFinite(reading.t_2m)) values.push(`${reading.t_2m.toFixed(1)} °C now`);
+  if (Number.isFinite(reading.precip_1h)) values.push(`${reading.precip_1h.toFixed(2)} mm/h`);
+  if (Number.isFinite(reading.wind_speed_10m)) values.push(`${reading.wind_speed_10m.toFixed(1)} m/s`);
   if (!values.length) return "";
-  const live = Boolean(point.live.is_live);
-  const observed = liveTimeLabel(point.live.valid_time || point.live.fetched_at, live);
+  const live = Boolean(reading.is_live);
+  const observed = liveTimeLabel(reading.valid_time || reading.fetched_at, live);
   const title = live
-    ? `Meteomatics current conditions, fetched ${liveTimeLabel(point.live.fetched_at)}`
+    ? `Meteomatics current conditions, fetched ${liveTimeLabel(reading.fetched_at)}`
     : `Meteomatics snapshot from the last data build (${liveTimeLabel(
-        point.live.valid_time || point.live.fetched_at
+        reading.valid_time || reading.fetched_at
       )}); the live proxy is unavailable`;
   return `<div class="live-chip ${live ? "is-live" : "is-snapshot"}" title="${escapeHtml(
     title
@@ -959,24 +1583,26 @@ function imagery(point) {
 
 function caseSources(point, variable) {
   const bits = [`<b>Variable:</b> ${escapeHtml(variable.source)}`];
-  if (point?.live) bits.push("<b>Live:</b> Meteomatics");
+  if (liveFor(point)) bits.push("<b>Live:</b> Meteomatics");
   if (point?.imagery) {
     const meta = point.imagery_meta || {};
     const label = meta.label || "NASA Blue Marble context crop";
     const attribution = meta.attribution ? ` — ${escapeHtml(meta.attribution)}` : "";
     bits.push(`<b>Imagery:</b> ${escapeHtml(label)}${attribution}`);
   }
-  if (variable.kind === "grid") bits.push("<b>Grid:</b> GISTEMP v4, 4° subsample, BH q = 0.05");
+  if (variable.kind === "grid") bits.push("<b>Grid:</b> GISTEMP v4, 4° subsample, BH FDR q = 0.05");
   return `<div class="case-sources">${bits.join("<br>")}</div>`;
 }
 
 function workBlock(kind) {
   const text =
     kind === "grid"
-      ? "Annual GISTEMP anomalies are fitted with OLS and Newey–West HAC standard errors. The map uses a 4° subsample and Benjamini–Hochberg q = 0.05. The baseline is the published 1951–1980 anomaly. No attribution is claimed."
+      ? "Annual GISTEMP anomalies are fitted with OLS and Newey–West HAC standard errors. Cells count as significant only after Benjamini–Hochberg FDR correction at q = 0.05 across the 4° subsample. Neighbouring cells are correlated, so that correction is approximate. The baseline is the published 1951–1980 anomaly. No attribution is claimed."
       : kind === "global"
-        ? "The global series is the published GISTEMP annual anomaly. The cell counts come from the same 4° subsample and HAC contract, corrected with Benjamini–Hochberg q = 0.05. The global slope is not an area-weighted average of the cells."
-        : "Annual means only. OLS with Newey–West HAC standard errors; verdict at p < 0.05; 95% interval with Student-t on n − 2 df; Sen's slope as a robust check; Mann–Kendall descriptive only. The AI proposed the variable and wrote the narrative; it did not compute a number.";
+        ? "The global series is the published GISTEMP annual anomaly. The cell counts come from the same 4° subsample and HAC contract, corrected with Benjamini–Hochberg FDR at q = 0.05; neighbouring cells are correlated, so the correction is approximate. The global slope is not an area-weighted average of the cells."
+        : kind === "ice"
+          ? "The Sea Ice Index reports monthly extent and area per hemisphere. Extent is the area with at least 15% ice cover; concentration is 100 × area ÷ extent, the mean concentration of the ice-covered area. Each year is the mean of twelve monthly values, so the same trend code reads it as any other record — which hides the seasonal cycle. The family correction runs across the three records (two hemispheres and their sum), separately for each measure. No attribution is claimed."
+          : "Annual means only. OLS with Newey–West HAC standard errors; 95% interval with Student-t on n − 2 df; Sen's slope as a robust check. A verdict needs the HAC p < 0.05 and the Hamed–Rao corrected Mann–Kendall p < 0.05 with the same direction. The AI proposed the variable and wrote the narrative; it did not compute a number.";
   return `<details class="work"><summary>Show your work</summary><p>${escapeHtml(text)}</p></details>`;
 }
 
@@ -997,10 +1623,14 @@ function cityNarrative(point, variable, trend, windowKey) {
   const sentence = trend.exploratory
     ? `Only ${trend.n} annual means are available, so the result is labelled exploratory and no significance claim is made.`
     : trend.verdict === "significant increasing" || trend.verdict === "significant decreasing"
-      ? `The slope survives the HAC significance test at the 5% level (p ${pText(trend.p_value)}).`
-      : `The fitted slope does not survive the HAC significance test at the 5% level (p ${pText(
+      ? `The HAC slope test (p ${pText(
           trend.p_value
-        )}), so the app does not call it a trend.`;
+        )}) and the corrected Mann–Kendall test (p ${pText(
+          trend.mk_p_corrected
+        )}) are both significant at the 5% level and agree on direction.`
+      : `The app calls a trend only when the HAC slope test and the corrected Mann–Kendall test both pass at the 5% level; here HAC p ${pText(
+          trend.p_value
+        )} and corrected Mann–Kendall p ${pText(trend.mk_p_corrected)}.`;
   return `${escapeHtml(point.name)}'s annual ${escapeHtml(
     variable.short.toLowerCase()
   )} ${direction} by <strong>${signed(trend.slope_per_decade)} ${escapeHtml(
@@ -1011,7 +1641,9 @@ function cityNarrative(point, variable, trend, windowKey) {
     trend.p_value
   )}). ${sentence} Sen's slope is ${signed(
     trend.sen_slope_per_decade
-  )} ${escapeHtml(variable.units)}/decade. Mann–Kendall is a descriptive cross-check only. This is a trend detection, not an attribution.`;
+  )} ${escapeHtml(
+    variable.units
+  )}/decade. The Mann–Kendall p-value uses the Hamed–Rao variance correction for autocorrelation, computed on the Sen-detrended series. This is a trend detection, not an attribution.`;
 }
 
 function gridNarrative(cell, trend, variable, windowKey) {
@@ -1056,21 +1688,44 @@ function globalNarrative(trend, variable, windowKey, counts) {
     "–"
   )} (95% CI ${signed(trend.ci_low_per_decade)} to ${signed(
     trend.ci_high_per_decade
-  )}; n = ${trend.n}; HAC p ${pText(trend.p_value)}). Across the 4° grid, ${counts.significant_increasing.toLocaleString()} cells show a significant increase after Benjamini–Hochberg correction, ${counts.significant_decreasing.toLocaleString()} a significant decrease, and ${counts.not_significant.toLocaleString()} are not significant. This is a trend detection, not an attribution.`;
+  )}; n = ${trend.n}; HAC p ${pText(trend.p_value)}). Across the 4° grid, ${counts.significant_increasing.toLocaleString()} cells survive Benjamini–Hochberg FDR correction at q = 0.05 as increases, ${counts.significant_decreasing.toLocaleString()} as decreases, and ${counts.not_significant.toLocaleString()} are not significant. Neighbouring cells are correlated, so that correction is approximate. This is a trend detection, not an attribution.`;
 }
 
 /* --------------------------------------------------------------- intake UI */
 
 function renderSuggestions() {
-  els.suggestions.innerHTML = state.rag.examples
-    .slice(0, 5)
+  const chips = state.rag.examples
+    .slice(0, 2)
     .map(
       (question) =>
         `<button class="chip" type="button" data-question="${escapeHtml(question)}">${escapeHtml(
           question
         )}</button>`
-    )
-    .join("");
+    );
+  // The ocean is a place to ask about, never a cloud of dots: this opens a
+  // basin case like any other question.
+  chips.push(
+    `<button class="chip chip-ocean" type="button" data-question="Is the Pacific warming?">Is the Pacific warming?</button>`
+  );
+  chips.push(
+    `<button class="chip chip-ice" type="button" data-question="Is the Arctic sea ice shrinking?">Is the Arctic sea ice shrinking?</button>`
+  );
+  // The demo's twist, derived from the bundle so a rebuild cannot rot it: the
+  // steepest featured case the statistics refuse to call, one click away.
+  const herring = deriveSteepUnproven(state.points, state.meta.windows[0]);
+  if (herring) {
+    const units = state.byCode.get("T2M")?.units || "°C";
+    chips.push(
+      `<button class="chip chip-herring" type="button" data-open-point="${escapeHtml(
+        herring.point.id
+      )}" title="${escapeHtml(
+        `${signed(herring.trend.slope_per_decade)} ${units} per decade, HAC p ${formatP(
+          herring.trend.p_value
+        )} — steep, but not proven`
+      )}">Steep, but not proven · ${escapeHtml(herring.point.name)}</button>`
+    );
+  }
+  els.suggestions.innerHTML = chips.join("");
 }
 
 function renderPlan(plan) {
@@ -1084,15 +1739,37 @@ function renderPlan(plan) {
       <span class="panel-kicker">Case plan</span>
       <span class="plan-confidence">${confidence}% match</span>
     </div>
-    <div class="plan-title">${escapeHtml(plan.variable.label)}</div>
-    <div class="plan-meta">${escapeHtml(plan.place.name)} · ${plan.windowKey.replace(
-      "-",
-      "–"
-    )} · ${escapeHtml(plan.variable.units)}</div>
+    <div class="plan-title">${escapeHtml(
+      plan.kind === "country" ? `${plan.place.name} average` : plan.variable.label
+    )}</div>
+    <div class="plan-meta">${escapeHtml(plan.place.name)}${
+      plan.kind === "country"
+        ? ` · ${plan.place.stations} stations`
+        : plan.kind === "ocean"
+          ? ` · ${plan.place.cells} ocean cells`
+          : plan.kind === "seaice"
+            ? " · 12-month mean"
+            : ""
+    } · ${plan.windowKey.replace("-", "–")} · ${escapeHtml(plan.variable.units)}</div>
     <p class="plan-why">${escapeHtml(plan.explanation)}</p>
     <div class="plan-sources">${escapeHtml(plan.sources)}${
       plan.note ? `<br>${escapeHtml(plan.note)}` : ""
     }</div>
+    ${
+      plan.cities?.length
+        ? `<div class="plan-cities">
+      <div class="plan-cities-label">Or open a city in ${escapeHtml(plan.place.name)}</div>
+      <div class="city-chips">${plan.cities
+        .map(
+          (city) =>
+            `<button class="chip chip-small" type="button" data-action="plan-city" data-city-id="${escapeHtml(
+              city.id
+            )}">${escapeHtml(city.name)}</button>`
+        )
+        .join("")}</div>
+    </div>`
+        : ""
+    }
     <div class="plan-actions">
       <button class="primary-btn" type="button" data-action="run-plan">Run this case</button>
       <button class="ghost-btn" type="button" data-action="clear-plan">Clear</button>
@@ -1107,11 +1784,17 @@ function renderPlan(plan) {
   </div>`;
 }
 
-function handleAsk(question) {
+async function handleAsk(question) {
+  // A country name needs the country averages, which are not on the critical
+  // path; this is the only place they enter memory.
+  await Promise.all([ensureCountries(), ensureOcean(), ensureSeaIce()]);
   const plan = planCase(question, {
     rag: state.rag,
     points: state.points,
     variables: state.variables,
+    countries: state.countries,
+    ocean: state.ocean,
+    seaIce: state.seaIce,
   });
   state.plan = plan;
   renderPlan(plan);
@@ -1119,12 +1802,46 @@ function handleAsk(question) {
   if (plan) els.plan.scrollIntoView({ block: "nearest" });
 }
 
-function runPlan() {
+function planForCity(cityId) {
+  const point = state.byId.get(cityId);
+  const base = state.plan;
+  if (!point || !base) return;
+  const plan = {
+    ...base,
+    kind: "city",
+    place: point,
+    cities: [],
+    sources: `${base.variable.source} · ${point.name}, ${point.country}`,
+    explanation: `"${point.name.toLowerCase()}" resolves to ${point.name}; using the ${base.windowKey.replace(
+      "-",
+      "–"
+    )} record.`,
+  };
+  state.plan = plan;
+  renderPlan(plan);
+}
+
+async function runPlan() {
   const plan = state.plan;
   if (!plan) return;
   state.windowKey = plan.windowKey;
+  if (plan.kind === "seaice") {
+    await selectSeaIce(plan.place, plan.variable.code);
+    showToast(`Case opened: sea ice extent · ${plan.place.name}`);
+    return;
+  }
+  if (plan.kind === "ocean") {
+    await selectOcean(plan.place);
+    showToast(`Case opened: ocean · ${plan.place.name} · ${plan.place.cells} cells`);
+    return;
+  }
+  if (plan.kind === "country") {
+    selectCountry(plan.place);
+    showToast(`Case opened: ${plan.variable.short} · ${plan.place.name} average`);
+    return;
+  }
   if (plan.place.global) {
-    selectGlobal(plan.windowKey);
+    await selectGlobal(plan.windowKey);
   } else {
     const point = state.byId.get(plan.place.id);
     if (!point) return;
@@ -1136,16 +1853,26 @@ function runPlan() {
 
 /* ------------------------------------------------------------------- live */
 
+// The proxy spends a metered upstream quota: asking for every station cost 29
+// Meteomatics queries per hour (25 coordinates each) against a ~1,000/day
+// allowance, and shipped 708 readings to every visitor. A reading is now asked
+// for one open case at a time, and only while that case is on screen.
 function startLiveRefresh() {
-  refreshLiveReadings();
   setInterval(() => {
-    if (!document.hidden) refreshLiveReadings();
+    if (document.hidden) return;
+    if (state.selectedKind !== "city" || !state.selected) return;
+    refreshLiveForCase(state.selected, { force: true });
   }, LIVE_REFRESH_MS);
 }
 
-async function refreshLiveReadings() {
+async function refreshLiveForCase(point, { force = false } = {}) {
+  if (!point?.id) return;
+  const cached = liveReadings.get(point.id);
+  if (cached && !force && Date.now() - cached.fetchedAt < LIVE_REFRESH_MS) return;
   try {
-    const response = await fetch(assetUrl("/api/live"), { headers: { accept: "application/json" } });
+    const response = await fetch(assetUrl(`/api/live?ids=${encodeURIComponent(point.id)}`), {
+      headers: { accept: "application/json" },
+    });
     if (!response.ok) {
       if (import.meta.env.DEV) {
         console.debug(`Live readings unavailable (HTTP ${response.status}); using the build snapshot.`);
@@ -1153,25 +1880,19 @@ async function refreshLiveReadings() {
       return;
     }
     const payload = await response.json();
-    if (!payload?.ok || !payload.points) return;
-
-    let updated = 0;
-    for (const point of state.points) {
-      const reading = payload.points[point.id];
-      if (!reading || !Number.isFinite(reading.t_2m)) continue;
-      point.live = {
-        t_2m: reading.t_2m,
-        precip_1h: reading.precip_1h,
-        wind_speed_10m: reading.wind_speed_10m,
-        valid_time: reading.valid_time || payload.valid_time,
-        fetched_at: payload.fetched_at,
-        source: "Meteomatics",
-        is_live: true,
-      };
-      updated += 1;
-    }
-
-    if (updated && state.selectedKind === "city") refreshLiveChip();
+    const reading = payload?.points?.[point.id];
+    if (!payload?.ok || !reading || !Number.isFinite(reading.t_2m)) return;
+    liveReadings.set(point.id, {
+      t_2m: reading.t_2m,
+      precip_1h: reading.precip_1h,
+      wind_speed_10m: reading.wind_speed_10m,
+      valid_time: reading.valid_time || payload.valid_time,
+      fetched_at: payload.fetched_at,
+      is_live: true,
+      source: "Meteomatics",
+      fetchedAt: Date.now(),
+    });
+    if (state.selectedKind === "city" && state.selected?.id === point.id) refreshLiveChip();
   } catch (error) {
     if (import.meta.env.DEV) {
       console.debug("Live readings unavailable; using the build snapshot.", error);
@@ -1300,6 +2021,12 @@ function verdictInfo(trend, variable) {
 }
 
 function changeWord(variable, increasing) {
+  if (variable.code === "SEAICE") {
+    return increasing ? "Significant advance" : "Significant decline";
+  }
+  if (variable.code === "SEAICECONC") {
+    return increasing ? "Significant concentration rise" : "Significant concentration fall";
+  }
   if (variable.code === "T2M" || variable.code === "GISTEMP") {
     return increasing ? "Significant warming" : "Significant cooling";
   }
@@ -1361,15 +2088,24 @@ function bindStaticEvents() {
 
   els.suggestions.addEventListener("click", (event) => {
     const chip = event.target.closest("[data-question]");
-    if (!chip) return;
-    els.askInput.value = chip.dataset.question;
-    handleAsk(chip.dataset.question);
+    if (chip) {
+      els.askInput.value = chip.dataset.question;
+      handleAsk(chip.dataset.question);
+      return;
+    }
+    const opener = event.target.closest("[data-open-point]");
+    if (!opener) return;
+    const point = state.byId.get(opener.dataset.openPoint);
+    if (!point) return;
+    state.variable = "T2M";
+    selectPoint(point);
   });
 
   els.plan.addEventListener("click", (event) => {
     const action = event.target.closest("[data-action]");
     if (!action) return;
     if (action.dataset.action === "run-plan") runPlan();
+    if (action.dataset.action === "plan-city") planForCity(action.dataset.cityId);
     if (action.dataset.action === "clear-plan") {
       state.plan = null;
       renderPlan(null);
@@ -1382,6 +2118,28 @@ function bindStaticEvents() {
     const name = action.dataset.action;
     if (name === "close-case") {
       clearCase();
+      return;
+    }
+    if (name === "open-city") {
+      const point = state.byId.get(action.dataset.cityId);
+      if (point) selectPoint(point);
+      return;
+    }
+    if (name === "open-ocean") {
+      const region = state.oceanById.get(action.dataset.regionId);
+      if (region) selectOcean(region);
+      return;
+    }
+    if (name === "open-seaice") {
+      const record = state.seaIceById.get(action.dataset.iceId);
+      if (record) selectSeaIce(record, state.iceCode || "SEAICE");
+      return;
+    }
+    if (name === "select-ice-code") {
+      if (action.dataset.code === "SEAICE" || action.dataset.code === "SEAICECONC") {
+        state.iceCode = action.dataset.code;
+        renderSeaIceCase();
+      }
       return;
     }
     if (name === "select-variable") {
@@ -1403,10 +2161,19 @@ function bindStaticEvents() {
   });
 
   document.querySelectorAll(".layer-switch button").forEach((button) => {
-    button.addEventListener("click", () => {
+    button.addEventListener("click", async () => {
       state.layer = button.dataset.layer;
+      if (state.layer === "field" || state.layer === "ocean") await ensureGrid();
       refreshLayer();
-      showToast(state.layer === "field" ? "Trend field: 4,039 GISTEMP cells" : "City points: 45 stations");
+      showToast(
+        state.layer === "ocean"
+          ? `Ocean field: ${state.gridPoints
+              .filter((cell) => cell.is_ocean)
+              .length.toLocaleString()} ocean cells · sea surface temperature`
+          : state.layer === "field"
+            ? `Trend field: ${state.gridPoints.length.toLocaleString()} GISTEMP cells`
+            : `City points: ${state.points.length.toLocaleString()} stations`
+      );
     });
   });
 

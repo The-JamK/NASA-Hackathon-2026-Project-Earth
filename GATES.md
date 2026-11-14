@@ -1,4 +1,4 @@
-# Gates: Earth System Trend Detective — Case Files
+# Gates: Earth System Trend Detective — Signal & Noise
 
 OWNS: whole project
 Scope: a fresh, static web app with a Google-Earth-style 3D globe, real NASA/Meteomatics data bundles, deterministic trend statistics, local vector RAG for case plans, and a case-file UI.
@@ -8,12 +8,12 @@ Last verified: 2026-11-14
 - [x] G1: The data build produces a bundle with at least 25 points, at least 2,000 global grid cells, and four variables, all from real cached sources.
   CHECK: uv run python scripts/verify_data.py
   EXPECT: data verified
-  EVIDENCE: 45 points · 11 featured · 6 live · 4,039 grid cells · 6 source checks ok · global 1990–2025 slope +0.2362 °C/decade.
+  EVIDENCE: 708 points across 222 countries and territories · 14 featured · 6 live · 696 points with all four variables · 4,039 grid cells · 6 source checks ok · global 1990–2025 slope +0.2362 °C/decade.
 
 - [x] G2: The statistics engine reproduces known-answer fixtures for OLS/HAC, Sen's slope, and Mann–Kendall within tolerance.
-  CHECK: uv run pytest -q
+  CHECK: uv run --with pytest pytest -q
   EXPECT: passed
-  EVIDENCE: 6 tests passed.
+  EVIDENCE: 12 tests passed. pytest is not a declared dependency, so the check supplies it with `--with`; bare `uv run pytest` cannot find the module.
 
 - [x] G3: The production frontend build succeeds.
   CHECK: npm run build
@@ -23,7 +23,7 @@ Last verified: 2026-11-14
 - [x] G4: The dev server serves the built app and every required data asset returns HTTP 200.
   CHECK: node scripts/verify_app.mjs
   EXPECT: app verified
-  EVIDENCE: page, 3 globe textures, 11 context images and all JSON bundles returned 200; app verified.
+  EVIDENCE: page, 3 globe textures, 14 context images and all JSON bundles returned 200; app verified.
 
 - [x] G5: The local vector RAG returns the expected variables for nine golden questions.
   CHECK: node scripts/verify_rag.mjs
@@ -42,7 +42,7 @@ Last verified: 2026-11-14
 - [x] G8: The app works from the cached bundle with the network off for data (no live API required to render a case).
   CHECK: node scripts/verify_offline.mjs
   EXPECT: offline verified
-  EVIDENCE: no external URLs in app source; 45 points, 4,039 grid cells, 36 global years and 11 context images all local. The check strips the landing page's outbound repository link and its inline SVG namespace URI, which are a link and a namespace rather than requests; it previously failed on them, so the oracle now states what it actually tests.
+  EVIDENCE: no external URLs in app source; 554 points, 4,039 grid cells, 36 global years and 14 context images all local. The check strips the landing page's outbound repository link and its inline SVG namespace URI, which are a link and a namespace rather than requests; it previously failed on them, so the oracle now states what it actually tests.
 
 - [x] G9: A featured red-herring case presents a steep slope without a significance claim.
   CHECK: uv run python scripts/verify_data.py
@@ -52,7 +52,7 @@ Last verified: 2026-11-14
 - [x] G10: Every featured point labels its actual imagery source, and at least ten serve real Sentinel-2 L2A pixels fetched through Planetary Computer's STAC/mosaic APIs with RGB band handling and recorded HTTP proof.
   CHECK: uv run python scripts/verify_sentinel.py
   EXPECT: sentinel verified
-  EVIDENCE: 11/11 featured points use Sentinel-2 L2A mosaics; each has 9/9 HTTP 200 mosaic tiles. Unsigned visual COG returns HTTP 409 PublicAccessNotPermitted; SAS signing returns 200; signed Range GET returns 206; the COG is 3-band uint8 RGB with scale 1.0. `data/sentinel_report.json` records the item, URLs and statuses; no SAS token is stored.
+  EVIDENCE: 14/14 featured points use Sentinel-2 L2A mosaics; each has 9/9 HTTP 200 mosaic tiles. Unsigned visual COG returns HTTP 409 PublicAccessNotPermitted; SAS signing returns 200; signed Range GET returns 206; the COG is 3-band uint8 RGB with scale 1.0. `data/sentinel_report.json` records the item, URLs and statuses; no SAS token is stored.
 
 - [x] G11: The production build works at the GitHub Pages repository subpath, not only at the domain root.
   CHECK: npm run build, then serve `dist` under `/NASA-Hackathon-2026-Project-Earth/`
@@ -62,12 +62,12 @@ Last verified: 2026-11-14
 - [x] G12: A tapped coordinate resolves to the nearest station the bundle holds and to the nearest GISTEMP cell, both being the true minimum, with distance and bearing.
   CHECK: node scripts/verify_locate.mjs
   EXPECT: locate verified
-  EVIDENCE: 24 assertions over 45 stations and 4,039 cells; nearest station and nearest cell equal a brute-force haversine minimum at the Sahara, London, Sydney, mid-Pacific, Kigali and Reykjavik taps; equatorial distance 1,113.19 km, symmetry, zero-distance, compass strings (E/S/N/NW), coordinate formatting, and null returns on an empty bundle and an empty grid.
+  EVIDENCE: 24 assertions over 554 stations and 4,039 cells; nearest station and nearest cell equal a brute-force haversine minimum at the Sahara, London, Sydney, mid-Pacific, Kigali and Reykjavik taps; equatorial distance 1,113.19 km, symmetry, zero-distance, compass strings (E/S/N/NW), coordinate formatting, and null returns on an empty bundle and an empty grid.
 
 - [x] G13: The app ships the tap recommendation instead of the map panel: `#recommendation` is served, `recommendAt`/`nearestCell` are wired, and no map panel, locate form, map canvas, `MapView` or Google Maps link remains.
   CHECK: node scripts/verify_app.mjs
   EXPECT: app verified
-  EVIDENCE: page, 45 points, 4,039 grid cells, 3 textures, 11 context images; output lines `recommendation: overlay element served and wired to the tap handler` and `chrome: …`; the check now fails on `#map-panel`, `#locate-form`, `#map-canvas`, `MapView` or any `google.com/maps` reference and passes.
+  EVIDENCE: page, 554 points, 4,039 grid cells, 3 textures, 14 context images; output lines `recommendation: overlay element served and wired to the tap handler` and `chrome: …`; the check now fails on `#map-panel`, `#locate-form`, `#map-canvas`, `MapView` or any `google.com/maps` reference and passes.
 
 - [x] G14: The production build succeeds with the tap recommendation and halo layer.
   CHECK: npm run build
@@ -91,7 +91,7 @@ Last verified: 2026-11-14
 - [x] G18: The tagline “Ask the planet. Get the evidence.”, the dot inside the wordmark, the intake label and the “Case board” wording are gone from both pages and from main.js, and the wordmark reads GAUSSIAN FRONTIERS.
   CHECK: node scripts/verify_app.mjs
   EXPECT: app verified
-  EVIDENCE: output lines `chrome: tagline, brand dot, Intake label and case board wording removed` and `case layout: narrative paragraph above the verdict block`; rendered brand text is `GAUSSIAN FRONTIERS`; the landing title is `Case Files — NASA Space Apps 2026`. The landing page's only h1 was that sentence, so the page label now carries it at the kicker's size (9 px, accent) — the hero renders identically to before.
+  EVIDENCE: output lines `chrome: tagline, brand dot, Intake label and case board wording removed` and `case layout: narrative paragraph above the verdict block`; rendered brand text is `GAUSSIAN FRONTIERS`; the landing title is `Signal & Noise — NASA Space Apps 2026`. The landing page's only h1 was that sentence, so the page label now carries it at the kicker's size (9 px, accent) — the hero renders identically to before.
 
 - [x] G19: With no case open the right-hand panel is not rendered; opening a case shows it.
   MANUAL: verified in the Cloud browser at 1440×900 against the dev server.
@@ -117,8 +117,196 @@ Last verified: 2026-11-14
   EXPECT: identical hashes
   EVIDENCE: pushed `d73057e..ea41331 HEAD -> main`; `git rev-parse HEAD` and `FETCH_HEAD` both returned `ea41331` for the feature commit, and the ledger follow-up advanced `main` afterwards.
 
+- [x] G24: Grid-cell p-values are corrected with Benjamini–Hochberg at q = 0.05, every count uses the adjusted q, and the function matches a hand-checked answer plus the empty, all-significant and none-significant edges.
+  CHECK: uv run --with pytest pytest -q
+  EXPECT: passed
+  EVIDENCE: the known answer returns q = [0.04, 0.0533, 0.0533, 0.20] and one discovery for p = [0.01, 0.04, 0.03, 0.20]; the edge test covers empty input, q = 0.003 for [0.001, 0.002, 0.003] and q = 0.9 for [0.4, 0.6, 0.9] with no discoveries. The shipped grid moves 1990–2025 from 3,100 / 81 / 858 raw to 3,039 / 78 / 922 adjusted, and `verify_data.py` pins the adjusted counts.
+
+- [x] G25: Mann–Kendall carries the Hamed–Rao (1998) variance correction, is tested against known answers, and leaves a clean line alone while widening an autocorrelated one.
+  CHECK: uv run --with pytest pytest -q
+  EXPECT: passed
+  EVIDENCE: rank autocorrelation returns 0.4 / −0.1 / −0.4 on a linear rank vector; a perfect line keeps factor 1.000 and an unchanged p; an AR(1) series with φ = 0.85 gives factor > 1.5 and a larger corrected p; 60 i.i.d. draws stay inside factor 0.5–1.5 and a p ratio of 0.3–3.0. On the real bundles Nairobi and Niamey rainfall keep factor 1.00 and McMurdo is 1.07 (p 0.0283 → 0.0348). Correction is estimated on the Sen-detrended series, because ranking the raw trended series over-corrected and flipped Nairobi.
+
+- [x] G26: A point is significant only when the HAC OLS test and the corrected Mann–Kendall agree at 5% in direction, and short records stay exploratory.
+  CHECK: uv run --with pytest pytest -q; uv run python scripts/verify_data.py
+  EXPECT: passed; data verified
+  EVIDENCE: seven verdict cases pass, including McMurdo's shape (HAC 0.06, MK 0.02 → not proven), a direction conflict and a missing correction. Backfilling 537 stored point trends moves 27 to not proven (22 increasing, 5 decreasing); `verify_data.py` now fails if a stored verdict claims a trend without both tests. Global verdicts stay significant increasing for 1990–2025 and 2000–2025, and the grid-cell counts stay BH-based.
+
+- [x] G27: The red-herring case is described as steep but not proven at the 5% level, not as noise.
+  CHECK: grep -rin "noise" over the source, docs and scripts
+  EXPECT: no claim that a steep line is noise
+  EVIDENCE: MISSION.md now reads "A red-herring case is steep but not proven at the 5% level." The other hits (app.html "distinguishable from noise", main.js "cannot separate one from noise", a test comment) are statements about separating a slope from scatter. McMurdo still renders NOT PROVEN at HAC p 0.060 with corrected MK p 0.035, so nothing was tuned to keep the story.
+
+- [x] G28: Both pages, the docs and the method dialog name the product Signal & Noise, the old name is gone, and the ampersand is escaped in HTML.
+  CHECK: node scripts/verify_app.mjs
+  EXPECT: app verified
+  EVIDENCE: rendered titles are `Signal &amp; Noise — NASA Space Apps 2026` and `Signal &amp; Noise — Gaussian Frontiers`; the landing kicker and both footers read Signal & Noise. verify_app now fails if either page lacks `Signal &amp; Noise` or still matches /case files/i, and `grep -ri "case files"` returns only that guard. The repository name, folder, `base "./"`, asset and data paths, worker names and `case-files-*` user agents are unchanged, as are generic "case file" phrases and CASE- ids.
+
+- [x] G29: Every country and territory contributes its three largest populated places, conurbations are not duplicated, and a point ships only with all four NASA POWER variables.
+  CHECK: uv run python scripts/build_data.py --skip-grid --skip-imagery; uv run python scripts/verify_data.py
+  EXPECT: data verified
+  EVIDENCE: Natural Earth populated places (7,342 rows, public domain) ranked by `POP_MAX` per `ADM0NAME`: 568 candidates across 228 units, 64 of which hold fewer than three places. 53 candidates matched the curated 45 (same name or <15 km), 14 conurbations were merged (Giza/Cairo 6.1 km, Piraeus/Athens 4.5 km, Callao/Lima 10.4 km) and 6 were dropped for a masked root-zone soil moisture series (Majuro, Funafuti, Malé, Atafu, Esperanza Base, Casey Station). Result after the sparse-region passes in G31, G33, G34 and the polar list in G43: 65 curated + 509 top-city + 134 sparse = 708 points, 696 with four variables and twelve with three. `points.json` is 6.1 MB, `rag_index.json` 101 KB with 708 places, 14 Sentinel-2 mosaics, and 6 Meteomatics snapshots carried from `data/cache`. Earthdata could not be re-authenticated because every value in the local `.env` is empty, so `sources.json` keeps the earlier verification and says so in the detail line.
+
+- [x] G30: The expanded bundle and its pipeline are pushed to `main` on GitHub.
+  CHECK: git rev-parse HEAD and git rev-parse origin/main agree after fetching `main`.
+  EXPECT: identical hashes
+  EVIDENCE: pushed `c78898d..62dc704 HEAD -> main`; `git rev-parse HEAD` and `origin/main` both returned `62dc704dd619c6dd7c2305f5e87dcfad7923f404`. The ledger follow-up advanced `main` afterwards.
+
+- [x] G31: Regions the per-country rule leaves thin gain the largest city that no existing point covers within 500 km, so station density follows land area rather than country count.
+  CHECK: uv run python scripts/build_data.py --skip-grid --skip-imagery; uv run python scripts/verify_data.py
+  EXPECT: data verified
+  EVIDENCE: `fill_sparse_regions` scans Natural Earth's 7,342 places for Russia, northern China (lat ≥ 35), the Sahara belt (lat ≥ 15), North America, South America and Australia and accepts a place only when it is at least 500 km from every existing or newly accepted station and holds at least 20,000 people. Result: across the six original regions 109 were added — North America 29, South America 29, Russia 25, northern China 11, Australia 8, North Africa 7 — taking Russia from 3 to 28 stations, northern China from 1 to 12, North Africa from 23 to 30, North America from 67 to 96, South America from 37 to 66 and Australia from 4 to 12 (Darwin and Adelaide included), while Europe and the Mediterranean stay at 126.
+
+- [x] G33: The rule also covers Southeast Asia, the Middle East and the Indian interior, and no station is named after its own country.
+  CHECK: uv run python scripts/build_data.py --skip-grid --skip-imagery; uv run python scripts/verify_data.py
+  EXPECT: data verified
+  EVIDENCE: The same 500 km / 20,000-person rule added 21 more stations — Southeast Asia 12 (Makassar, Pontianak, Samarinda, Banda Aceh, Manado, Bengkulu, Ambon, Jayapura, Biak, Kota Waingapu, Merauke, Puerto Princesa), India 6 (Amaravati, Nagpur, Mangalore, Udaipur, Berhampur, Port Blair) and the Middle East 3 (Zahedan, Hail, Ash Shihr). Southeast Asia's worst gap falls from 1,421 km to 664 km across 26 → 38 stations; India's mean nearest-neighbour distance falls from 1,200 km to 640 km across 3 → 9 stations; the Middle East is already dense (40 → 43 stations, worst gap 845 → 736 km). Bundle is 684 points, 683 with all four variables, 222 countries.
+  NOTE: Natural Earth labels Hail, Saudi Arabia, with `NAME_EN` of "Saudi Arabia", which had put a station named after the country on the map. `_record` now falls back to `NAME` when `NAME_EN` duplicates the country, so Hail appears under its own name; the earlier flat "name equals country" filter was reverted because it also deleted Monaco, Luxembourg and Djibouti City, dropping three countries from the bundle.
+
+- [x] G34: The rule extends to Central Asia, the Amazon interior and the Sahel, and the remaining thin regions are reported by spacing rather than station count.
+  CHECK: uv run python scripts/build_data.py --skip-grid --skip-imagery; uv run python scripts/verify_data.py
+  EXPECT: data verified
+  EVIDENCE: Central Asia (Kazakhstan, Kyrgyzstan, Tajikistan, Turkmenistan, Uzbekistan) gained 3 stations — Oskemen, Atyrau, Baikonur — taking it 15 → 18; the Sahel belt (10–18°N from Senegal to Sudan) gained 1, Nyala, taking it 17 → 18 and cutting its worst nearest-neighbour gap from 1,926 km to 914 km; the Amazon interior (basin countries, 16°S–6°N, 75–44°W) needed none, because the South America pass had already left every settlement of 20,000-plus within 500 km of a station and the 945 km worst gap falls over unpopulated forest. Central Asia's worst gap stays large (785 → 866 km) for the same reason the rule is defined that way: a station is only placed where nothing is within 500 km, so a desert filling point is itself remote.
+- [x] G35: A country name reaches that country's principal station from every spelling, not the global field.
+  CHECK: uv run python scripts/build_data.py --skip-grid --skip-imagery; node scripts/verify_rag.mjs
+  EXPECT: rag verified
+  EVIDENCE: All 708 stations now carry their country name as an alias, and `COUNTRY_SPELLINGS` stamps usa/us, uae and uk/britain on the stations of those countries. `resolvePlace` breaks ties by alias length, then the hand-curated flag, then population, so "United States", "USA" and "US" all resolve to Los Angeles (the largest hand-curated US case), "UAE" to Dubai and "UK" to London, while city questions are unchanged (Yakutsk → Yakutsk, Nairobi → Nairobi, Delhi → Delhi). Before this, "Is the United States warming?" fell through to the global GISTEMP field because the retrieval index knew the country only as "usa" and "us".
+  NOTE: The tie-break matters. With the country alias on every station, a country query matches 22 US entries; without an ordering rule the winner was whichever entry came first in the index.
+
+  NOTE: Spacing is the honest metric here, not counts. Adding stations can raise the mean nearest-neighbour distance whenever the new station is the remote one being added, which is why these three regions are reported with median and worst gap alongside the mean. Bundle is 708 points, 696 with all four variables, 222 countries.
+
+- [x] G32: Generated points use the hand-curated country names, so one country is never listed twice and no Natural Earth typo reaches the interface.
+  CHECK: uv run python scripts/build_data.py --skip-grid --skip-imagery; python -c "import json; p=json.load(open('public/data/points.json'))['points']; print(len({x['country'] for x in p}))"
+  EXPECT: 222
+  EVIDENCE: Before the alias table the bundle reported 225 countries, with the United States split across `United States` (5 curated) and `United States of America` (17 generated), the UAE across `UAE` and `United Arab Emirates`, and New Zealand listed as `Necw Zealand`. `COUNTRY_ALIASES` maps those three onto the curated spelling; country count is 222, the 22 US points share one label, and filtering or asking about a country returns all of its stations.
+
 ## Status
 
-MET: 23
-UNMET: 0
+- [x] G36: Every country in the bundle has a country-average record: a mean annual series, trends for every variable and window, and its stations accounted for.
+  CHECK: uv run python scripts/verify_countries.py
+  EXPECT: countries verified
+  EVIDENCE: `build_countries` groups the 708 stations into 222 countries, averages each annual value across that country's stations, and runs the same estimator at country scale with Benjamini–Hochberg applied across the 222 averages. The verifier recomputes every mean value from the member stations and requires it to sit inside the station range: `countries: 222 · stations: 708 · 176 averaged over several stations`. Antarctica carries three variables rather than four because McMurdo has no root-zone soil moisture, and the checker requires exactly the variables its stations carry.
+
+- [x] G37: A country question plans a country-average case and offers that country's cities, while city and global questions keep their current plans.
+  CHECK: node scripts/verify_country_plan.mjs
+  EXPECT: country plan verified
+  EVIDENCE: `resolveCountry` matches country names and short spellings with word boundaries and prefers the longer match, so "Is France warming?" plans the country average even though Paris carries a "france" alias, while Nairobi, Delhi, London, Yakutsk and the Sahel question still plan their city cases and "Is the world warming?" still plans the global field. The runner plans all 222 countries: `country plans: 222 · city regressions: 5 · global: 1 · aliases: 226`.
+
+- [x] G38: The plan card lists the country's cities and the country case renders its station count (manual browser check).
+  CHECK: manual
+  EXPECT: the country plan shows an average line plus clickable city suggestions, and opening it renders a case with the station count.
+  EVIDENCE: On the dev server, "Is France warming?" produced a plan card reading `France average · France · 3 stations · 1990–2025 · °C` with Paris, Lyon and Marseille as chips; clicking a chip re-planned that city (Paris, city case). "Is India warming?" opened a country case headed `COUNTRY AVERAGE · 9 STATIONS · ASIA` with the mean series, `Stations averaged 9`, and eight city chips. Clicking Paris opened the city case. Screenshot captured at the India country average: +0.037 °C per decade, `NOT PROVEN`.
+
+- [x] G39: The full check suite still passes with country averages in the bundle.
+  CHECK: bash scripts/verify_all.sh
+  EXPECT: all checks passed
+  EVIDENCE: Ran `bash scripts/verify_all.sh`; every check passed and the run ended with `all checks passed`. The new bundle is 708 points, 222 country averages, 4,039 grid cells, 629 city suggestions, with `countries.json` 2.0 MB made from the same station series.
+
+- [x] G40: The country-average feature is pushed, deployed and resolves on the live site.
+  CHECK: bash scripts/verify_live.sh
+  EXPECT: live verified
+  EVIDENCE: Pushed and confirmed with `bash scripts/verify_live.sh`: `points.json`, `rag_index.json` and `countries.json` all match `dist`, and the deployed bundle plans all 222 country averages plus the city spot checks (`live plan verified`).
+
+- [x] G41: The globe skin is a genuinely higher-resolution map, and the build cannot quietly ship a smaller one.
+  CHECK: node scripts/verify_textures.mjs
+  EXPECT: textures verified
+  EVIDENCE: The texture was the three-globe example image at 4096×2048 (1.46 MB). It is now NASA GIBS Blue Marble shaded relief and bathymetry at 8192×4096 (3.12 MB), which is 30 texels per degree at the equator and twice the linear detail of the old file. `verify_textures.mjs` parses the JPEG and PNG headers and requires 2:1 equirectangular images of at least 8192×4096, 2048×1024 and 4096×2048; it is wired into `scripts/verify_all.sh`, so the suite reports `textures verified` before `all checks passed`. Visual check on the dev server: coastlines, terrain and bathymetry are visibly sharper with no WebGL or console texture errors.
+
+- [x] G42: The relief shading is a higher-resolution map than the skin it sits on and costs no more to download.
+  CHECK: node scripts/verify_textures.mjs
+  EXPECT: textures verified
+  EVIDENCE: The bump map was a 2048×1024 PNG (0.38 MB) at 15 texels per degree while the skin had moved to 30. It is now ASTER GDEM greyscale shaded relief at 4096×2048 JPEG (0.36 MB), so the shading matches the skin and the download is 20 KB smaller. `verify_textures.mjs` requires at least 4096×2048 for this file and still enforces the 2:1 equirectangular aspect; the suite reports `textures verified` and `all checks passed`. Visual check on the dev server: terrain relief reads cleanly with no double-shadowing artefacts.
+
+- [x] G43: Both polar belts carry a real network instead of a token station.
+  CHECK: uv run python scripts/verify_data.py && node scripts/verify_country_plan.mjs
+  EXPECT: data verified
+  EVIDENCE: The Arctic had 7 stations above 66.5°N and Antarctica exactly one, McMurdo. Ten Arctic sites were added roughly 1,000 km apart — Utqiaġvik, Inuvik, Cambridge Bay, Resolute, Ittoqqortoormiit, Nord (81.6°N), Khatanga, Tiksi, Pevek, Srednekolymsk — taking the Arctic to 17, and ten Antarctic research stations — Vostok, Concordia, Casey, Dumont d'Urville, Davis, Mawson, Syowa, Neumayer, Halley, Rothera — taking Antarctica to 11. Natural Earth was not usable here: it has no Antarctic settlements and its Arctic villages are below the 20,000-person fill rule, so both belts are explicit entries in the curated table with a continuous NASA POWER record, which the build verifies.
+  NOTE: All ten Antarctic stations return three of the four variables, because MERRA-2 masks root-zone soil moisture over ice; that is why the bundle now has 12 three-variable stations rather than one. Some polar trends are negative and significant — Cambridge Bay −0.60, Nord −0.61, Resolute −0.40 °C/decade — and those are the reanalysis values for this 1990–2025 window, checked against the raw annual series rather than assumed to be an artefact.
+
+- [x] G44: The live proxy is asked for one station at a time, so one open case costs one upstream query, and every failure path is labelled.
+  CHECK: node scripts/verify_live_proxy.mjs
+  EXPECT: live proxy verified
+  EVIDENCE: The app fetched `/api/live` with no `ids`, so the Worker selected all 708 points and sent 29 Meteomatics queries per cold cache (25 coordinates each) against a ~1,000/day allowance, returning 708 readings to every visitor. `refreshLiveReadings` is now `refreshLiveForCase`: it asks for `?ids=<one station>`, memoises per id, and only re-asks while that case is open. Readings live in a separate map, so a failed refresh falls back to the labelled build snapshot instead of a stale reading wearing a Live badge. The verifier runs the shared handler against a stub upstream and checks 1 point = 1 query, one reading back, the upstream URL carrying the hour and the coordinate, cache hit on repeat, 3 queries for 60 coordinates, and 503/502/504/405/400. In the browser, opening McMurdo issued exactly `GET /api/live?ids=mcmurdo` → 503 (no credentials).
+
+- [x] G45: The first case no longer waits for the bundles it does not need.
+  CHECK: node scripts/verify_firstload.mjs
+  EXPECT: first load verified
+  EVIDENCE: `init()` awaited 11.3 MB raw / ~2.7 MB gzip of JSON (points 5.8 MB, grid 3.3 MB, countries 2.0 MB) before the loading overlay lifted. `ensureGrid()` and `ensureCountries()` now load the trend field and the country averages on first use, one fetch each. The critical path is variables + points + rag_index + sources + app.js = 2,145 kB gzip, and the check fails if either deferred bundle returns to the init `Promise.all` or gains a second fetch. Browser evidence from the network log: on load only `variables.json`, `points.json`, `rag_index.json` and `sources.json` were fetched — no `grid.json`, no `countries.json`, no `/api/live`; `countries.json` appeared only after asking "Is France warming?", which planned `France average · 3 stations`.
+
+- [x] G46: The red-herring twist is derived from the bundle and reachable in one click.
+  CHECK: node scripts/verify_red_herring.mjs
+  EXPECT: red herring verified
+  EVIDENCE: `src/herring.js` picks the steepest featured case whose verdict is "no significant trend" with HAC p ≥ 0.05, so a rebuild cannot leave the demo pointing at a case that has become significant. The check requires a featured, non-exploratory record with n ≥ 20, and requires it to sit in the steeper half of the featured cases (McMurdo 0.303 °C/decade, p 0.060, n 36, ranked 7 of 14 against a median of 0.286) — just below five significant cases at 0.305–0.347, which is the story. It also asserts the chip is wired (`deriveSteepUnproven`, `data-open-point`, `renderSuggestions`, `#suggestions`). In the browser the fifth chip reads `Steep, but not proven · McMurdo` and opens CASE-2489 showing NOT PROVEN, +0.30 °C/decade, 95% CI −0.01 to +0.62, HAC p 0.060, MK p 0.035.
+
+- [x] G47: The full suite also checks the deployed app, so a stale build cannot pass every gate.
+  CHECK: bash scripts/verify_all.sh
+  EXPECT: all checks passed
+  EVIDENCE: `verify_all.sh` now runs `verify_live_proxy.mjs`, `verify_red_herring.mjs` and `verify_firstload.mjs`, and ends with `verify_live.sh` (bundle hashes for points/rag_index/countries plus all 222 country plans) so deployment drift fails the suite instead of passing silently. A clean run ended `all checks passed` with the live block reporting `live verified`. Note: this compares the data bundles and the plan engine, not the deployed JavaScript — a changed `dist/app.js` still needs a push to GitHub Pages.
+
+- [x] G49: Ocean cells are classified from a real coastline mask, and the mask is right at named anchors.
+  CHECK: node scripts/verify_ocean.mjs
+  EXPECT: ocean verified
+  EVIDENCE: The GISTEMP file ships anomalies only, so `scripts/landmask.py` parses the already-cached Natural Earth 1:10m countries shapefile with `struct` (258 type-5 records, 548,471 points), skips rings by bounding box, and tests cell centres with even-odd crossing so lake holes read as water. Of 4,039 cells, 2,672 are ocean and 1,367 land. Anchors at grid points classify as expected: mid-Pacific (−17,−167), N Atlantic (39,−39), Southern Ocean (−61,1) and Arctic (87,1) water; Sahara (19,9), Amazon (−5,−63), Antarctica (−81,1) and Siberia (63,101) land. The check's first run failed on a non-grid coordinate (lon −41), which records the constraint that cell centres are the odd offsets of the 4° subsample: lat ≡ 3, lon ≡ 1 mod 4.
+
+- [x] G50: Every ocean mean is the area-weighted mean of the cells it claims, basins share no cell, and the family correction covers basins only.
+  CHECK: node scripts/verify_ocean.mjs
+  EXPECT: ocean verified
+  EVIDENCE: `scripts/build_ocean.py` averages member cells by cos(lat), because a 4° cell near a pole covers less ground than one at the equator, and runs the same `compute_trend` as every other case. The verifier recomputes each region's series from grid.json year by year and requires agreement within 0.002; it also requires 2,333 cells partitioned across the eight disjoint basins with no cell in two, `q ≥ p` for every basin trend, significance agreeing with q < 0.05, and `q = null` for the global aggregate. That aggregate is deliberately outside the family: it shares the basins' cells, so correcting across it would count each cell twice. Storing q at 6 dp turned a basin p of 4.6e-8 into q = 0, which the check caught; q is now stored at 9 dp.
+
+- [x] G51: An ocean question plans an ocean case, and a sea-ice question never lands on a station.
+  CHECK: node scripts/verify_ocean.mjs
+  EXPECT: ocean verified
+  EVIDENCE: `resolveOcean` matches basin aliases longest-first, so "north pacific" beats "pacific" and "indian ocean" beats "indian"; every alias of all nine regions plans `kind: ocean` with the variable relabelled "Sea surface temperature". "Is the Pacific warming?" plans Tropical Pacific · 314 ocean cells · 72%. ""Is the Arctic sea ice shrinking?" previously planned Tromsø air temperature at 56%; ice questions are now answered by a real sea-ice record (G55), and this gate only requires that they never plan a station.
+
+- [x] G52: The ocean is a place and a layer, not a cloud of dots, and two narrow-width regressions were found and fixed.
+  CHECK: manual, in the preview panel at 631×704 and 1440×900
+  EXPECT: an ocean case opens from a question, and the Ocean layer shows water cells only
+  EVIDENCE: The layer switch gains a third button whose field is the existing 4,039-cell layer filtered to `is_ocean` (2,672 shown), so the ocean reads as a field with blank continents rather than extra points; the legend gains `ocean cell · SST` only in that mode, and the case panel reads `Ocean region · sea surface temperature · 314 GISTEMP cells` with its extent in words, plus neighbour-basin chips. No ocean marker is added to the Cities layer (708 points before and after). Two defects the browser check found: the fourth legend row pushed the Ocean button to x 617–678 while the bar ended at 619, fixed by hiding `#ocean-legend` at ≤900 px and pinning the switch (measured 557–618 inside a 631 px viewport); and a case opened from the plan card sat at `scrollTop` 805, fixed by resetting the panel on the next frame as well (measured 0). The region outline (option C) was not built: the plan's fallback was the ring plus the text extent, and the scene already carries a custom layer, arcs, labels and rings.
+  NOTE: The screenshot tool returned the same stale frame three times after resizing, so the desktop composition was not confirmed visually; the layout was confirmed by measurement instead (viewport 1440×900, canvas 2880×1800, case panel at x 998–1416).
+
+- [x] G53: The sea-ice record comes from the open NSIDC index, one annual mean per year, and the global record is exactly the two hemispheres summed.
+  CHECK: uv run python scripts/build_seaice.py
+  EXPECT: 36/36 complete years for both hemispheres, then three records written
+  EVIDENCE: The NSIDC/NOAA Sea Ice Index (G02135 v4.0) is served as 24 per-month CSVs from `noaadata.apps.nsidc.org` with no Earthdata account, which is what makes this variable shippable while the Earthdata-backed ones are not. Bulk fetching hit the host's throttle: single files returned 200, then mixed 500s, then connection refusals for every month after ~30 rapid requests (and still refused minutes later). The builder therefore reads the same index as four PSL timeseries — extent and area per hemisphere, `n_iceextent.mon.csv`, `n_icearea.mon.csv`, `s_iceextent.mon.csv`, `s_icearea.mon.csv` (1978→2026, 10⁶ km², −9999 for missing) — four requests instead of twenty-four. A year enters the series only with all twelve months, so a ten-month mean cannot masquerade as an annual one: `36/36 complete years` for each hemisphere. Global sea ice is written as the year-by-year sum of the two, not a separate fit. The bundle is 15.4 kB.
+
+- [x] G54: Every sea-ice annual mean is recomputed from the cached series, and the Arctic/Antarctic split is the honest pair the demo claims.
+  CHECK: node scripts/verify_seaice.mjs
+  EXPECT: sea ice verified
+  EVIDENCE: The verifier parses the cached CSVs independently and rebuilds the annual means, requiring agreement within 0.001 for all 36 years per hemisphere, and requires global = Arctic + Antarctic within 0.002. It enforces the family contract (`q ≥ p` for all three, significance agreeing with q < 0.05) and that q is not rounded to zero: the Arctic p is 1.4e-12 with q 4e-12, and storing q at nine decimals would have written 0 for a value that is not zero. The numbers: Arctic −0.539 (CI −0.640 to −0.438, p 1.4e-12), Antarctic −0.233 (CI −0.543 to +0.077, p 0.136, MK p 0.367), global −0.772 (CI −1.032 to −0.513, q 1.1e-6). The check fails if the Antarctic interval stops crossing zero or the Antarctic becomes significant, because the demo's contrast depends on that.
+
+- [x] G55: A sea-ice question plans the sea-ice record rather than a station, and every alias reaches its own hemisphere.
+  CHECK: node scripts/verify_seaice.mjs
+  EXPECT: sea ice verified
+  EVIDENCE: `resolveSeaIce` matches record aliases longest-first and the planner now prefers that record to both the city and the basin path, so "arctic sea ice", "arctic ice", "sea ice" and "global sea ice" all plan `kind: seaice` with the variable labelled Sea ice extent (10⁶ km²). The first run failed with `"arctic ice" planned city at Tromsø`: the ice vocabulary regex requires "sea ice", so an alias-only phrasing fell through. The gate now keys on either signal (a matched record or an ice term) and plans all 12 aliases; it also requires the plan to say what extent measures. `verify_ocean.mjs` keeps the weaker rule that an ice question never plans a station, so the earlier bug cannot return through either gate.
+  NOTE: In the browser on the dev server, the fourth suggestion chip reads `Is the Arctic sea ice shrinking?` and plans `Sea ice extent · Arctic sea ice · 12-month mean · 1990–2025 · 10⁶ km²`. Running it opens a case headed `SEA ICE EXTENT · ANNUAL MEAN OF 12 MONTHLY EXTENTS · 10⁶ KM²` with `OPEN AND SHUT`, −0.54, significant decline, a drawn chart, `scrollTop` 0, and two chips for the other records. Clicking `Antarctic sea ice` re-renders the same panel as `NOT PROVEN`, −0.23, CI −0.54 to +0.08, HAC p 0.136, with the non-significance caveat. `seaice.json` (8.2 kB) is fetched once, on the first question, and nothing is added to the globe. Two copy defects the browser check caught and this change fixed: the narrative read "at q = < 0.001", and it said the Antarctic record "survives" a correction when its q is above 0.05.
+
+- [ ] G48: The two-minute demo has been rehearsed end to end with a stopwatch against the deployed URL.
+  MANUAL: run `DEMO.md` twice, timed.
+  OPEN: written with the real bundle numbers, but not rehearsed; the spoken script is a human step and is not claimed as verified.
+
+## Blocked
+
+- **The Live chip cannot be live yet.** `METEOMATICS_USERNAME` and `METEOMATICS_PASSWORD` are present but empty in this workspace's `.env` (lines 9–10, 0 characters; file mtime 09:35, dev server started 16:55), the running dev server answers `{"ok":false,"error":"live_unconfigured"}`, and there is no `.env.local` or `worker/.dev.vars`. Setting them requires a dev-server restart, because `vite.config.js` reads `.env` once when the config is evaluated.
+- **The public proxy is unhosted.** GitHub Pages cannot run `worker/index.js`. Sites caps an upload at 10 MiB / 1,000 assets and `dist` is 19 MB (11.3 MB data, 3.6 MB textures, 2 MB JS), so the whole app cannot ship there; the remaining path is a proxy-only Worker with the point list and CORS in front of `/api/live`. It is not worth deploying before the credentials exist.
+
+- [x] G56: Concentration is a real second measure on the same records, recomputed from ice area, and every sea-ice case shows both verdicts at once.
+  CHECK: node scripts/verify_seaice.mjs
+  EXPECT: sea ice verified
+  EVIDENCE: The Sea Ice Index carries ice area as well as extent, so the bundle now stores `SEAICECONC` = 100 × annual mean area ÷ annual mean extent — the mean concentration of the ice-covered area, not a second dataset. Arctic 82.5% in 1990 to 81.4% in 2025, +0.379 percentage points/decade (95% CI +0.073 to +0.684); the HAC test passes (p 0.017) but the Hamed–Rao corrected Mann–Kendall does not (p 0.086), so the verdict is **NOT PROVEN**. Antarctic +0.161 (p 0.273), also not proven. Global concentration is computed from the summed areas, never as the mean of two percentages; the verifier checks that identity year by year, recomputes both measures from the cached extent and area series (0.006 pp tolerance for the ratio, 0.001 for extent), requires every value to sit in 0–100, and fails if the Arctic extent/concentration contrast disappears or the concentration verdict changes. `seaIceVariableCode` sends "concentration" questions to the ratio and defaults to extent; in the browser, "What is the Arctic sea ice concentration?" planned `Sea ice concentration · Arctic sea ice · 12-month mean · %`, rendered `SIGNIFICANT +0.38 percentage points / decade` with the HAC-vs-MK caveat, and the both-measures block read `EXTENT −0.54 million km²/decade PROVEN` above `CONCENTRATION +0.38 percentage points/decade NOT PROVEN`. Clicking the extent row re-rendered the same panel as `OPEN AND SHUT −0.54`, significant decline, `scrollTop` 0.
+  NOTE: The independent verifier caught nothing here, but the browser check found the measure switch worked only because the case re-renders in place; the first attempt to drive it after a page reload did nothing until the suggestion chips had rendered, which is a timing artefact of the check, not the app.
+
+- [x] G57: Both sea-ice measures are on one chart, indexed, so the divergence is visible without switching measures.
+  CHECK: node scripts/verify_seaice.mjs
+  EXPECT: sea ice verified
+  EVIDENCE: `renderCompareChart` divides each series by its own first value in the window and scales it to 100, then draws both on shared axes. Dual y-axes were rejected on purpose: two independently chosen scales can manufacture a divergence, and this app cannot afford a chart that argues past its statistics. The `index, <first year> = 100` label and a legend carrying the base year travel with the chart, and the selected measure stays at full stroke while the other drops to 0.55 opacity. In the browser, the Arctic case drew two 36-point paths (`#4f93d6` extent at full opacity, `#c9a227` concentration at 0.55), ticks 90/95/100, and the panel still read `OPEN AND SHUT −0.54` with `EXTENT −0.54 … PROVEN` above `CONCENTRATION +0.38 … NOT PROVEN`. Switching measure swapped the emphasis, and switching the window to 2000–2025 re-based the chart to `index, 2000 = 100` with 1990 replaced at both ends (`n = 26`, concentration +0.55, CI −0.05 to +1.15). The gate fails if either series is dropped from the case or the chart stops being drawn from the shared window.
+  NOTE: The measured SVG box came back 568×271 for a 360×172 viewBox, i.e. the panel's own scaling; the visual result was not reviewed as a screenshot, only through the DOM.
+
+- [x] G58: A tap on water in the Ocean layer opens the basin under the tap, not a station and not one cell's surface temperature.
+  CHECK: node scripts/verify_ocean.mjs
+  EXPECT: ocean verified
+  EVIDENCE: `finishGlobeTap` now branches before the station path: in the Ocean layer it waits for `ocean.json`, takes the nearest ocean cell within 3° (the 4° grid's half-diagonal is 2.8°), and resolves that cell with `oceanRegionAt`, which repeats the build's wrapped box test — `(lon - start) % 360 <= span` over `lat_bounds`/`lon_bounds` — and skips the aggregate, which matches every point. The verifier round-trips the first twelve cells of every basin back through `oceanRegionAt` and requires the same basin, pins mid-Pacific → Tropical Pacific, N Atlantic (39,−39) → North Atlantic, Southern Ocean (−61,1) → Southern Ocean and Arctic (87,1) → Arctic Ocean, and requires the Sahara (19,9) to resolve to nothing. Water in no basin is handled separately: 339 cells (the tropical Atlantic, for one) resolve to null, and the tap path sends them to the global ocean with `this water is outside the named basins` rather than calling them land — the check pins that count, the null case at (−1,−31) and the fallback marker. In the browser, a synthetic pointer tap on the Atlantic opened `North Atlantic`, `Ocean region · sea surface temperature · 178 GISTEMP cells`, with the toast `Ocean case: North Atlantic · 178 cells` and no station card. A tap on land in the same layer produced `Land — the Ocean layer only shows water. Switch to Cities to ask about a station.` and opened no case, so the old nearest-city behaviour cannot fire from the water view.
+  NOTE: The taps were synthesised as pointer events on the canvas at screen fractions, so they prove the handler and the mapping, not finger accuracy on a phone.
+
+MET: 57
+UNMET: 1
 ABANDONED: 0

@@ -52,7 +52,7 @@ export function initHero() {
 
   const globe = new Globe(scene, { animateIn: false })
     .globeImageUrl(assetUrl("/textures/earth-blue-marble.jpg"))
-    .bumpImageUrl(assetUrl("/textures/earth-topology.png"))
+    .bumpImageUrl(assetUrl("/textures/earth-topology.jpg"))
     .backgroundColor("rgba(0, 0, 0, 0)")
     .showAtmosphere(true)
     .atmosphereColor("#8fb6c9")

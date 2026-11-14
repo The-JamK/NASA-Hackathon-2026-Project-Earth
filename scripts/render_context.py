@@ -7,6 +7,7 @@ without a second imagery API or a blank tile.
 
 from __future__ import annotations
 
+import argparse
 import json
 import math
 from pathlib import Path
@@ -31,6 +32,9 @@ IMAGERY_IDS = {
     "tokyo",
     "cairo",
     "mcmurdo",
+    "shanghai",
+    "dhaka",
+    "reykjavik",
 }
 
 
@@ -51,7 +55,7 @@ def crop_box(lat: float, lon: float, width: int, height: int) -> tuple[int, int,
     return left, top, right, bottom
 
 
-def main() -> None:
+def main(only: str | None = None) -> None:
     source = Image.open(TEXTURE).convert("RGB")
     OUT.mkdir(parents=True, exist_ok=True)
     points_path = PUBLIC / "points.json"
@@ -60,6 +64,8 @@ def main() -> None:
     for point in payload["points"]:
         slug = point["id"]
         if slug not in IMAGERY_IDS:
+            continue
+        if only and slug != only:
             continue
         box = crop_box(float(point["lat"]), float(point["lon"]), source.width, source.height)
         crop = source.crop(box)
@@ -93,17 +99,29 @@ def main() -> None:
     sources_path = PUBLIC / "sources.json"
     sources = json.loads(sources_path.read_text(encoding="utf-8"))
     sources["sources"] = [s for s in sources["sources"] if s["id"] not in {"gibs", "blue-marble"}]
+    fallbacks = sum(
+        1
+        for point in payload["points"]
+        if (point.get("imagery_meta") or {}).get("source_id") == "blue-marble"
+    )
     sources["sources"].append(
         {
             "id": "blue-marble",
             "name": "NASA Blue Marble",
             "kind": "fallback",
             "status": "ok",
-            "detail": f"fallback context crops for {len(IMAGERY_IDS)} featured points",
+            "detail": (
+                f"globe texture + fallback context for {fallbacks} featured point(s)"
+                if fallbacks
+                else "globe texture; all featured points use Sentinel-2"
+            ),
         }
     )
     sources_path.write_text(json.dumps(sources, ensure_ascii=False, indent=1), encoding="utf-8")
 
 
 if __name__ == "__main__":
-    main()
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--only", help="render a single point slug")
+    args = parser.parse_args()
+    main(only=args.only)

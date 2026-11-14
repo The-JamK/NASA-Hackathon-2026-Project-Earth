@@ -1,4 +1,4 @@
-"""Deterministic trend statistics for the Case Files app.
+"""Deterministic trend statistics for the Signal & Noise app.
 
 The contract:
   annual means only
@@ -7,7 +7,8 @@ The contract:
   verdict at p < alpha with the sign of the slope
   95% interval from HAC SE with Student-t on n-2 df
   Sen's slope as a robust second opinion
-  Mann-Kendall descriptive only
+  Mann-Kendall with the Hamed-Rao (1998) autocorrelation correction
+  a trend is significant only when HAC OLS and corrected Mann-Kendall agree
   below 20 annual observations -> exploratory, no significance claim
 
 The browser never computes a verdict. Every number it displays comes from this
@@ -38,6 +39,115 @@ def hac_maxlag(n: int) -> int:
     if n < 1:
         raise ValueError(f"n must be at least 1, got {n}")
     return max(1, int(math.floor(4.0 * (n / 100.0) ** (2.0 / 9.0))))
+
+
+def _rank_autocorrelation(ranks: np.ndarray, lag: int) -> float:
+    """Lag-`lag` autocorrelation of a ranked series.
+
+    Uses the standard estimator with the full-series denominator, which is the
+    form Hamed and Rao (1998) use for the variance correction.
+    """
+    centered = ranks - ranks.mean()
+    denominator = float(np.dot(centered, centered))
+    if denominator <= 0.0 or lag <= 0 or lag >= ranks.size:
+        return 0.0
+    return float(np.dot(centered[:-lag], centered[lag:]) / denominator)
+
+
+def hamed_rao_mk(values: Sequence[float]) -> dict[str, float] | None:
+    """Mann-Kendall with the Hamed & Rao (1998) variance correction.
+
+    The i.i.d. Mann-Kendall variance of S is
+        Var(S) = n (n - 1) (2n + 5) / 18
+    and positive autocorrelation inflates the true variance. Hamed and Rao scale
+    it by n / n*:
+
+        n/n* = 1 + 2 / (n (n-1) (n-2)) * sum_{i=1}^{n-1} (n-i)(n-i-1)(n-i-2) rho_i
+
+    where rho_i is the lag-i autocorrelation of the ranks. Z is rescaled by
+    1 / sqrt(n/n*), so a positively autocorrelated record gets a smaller |Z| and
+    a larger p-value than the standard test would give.
+
+    The autocorrelation is estimated on the Sen-detrended series, as Hamed and
+    Rao specify: a monotone trend is itself highly autocorrelated, so ranking the
+    raw series would count the trend as persistence and over-correct it.
+
+    Returns None when fewer than three finite values are supplied.
+    """
+    y = np.asarray(values, dtype=float).ravel()
+    y = y[np.isfinite(y)]
+    n = int(y.size)
+    if n < 3:
+        return None
+
+    s = 0.0
+    for i in range(n - 1):
+        s += float(np.sum(np.sign(y[i + 1 :] - y[i])))
+    variance = n * (n - 1) * (2 * n + 5) / 18.0
+    if variance <= 0.0:
+        return None
+
+    if s > 0.0:
+        z = (s - 1.0) / math.sqrt(variance)
+    elif s < 0.0:
+        z = (s + 1.0) / math.sqrt(variance)
+    else:
+        z = 0.0
+
+    steps = np.arange(n, dtype=float)
+    detrended = y - stats.theilslopes(y, steps)[0] * steps
+    spread = float(np.ptp(y))
+    factor = 1.0
+    if n > 3 and float(np.ptp(detrended)) > 1e-12 * max(1.0, spread):
+        ranks = stats.rankdata(detrended, method="average")
+        total = 0.0
+        for lag in range(1, n - 1):
+            weight = (n - lag) * (n - lag - 1) * (n - lag - 2)
+            if weight:
+                total += weight * _rank_autocorrelation(ranks, lag)
+        factor = max(1.0, 1.0 + (2.0 / (n * (n - 1) * (n - 2))) * total)
+    # The correction may widen the variance, never narrow it, so a negative
+    # sample autocorrelation cannot make the test more liberal.
+    factor = max(factor, 1.0)
+
+    z_corrected = z / math.sqrt(factor)
+    return {
+        "n": float(n),
+        "s": s,
+        "z": z,
+        "p": float(2.0 * stats.norm.sf(abs(z))),
+        "variance_factor": factor,
+        "z_corrected": z_corrected,
+        "p_corrected": float(2.0 * stats.norm.sf(abs(z_corrected))),
+    }
+
+
+def combined_verdict(
+    exploratory: bool,
+    p_value: float,
+    slope: float,
+    mk_p_corrected: float | None,
+    mk_tau: float | None,
+    alpha: float = DEFAULT_ALPHA,
+) -> str:
+    """The verdict contract: both tests must agree on a significant trend.
+
+    A point is only significant when the HAC OLS test and the autocorrelation
+    corrected Mann-Kendall test are both significant at alpha and their
+    directions agree. Anything else is "no significant trend", and short series
+    stay exploratory regardless of the tests.
+    """
+    if exploratory:
+        return VERDICT_EXPLORATORY
+    if mk_p_corrected is None or not math.isfinite(mk_p_corrected):
+        return VERDICT_NONE
+    if p_value >= alpha or mk_p_corrected >= alpha:
+        return VERDICT_NONE
+    if slope == 0.0 or mk_tau is None or not math.isfinite(mk_tau) or mk_tau == 0.0:
+        return VERDICT_NONE
+    if (slope > 0.0) != (mk_tau > 0.0):
+        return VERDICT_NONE
+    return VERDICT_INCREASING if slope > 0.0 else VERDICT_DECREASING
 
 
 def compute_trend(
@@ -85,19 +195,17 @@ def compute_trend(
     else:
         mk_z = 0.0
 
+    corrected = hamed_rao_mk(y)
+    mk_p_corrected = corrected["p_corrected"] if corrected else None
+    mk_z_corrected = corrected["z_corrected"] if corrected else None
+    mk_variance_factor = corrected["variance_factor"] if corrected else None
+
     residuals = np.asarray(fit.resid, dtype=float)
     lag1 = float(np.corrcoef(residuals[:-1], residuals[1:])[0, 1]) if n > 2 else 0.0
     dw = float(durbin_watson(residuals))
 
     exploratory = n < MIN_YEARS
-    if exploratory:
-        verdict = VERDICT_EXPLORATORY
-    elif p_value < alpha and slope > 0:
-        verdict = VERDICT_INCREASING
-    elif p_value < alpha and slope < 0:
-        verdict = VERDICT_DECREASING
-    else:
-        verdict = VERDICT_NONE
+    verdict = combined_verdict(exploratory, p_value, slope, mk_p_corrected, tau, alpha)
 
     return {
         "n": n,
@@ -113,6 +221,9 @@ def compute_trend(
         "mk_tau": tau,
         "mk_z": mk_z,
         "mk_p": mk_p,
+        "mk_p_corrected": mk_p_corrected,
+        "mk_z_corrected": mk_z_corrected,
+        "mk_variance_factor": mk_variance_factor,
         "lag1_residual": lag1,
         "durbin_watson": dw,
         "verdict": verdict,

@@ -79,6 +79,22 @@ def main() -> int:
         fail(f"expected at least 10 context images, found {len(imagery)}")
 
     for point in points:
+        for code, windows in point.get("trends", {}).items():
+            for window, trend in windows.items():
+                if not trend:
+                    continue
+                corrected = trend.get("mk_p_corrected")
+                if not isinstance(corrected, (int, float)):
+                    fail(f"{point.get('id')} {code} {window} has no corrected Mann-Kendall p-value")
+                both = trend["p_value"] < 0.05 and corrected < 0.05
+                significant = trend.get("verdict", "").startswith("significant")
+                if significant and not both:
+                    fail(f"{point.get('id')} {code} {window} claims a trend without both tests")
+                if both and trend.get("verdict") == "no significant trend":
+                    signs = (trend["slope_per_decade"] > 0) == (trend["mk_tau"] > 0)
+                    if signs:
+                        fail(f"{point.get('id')} {code} {window} passed both tests but is not proven")
+
         usable_variables = 0
         for code in POINT_CODES:
             series = point.get("series", {}).get(code)
