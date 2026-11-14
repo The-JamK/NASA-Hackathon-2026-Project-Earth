@@ -141,6 +141,16 @@ if (!html.includes("Signal &amp; Noise") || !landing.includes("Signal &amp; Nois
 if (/case files/i.test(html) || /case files/i.test(landing)) {
   fail("the old product name is still on a page");
 }
+// The case page must lead with the product name too, not the tagline.
+if (!/<title>Gaussian Frontiers — Signal &amp; Noise<\/title>/.test(html)) {
+  fail("the case page titles the tagline instead of the product name");
+}
+if (/Back to the Signal &amp; Noise/.test(html)) {
+  fail("the case page's back link still calls the tagline the product");
+}
+if (/panel-kicker">Signal &amp; Noise</.test(html)) {
+  fail("the case loading eyebrow still shows the tagline as the name");
+}
 if (html.includes(">Intake<")) fail("the intake panel still shows the Intake label");
 if (html.includes("Case board") || main.includes("Case board")) {
   fail("the case board wording is still present");

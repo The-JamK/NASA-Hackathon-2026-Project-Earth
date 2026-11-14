@@ -327,6 +327,11 @@ Last verified: 2026-11-14
   MANUAL: browser run against the current build at 1440x900 and 390x844.
   EVIDENCE: Hover sets `is-hovering`, shows `Click to open the case` and a pointer cursor; a click opens the native dialog; Escape closes it and focus returns to `hero-globe`; the focus ring reads `rgb(255, 107, 74)`. With `reducedMotion: reduce`, two full screenshots two seconds apart are byte-identical (rotation stopped) and `.hero-box` opacity is 1, so the copy appears without the staggered draw-in; under normal motion the same pair of screenshots differs. At 390x844 a click on the globe's centre opens the dialog. That last check used a mouse click, not a real touch event: the browser context has no touch support, so finger accuracy is still unproven.
 
-MET: 61
+- [x] G63: The case page names the product first and uses the tagline only as a tagline.
+  CHECK: node scripts/verify_app.mjs
+  EXPECT: app verified
+  EVIDENCE: `app.html` had the tagline in the places that name the product: `<title>Signal & Noise — Gaussian Frontiers</title>`, the meta description opening with it, the brand link's `Back to the Signal & Noise overview`, the loading eyebrow above `Assembling the evidence locker…`, and the footer ordering. All five now read `Gaussian Frontiers` first with `Signal & Noise` after it, matching the landing page. `verify_app.mjs` gained three assertions — the exact `<title>Gaussian Frontiers — Signal &amp; Noise</title>`, no `Back to the Signal &amp; Noise` link and no `panel-kicker">Signal &amp; Noise` eyebrow — so the tagline cannot drift back into the name position. Run with the dev server it prints `app verified`, and it still requires `Signal &amp; Noise` to appear on both pages, which the new title, meta and footer satisfy.
+
+MET: 62
 UNMET: 1
 ABANDONED: 0
