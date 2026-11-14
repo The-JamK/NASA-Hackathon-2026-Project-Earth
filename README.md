@@ -9,7 +9,7 @@ npm install
 npm run dev
 ```
 
-The app uses prebuilt data under `public/data`; rebuild the data bundle with:
+The app uses prebuilt data under `public/data`; rebuild the data bundle with:  
 
 ```sh
 uv run python scripts/build_data.py --env-file path/to/.env
