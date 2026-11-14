@@ -11,9 +11,9 @@ Last verified: 2026-11-14
   EVIDENCE: 45 points · 11 featured · 6 live · 4,039 grid cells · 6 source checks ok · global 1990–2025 slope +0.2362 °C/decade.
 
 - [x] G2: The statistics engine reproduces known-answer fixtures for OLS/HAC, Sen's slope, and Mann–Kendall within tolerance.
-  CHECK: uv run pytest -q
+  CHECK: uv run --with pytest pytest -q
   EXPECT: passed
-  EVIDENCE: 6 tests passed.
+  EVIDENCE: 12 tests passed. pytest is not a declared dependency, so the check supplies it with `--with`; bare `uv run pytest` cannot find the module.
 
 - [x] G3: The production frontend build succeeds.
   CHECK: npm run build
@@ -117,8 +117,33 @@ Last verified: 2026-11-14
   EXPECT: identical hashes
   EVIDENCE: pushed `d73057e..ea41331 HEAD -> main`; `git rev-parse HEAD` and `FETCH_HEAD` both returned `ea41331` for the feature commit, and the ledger follow-up advanced `main` afterwards.
 
+- [x] G24: Grid-cell p-values are corrected with Benjamini–Hochberg at q = 0.05, every count uses the adjusted q, and the function matches a hand-checked answer plus the empty, all-significant and none-significant edges.
+  CHECK: uv run --with pytest pytest -q
+  EXPECT: passed
+  EVIDENCE: the known answer returns q = [0.04, 0.0533, 0.0533, 0.20] and one discovery for p = [0.01, 0.04, 0.03, 0.20]; the edge test covers empty input, q = 0.003 for [0.001, 0.002, 0.003] and q = 0.9 for [0.4, 0.6, 0.9] with no discoveries. The shipped grid moves 1990–2025 from 3,100 / 81 / 858 raw to 3,039 / 78 / 922 adjusted, and `verify_data.py` pins the adjusted counts.
+
+- [x] G25: Mann–Kendall carries the Hamed–Rao (1998) variance correction, is tested against known answers, and leaves a clean line alone while widening an autocorrelated one.
+  CHECK: uv run --with pytest pytest -q
+  EXPECT: passed
+  EVIDENCE: rank autocorrelation returns 0.4 / −0.1 / −0.4 on a linear rank vector; a perfect line keeps factor 1.000 and an unchanged p; an AR(1) series with φ = 0.85 gives factor > 1.5 and a larger corrected p; 60 i.i.d. draws stay inside factor 0.5–1.5 and a p ratio of 0.3–3.0. On the real bundles Nairobi and Niamey rainfall keep factor 1.00 and McMurdo is 1.07 (p 0.0283 → 0.0348). Correction is estimated on the Sen-detrended series, because ranking the raw trended series over-corrected and flipped Nairobi.
+
+- [x] G26: A point is significant only when the HAC OLS test and the corrected Mann–Kendall agree at 5% in direction, and short records stay exploratory.
+  CHECK: uv run --with pytest pytest -q; uv run python scripts/verify_data.py
+  EXPECT: passed; data verified
+  EVIDENCE: seven verdict cases pass, including McMurdo's shape (HAC 0.06, MK 0.02 → not proven), a direction conflict and a missing correction. Backfilling 537 stored point trends moves 27 to not proven (22 increasing, 5 decreasing); `verify_data.py` now fails if a stored verdict claims a trend without both tests. Global verdicts stay significant increasing for 1990–2025 and 2000–2025, and the grid-cell counts stay BH-based.
+
+- [x] G27: The red-herring case is described as steep but not proven at the 5% level, not as noise.
+  CHECK: grep -rin "noise" over the source, docs and scripts
+  EXPECT: no claim that a steep line is noise
+  EVIDENCE: MISSION.md now reads "A red-herring case is steep but not proven at the 5% level." The other hits (app.html "distinguishable from noise", main.js "cannot separate one from noise", a test comment) are statements about separating a slope from scatter. McMurdo still renders NOT PROVEN at HAC p 0.060 with corrected MK p 0.035, so nothing was tuned to keep the story.
+
+- [x] G28: Both pages, the docs and the method dialog name the product Signal & Noise, the old name is gone, and the ampersand is escaped in HTML.
+  CHECK: node scripts/verify_app.mjs
+  EXPECT: app verified
+  EVIDENCE: rendered titles are `Signal &amp; Noise — NASA Space Apps 2026` and `Signal &amp; Noise — Gaussian Frontiers`; the landing kicker and both footers read Signal & Noise. verify_app now fails if either page lacks `Signal &amp; Noise` or still matches /case files/i, and `grep -ri "case files"` returns only that guard. The repository name, folder, `base "./"`, asset and data paths, worker names and `case-files-*` user agents are unchanged, as are generic "case file" phrases and CASE- ids.
+
 ## Status
 
-MET: 23
+MET: 28
 UNMET: 0
 ABANDONED: 0
