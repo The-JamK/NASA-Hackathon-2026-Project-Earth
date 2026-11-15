@@ -33,8 +33,14 @@ jobs:
       # Only on a schedule or a manual run: a push should not spend minutes of
       # runner time refetching six points, and the committed snapshot is fine
       # there.
+      # The deploy must never depend on this. If the refresh fails for any
+      # reason, `continue-on-error` lets the job carry on and ship the committed
+      # snapshot, which is exactly what shipped before the schedule existed; the
+      # timeout stops a hung dependency install from blocking the deploy.
       - name: Refresh the live snapshot
         if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
+        continue-on-error: true
+        timeout-minutes: 10
         uses: ./.github/actions/refresh-live
         with:
           username: ${{ secrets.METEOMATICS_USERNAME }}
