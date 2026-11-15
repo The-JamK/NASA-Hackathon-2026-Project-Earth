@@ -747,11 +747,11 @@ Last verified: 2026-11-14
   EXPECT: all checks passed
   EVIDENCE: `all checks passed`, with `hero: nine copy boxes, no leader lines` and the geometry, data and export checks unchanged, and `npm run build` clean.
 
-- [ ] G149: The result is committed to main and pushed.
+- [x] G149: The result is committed to main and pushed.
   CHECK: git status --porcelain --untracked-files=no
   EXPECT: (no output)
-  EVIDENCE: pending
+  EVIDENCE: `git status --porcelain --untracked-files=no` prints nothing and `cloud_git push` reported `d5fb4c6..29ba0ea  HEAD -> main`. `b7651f4` carries the note and the pointer-events change, `29ba0ea` merges `main` (which had added its own G145 and touched the refit script) with these gates renumbered G146-G149, and `all checks passed` holds on the merged tree.
 
-MET: 147
-UNMET: 2
+MET: 148
+UNMET: 1
 ABANDONED: 0
