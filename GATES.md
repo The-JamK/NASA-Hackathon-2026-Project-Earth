@@ -443,6 +443,15 @@ Last verified: 2026-11-14
   MANUAL: Cloud browser, built site, 1440x900, temporary probe removed before committing.
   EVIDENCE: Two samples 5.127 s apart read `rotation.y` 0.64713 -> 1.29217 = 0.12581 rad/s, i.e. one turn in 49.94 s, against the 0.12566 target (0.1% high, timing noise) and the 0.08976 measured at the 70 s setting. `camera.up` was `[0, 1, 0]` at both samples, so the Earth is still upright. The final build reports `typeof window.__heroProbe === "undefined"` and `grep -c __heroProbe src/hero.js` is 0. Screenshots 4 s apart: `artifacts/hero-upright-50s.png`, `artifacts/hero-upright-50s-t1.png`. `scripts/verify_all.sh` passes on this build.
 
-MET: 86
+- [x] G87: The ask strip no longer offers the sea-ice chip or the steep-but-unproven chip, and the other four chips are unchanged.
+  CHECK: node scripts/verify_app.mjs
+  EXPECT: app verified
+  EVIDENCE: `renderSuggestions()` in `src/main.js` drops the `chip-ice` push and the `chip-herring` block, and the `deriveSteepUnproven` import that only fed that block, taking the function from 109,050 to 108,129 bytes; the two RAG example chips, the ocean chip and the derived-place chip are untouched. `verify_app.mjs` now fails if `chip-ice`, `chip-herring`, `Arctic sea ice shrinking` or `Steep, but not proven` reappears in `main.js`. `verify_red_herring.mjs` is updated rather than deleted: it still fails if the derived seed stops being a featured, non-exploratory, steep-but-unproven case, and it now also fails if the chip comes back or if the seed station is missing from the shipped index (so it can still be asked for by name); it still reports `McMurdo 0.303 °C/decade, p 0.060, n 36, ranked 7/14 by steepness`. `DEMO.md` step 1:18 now types **Is McMurdo warming?** instead of clicking the chip, and its "what the twist depends on" paragraph says the chip is gone.
+
+- [x] G88: In the browser the strip shows exactly the four remaining chips, and both removed questions still work when typed.
+  MANUAL: Cloud browser, built site, 1440x900.
+  EVIDENCE: `#suggestions .chip` returns exactly 4 nodes: `Is the Sahel getting drier?`, `Is Nairobi warming?`, `Is the Pacific warming?` (chip-ocean) and `Is Gold Coast getting hotter?` (chip-derived) — neither removed chip is present. Typing `Is the Arctic sea ice shrinking?` into the ask box still plans `CASE PLAN 56% MATCH Sea ice extent Arctic sea ice · 12-month mean · 1990–2025 · 10⁶ km²`, and typing `Is McMurdo warming?` still plans `CASE PLAN 72% MATCH Temperature at 2 m McMurdo · 1990–2025 · °C`, so only the chips were removed, not the cases. Screenshot: `artifacts/ask-chips.png`. `scripts/verify_all.sh` passes on this build after one rerun: the first run's only failure was `verify_live.sh` seeing 503 from GitHub Pages mid-deploy for `/dist/index.html`, which returned 404 seconds later and passes standalone.
+
+MET: 88
 UNMET: 1
 ABANDONED: 0

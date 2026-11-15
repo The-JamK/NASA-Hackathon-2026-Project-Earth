@@ -148,6 +148,11 @@ if (/hero-dialog/.test(landing)) fail("the hero still ships a confirmation dialo
 
 const main = await (await get("/src/main.js", "javascript")).text();
 if (!main.includes("new Globe")) fail("main.js does not mount the globe");
+// The ask strip keeps four chips — two question examples, the ocean basin and the
+// derived place. The sea-ice and steep-but-unproven chips were removed on request.
+for (const gone of ["chip-ice", "chip-herring", "Arctic sea ice shrinking", "Steep, but not proven"]) {
+  if (main.includes(gone)) fail(`the ask strip still ships ${gone}`);
+}
 if (!main.includes("renderOceanCase")) fail("main.js does not render an ocean region case");
 if (!main.includes("ensureOcean")) fail("main.js does not load the ocean bundle");
 if (!html.includes('data-layer="ocean"')) fail("the layer switch has no ocean layer");

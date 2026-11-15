@@ -1,7 +1,7 @@
-// The demo's twist has to be reachable in one click and has to stay true after
-// a data rebuild. The case is derived from the bundle, so this check asserts the
-// derivation exists, that it picks a case the app will stamp NOT PROVEN, and that
-// the seed is actually wired into the ask chips.
+// The demo's twist has to stay true after a data rebuild. The case is derived
+// from the bundle, so this check asserts the derivation exists, that it picks a
+// case the app will stamp NOT PROVEN, and that the station can still be asked
+// for by name now that its chip is gone.
 import { readFileSync } from "node:fs";
 import { deriveSteepUnproven } from "../src/herring.js";
 import { loadPoints } from "./bundle.mjs";
@@ -54,12 +54,17 @@ if (seed.slope < median) {
   fail(`the seed's ${seed.slope.toFixed(3)} is below the featured median ${median.toFixed(3)}`);
 }
 
-// The app must offer it without hunting the globe: the chip is rendered from
-// the derivation and opens the point directly.
+// The chip is gone from the ask strip, so the case is reached by asking for the
+// station by name. That only works if the shipped index carries it, and the
+// strip must not quietly bring the chip back.
 const main = readFileSync(new URL("../src/main.js", import.meta.url), "utf8");
-if (!main.includes("deriveSteepUnproven")) fail("main.js does not derive the red herring");
-if (!main.includes("data-open-point")) fail("the red herring is not an opener chip");
+if (main.includes("chip-herring") || main.includes("Steep, but not proven")) {
+  fail("main.js still renders the red-herring chip");
+}
 if (!main.includes("renderSuggestions")) fail("main.js does not render the ask chips");
+if (!index.points.some((point) => point.id === seed.point.id && point.name)) {
+  fail("the seed station is missing from the shipped index, so it cannot be asked by name");
+}
 
 const html = readFileSync(new URL("../app.html", import.meta.url), "utf8");
 if (!html.includes('id="suggestions"')) fail("app.html has no suggestion strip");

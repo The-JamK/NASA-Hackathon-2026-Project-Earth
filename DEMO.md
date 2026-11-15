@@ -15,16 +15,17 @@ Open `app.html`. The globe is draggable; the ask box and chips are on the left.
 | 0:35 | Click **Is Nairobi warming?** | "Same contract, different variable: +0.313 °C per decade, CI 0.236 to 0.390, Mann–Kendall p < 0.001. Both tests agree, so it gets a verdict." |
 | 0:48 | Type **Is France warming?** and run | "France is a country, not a city: this is the mean of its 3 stations — +0.433 °C per decade, and it survives Benjamini–Hochberg across all 222 country averages." |
 | 1:02 | Click **Global** | "The whole field: +0.236 °C per decade, and of 4,039 GISTEMP cells, 3,039 are significant increases, 78 decreases, 922 not proven after FDR correction." |
-| 1:18 | Click **Steep, but not proven · McMurdo** | "Now the hard part. McMurdo is +0.303 °C per decade — steeper than the global trend, and seventh steepest of the featured cases. HAC p = 0.060. The interval crosses zero. **NOT PROVEN.**" |
+| 1:18 | Type **Is McMurdo warming?** and run | "Now the hard part. McMurdo is +0.303 °C per decade — steeper than the global trend, and seventh steepest of the featured cases. HAC p = 0.060. The interval crosses zero. **NOT PROVEN.**" |
 | 1:36 | Open **Show your work**, then the method dialog | "This is what we refuse to do: call that a trend. AI wrote every sentence you just read. It did not compute a single number." |
 | 1:50 | Close | "Every trend is a claim. The data decides the verdict." |
 
 ## What the twist depends on
 
-The chip is derived, not hard-coded: it opens the steepest featured case whose
+The case is derived, not hard-coded: it is the steepest featured case whose
 verdict is *not proven*. Today that is McMurdo, and the check enforces that it is
 still steeper than the median featured case (0.303 vs 0.286 °C/decade). If a data
-rebuild changes that, `verify_red_herring.mjs` fails instead of the demo.
+rebuild changes that, `verify_red_herring.mjs` fails instead of the demo. The ask
+strip no longer carries a chip for it, so reach it by typing the station name.
 
 ## If a judge asks about the ocean
 

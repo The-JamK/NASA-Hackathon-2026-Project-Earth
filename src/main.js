@@ -25,7 +25,6 @@ import { renderCompareChart, renderSeriesChart, trendColor } from "./chart.js";
 import { caseSlug, downloadCsv, reportRows, seriesRows, toCsv } from "./export.js";
 import { SOURCE_LINKS } from "./sources.js";
 import { formatLatLon, haversineKm, nearestCell, nearestRecord } from "./geo.js";
-import { deriveSteepUnproven } from "./herring.js";
 import { describeFailure, derivedPlan, isResolvablePlan, resolveQuestion } from "./field.js";
 import { dehydrate, detailPath, hydrate, trendOf } from "./bundle.js";
 
@@ -2312,28 +2311,10 @@ function renderSuggestions() {
   chips.push(
     `<button class="chip chip-ocean" type="button" data-question="Is the Pacific warming?">Is the Pacific warming?</button>`
   );
-  chips.push(
-    `<button class="chip chip-ice" type="button" data-question="Is the Arctic sea ice shrinking?">Is the Arctic sea ice shrinking?</button>`
-  );
   // A place with no station: the derived path answers from the GISTEMP field.
   chips.push(
     `<button class="chip chip-derived" type="button" data-question="Is Gold Coast getting hotter?">Is Gold Coast getting hotter?</button>`
   );
-  // The demo's twist, derived from the bundle so a rebuild cannot rot it: the
-  // steepest featured case the statistics refuse to call, one click away.
-  const herring = deriveSteepUnproven(state.points, state.meta.windows[0]);
-  if (herring) {
-    const units = state.byCode.get("T2M")?.units || "°C";
-    chips.push(
-      `<button class="chip chip-herring" type="button" data-open-point="${escapeHtml(
-        herring.point.id
-      )}" title="${escapeHtml(
-        `${signed(herring.trend.slope_per_decade)} ${units} per decade, HAC p ${formatP(
-          herring.trend.p_value
-        )} — steep, but not proven`
-      )}">Steep, but not proven · ${escapeHtml(herring.point.name)}</button>`
-    );
-  }
   els.suggestions.innerHTML = chips.join("");
 }
 
