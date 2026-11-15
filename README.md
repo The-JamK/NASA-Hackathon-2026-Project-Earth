@@ -319,6 +319,16 @@ gazetteer lacks — suburbs like Broadbeach, alternate spellings — need the Wo
 because the keyless geocoders live there and not in the page. There the app says
 so plainly instead of guessing.
 
+A name is matched generously rather than literally. `goldcoast` works without its
+space, `illonoisis` comes back as **Illinois**, and a name that means more than one
+place offers the choices instead of silently picking one: asking about **Washington**
+shows "Did you mean one of these?" with Washington, D.C. first and the state of
+Washington below it. States and provinces come from Natural Earth's admin-1 layer,
+so `Is Queensland getting wetter?` is answerable too — the case is the GISTEMP 4°
+cell nearest the division's label point, and the notice says so. Every candidate
+carries its own coordinates, so choosing one costs no extra request on either host.
+`scripts/verify_search.mjs` pins that behaviour.
+
 Vite uses relative asset paths (`base: "./"`) and the app resolves data,
 textures and point imagery through `import.meta.env.BASE_URL`, so the build works
 under the repository subpath rather than only at the domain root.

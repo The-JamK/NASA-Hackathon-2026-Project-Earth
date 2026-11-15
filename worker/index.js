@@ -32,7 +32,10 @@ function loadPoints(env, origin) {
 function loadGazetteer(env, origin) {
   if (!gazetteerPromise) {
     gazetteerPromise = assetJson(env, origin, "/data/gazetteer.json", "gazetteer.json")
-      .then((payload) => indexGazetteer(payload.places || []))
+      .then((payload) => [
+        ...indexGazetteer(payload.places || []),
+        ...indexGazetteer(payload.regions || [], { kind: "region" }),
+      ])
       .catch((error) => {
         gazetteerPromise = null;
         throw error;

@@ -28,7 +28,13 @@ function readGazetteer() {
     if (stat.mtimeMs !== gazetteerCache.mtimeMs) {
       gazetteerCache = {
         mtimeMs: stat.mtimeMs,
-        entries: indexGazetteer(JSON.parse(readFileSync(GAZETTEER_FILE, "utf8")).places || []),
+        entries: (() => {
+          const payload = JSON.parse(readFileSync(GAZETTEER_FILE, "utf8"));
+          return [
+            ...indexGazetteer(payload.places || []),
+            ...indexGazetteer(payload.regions || [], { kind: "region" }),
+          ];
+        })(),
       };
     }
     return gazetteerCache.entries;

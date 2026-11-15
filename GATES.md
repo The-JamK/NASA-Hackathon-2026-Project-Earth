@@ -458,6 +458,36 @@ Last verified: 2026-11-14
   MANUAL: Cloud browser, built site, 1440x900.
   EVIDENCE: `#suggestions .chip` returns exactly 4 nodes: `Is the Sahel getting drier?`, `Is Nairobi warming?`, `Is the Pacific warming?` (chip-ocean) and `Is Gold Coast getting hotter?` (chip-derived) — neither removed chip is present. Typing `Is the Arctic sea ice shrinking?` into the ask box still plans `CASE PLAN 56% MATCH Sea ice extent Arctic sea ice · 12-month mean · 1990–2025 · 10⁶ km²`, and typing `Is McMurdo warming?` still plans `CASE PLAN 72% MATCH Temperature at 2 m McMurdo · 1990–2025 · °C`, so only the chips were removed, not the cases. Screenshot: `artifacts/ask-chips.png`. `scripts/verify_all.sh` passes on this build after one rerun: the first run's only failure was `verify_live.sh` seeing 503 from GitHub Pages mid-deploy for `/dist/index.html`, which returned 404 seconds later and passes standalone.
 
-MET: 89
+- [x] G90: A misspelt place resolves — `illonoisis` finds Illinois, `reykavik` finds Reykjavik — through the shared matcher both hosts run.
+  CHECK: node scripts/verify_search.mjs
+  EXPECT: search verified
+  EVIDENCE: `searchPlaces` scores every entry by how much of the typed name its key accounts for, then adds a population prior, so the answer people expect wins. `scripts/verify_search.mjs` passes against the built gazetteer: `illonoisis` → Illinois (match `typo`), `reykavik` → Reykjavík, `Pariss` → Paris, `goldcoast` (no space) → Gold Coast, `guidance`-free nonsense like `zzqxville` → nothing, and `Paris` is not displaced by a longer name. The typo budget grows with the word — one edit per five letters — because "illonoisis" is three edits from "illinois". Both the Worker (`worker/resolve.js`) and the page (`src/field.js`) import this one function, so a pass here is a pass for either host.
+  NOTE: Typo tolerance changes behaviour honestly: "Is Atlantis warming?" now returns Atlanta and the Atlantic-region names as candidates, which is why the outage test in `verify_resolve.mjs` had to move to a name nothing is close to.
+
+- [x] G91: An ambiguous name comes back as ranked candidates with a "did you mean" flag instead of one silent guess, and `washington` offers Washington, D.C. first.
+  CHECK: node scripts/verify_resolve.mjs
+  EXPECT: resolver verified
+  EVIDENCE: The response carries `candidates` (name, country, kind, subtype, population, score, match) plus three flags: `ambiguous` when the runner-up is within 0.12 of the best, `expanded` when the answer is a name the question did not spell out, `corrected` when the matcher had to repair a typo. `verify_resolve.mjs` asserts `"Is Washington getting hotter?"` returns `Washington,  D.C.` first (folded `washington d c`), `expanded: true`, at least two candidates, the state as the second, and finite coordinates on every candidate; `illonoisis` returns Illinois with `corrected: true`; `Gold Coast` is none of the three flags. Scoring is what makes Washington work: an exact city scores 1.0, the initials expansion scores 0.98, and the population prior (0.25 × log10(pop)/7) puts Washington, D.C. (4.3M) ahead of the state (no population) and ahead of the UK Washington.
+
+- [x] G92: The gazetteer carries Natural Earth states and provinces, so `illinois` is a place the app can answer.
+  CHECK: node scripts/verify_gazetteer.mjs
+  EXPECT: gazetteer verified
+  EVIDENCE: `scripts/build_gazetteer.py` now also reads `ne_10m_admin_1_states_provinces` and writes 4,560 regions as `[name, country, lat, lon, type, altNames]` beside the 6,421 places, taking each division's label point from the DBF rather than parsing a polygon. `verify_gazetteer.mjs` passes: Illinois is a State in the United States with its label point at 39.946, -89.1991 inside the state's own bounds, Queensland and Ontario are present, Gold Coast is still a place, Broadbeach is still deliberately absent, rows are unique by name and country, every coordinate is in range, and the file is 554 KB (under the 800 KB budget, because the page downloads it).
+  NOTE: That layer's DBF names its columns in lower case (`name`, `admin`, `type_en`), unlike the populated-places layer; the first build returned 0 regions until that was handled.
+
+- [x] G93: Asking `washington` shows a "Did you mean" popup with Washington, D.C. first, and choosing it opens the derived case.
+  MANUAL: browser measurement on the built page.
+  EVIDENCE: On the dev page, `"Is Washington getting hotter?"` rendered a popup titled "Did you mean one of these?" with exactly two buttons — `Washington, D.C. city · United States of America · 4.3M` then `Washington state · United States of America` — while the plan behind it read `74% MATCH Washington, D.C.`. Clicking the second button removed the popup, moved the plan to Washington at 47.49°N 120.36°W and, on run, opened `CASE-16C2 · DERIVED CASE · STATE · UNITED STATES OF AMERICA` with the notice "The bundle has no station for Washington, a state, so this case is the GISTEMP 4° cell nearest its centre". `"Is illonoisis getting hotter?"` showed the singular title "Did you mean" with one button, `Illinois state · United States of America`, and choosing it opened `CASE-433D` at 39.95°N 89.20°W, +0.26 °C/decade.
+
+- [x] G94: The static GitHub Pages build behaves the same — typo, ambiguity and popup — with no server at all.
+  MANUAL: browser measurement against `python3 -m http.server` serving `dist`.
+  EVIDENCE: Served from a plain static server (which answers POST with 501 and has no resolver), `"Is Washington getting hotter?"` produced the same two-item popup from `data/gazetteer.json` — one failed `/api/resolve` request, then the page's own match — and `"Is illonoisis getting hotter?"` produced "Did you mean" → Illinois → `CASE-433D` at +0.26 °C/decade. The candidate objects carry their own coordinates, so choosing one needs no further call on either host.
+
+- [x] G95: Nothing regressed: the existing resolver, bundle, offline and first-load checks still pass and the build still succeeds.
+  CHECK: node scripts/verify_resolve.mjs && node scripts/verify_bundle.mjs && node scripts/verify_offline.mjs && npm run build
+  EXPECT: resolver verified
+  EVIDENCE: All four pass after the change (`resolver verified: 10973 gazetteer places`, `bundle verified`, `offline verified`, `✓ built`). `verify_firstload.mjs` still passes at 293 kB gzip on the critical path (was 289 kB, +4 kB for the matcher), and `verify_all.sh` now runs the two new checks before the resolver. The worker's gazetteer loader and the Vite middleware both index places and regions, so the server paths see the same 10,973 entries the page does.
+
+MET: 95
 UNMET: 1
 ABANDONED: 0

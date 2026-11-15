@@ -1801,6 +1801,8 @@ function renderGridCase() {
 function renderDerivedCase() {
   const item = state.selected;
   const place = item.place || { name: "This place", lat: item.lat, lon: item.lon };
+  const region = place.kind === "region";
+  const regionLabel = (place.subtype || "state or province").toLowerCase();
   const raw = item.trends?.[state.windowKey] || null;
   const trend = normalizeGridTrend(raw);
   const variable = state.byCode.get("GISTEMP");
@@ -1836,13 +1838,25 @@ function renderDerivedCase() {
       <button class="case-close" data-action="close-case" type="button">Close</button>
     </div>
     <h2 class="place-title">${escapeHtml(place.name)}</h2>
-    <p class="place-sub">Derived case · no station here${
+    <p class="place-sub">Derived case · ${region ? escapeHtml(regionLabel) : "no station here"}${
       place.country ? ` · ${escapeHtml(place.country)}` : ""
     } · ${here}</p>
     <div class="caveat">
-      The bundle holds no station at ${escapeHtml(place.name)}, so this case is the nearest
-      GISTEMP 4° cell — ${distanceText(item.distanceKm)} away at ${cellAt} — and its numbers
-      describe that cell, roughly a 440 km box, not the city boundary. ${how}
+      ${
+        region
+          ? `The bundle has no station for ${escapeHtml(place.name)}, a ${escapeHtml(
+              regionLabel
+            )}, so this case is the GISTEMP 4° cell nearest its centre — ${distanceText(
+              item.distanceKm
+            )} away at ${cellAt} — and its numbers describe that cell, roughly a 440 km box, not the whole ${escapeHtml(
+              regionLabel
+            )}.`
+          : `The bundle holds no station at ${escapeHtml(
+              place.name
+            )}, so this case is the nearest GISTEMP 4° cell — ${distanceText(
+              item.distanceKm
+            )} away at ${cellAt} — and its numbers describe that cell, roughly a 440 km box, not the city boundary.`
+      } ${how}
     </div>
     ${variableChips(variable, true)}
     ${windowChips()}
@@ -2424,6 +2438,86 @@ async function offerDerivedPlan(question, seq) {
   state.plan = plan;
   renderPlan(plan);
   els.plan.scrollIntoView({ block: "nearest" });
+  // A name is often not one place, and a misspelling is not a different place.
+  // Say which one is meant instead of quietly choosing.
+  if (resolution.ambiguous || resolution.expanded || resolution.corrected) showSuggestions(resolution);
+}
+
+const compactNumber = new Intl.NumberFormat("en", {
+  notation: "compact",
+  maximumFractionDigits: 1,
+});
+
+function suggestionLabel(candidate) {
+  const kind =
+    candidate.kind === "region"
+      ? (candidate.subtype || "region").toLowerCase()
+      : candidate.kind === "place"
+        ? "city"
+        : "place";
+  const people =
+    candidate.kind === "region" || !(candidate.population > 0)
+      ? ""
+      : ` · ${compactNumber.format(candidate.population)}`;
+  return candidate.country ? `${kind} · ${candidate.country}${people}` : `${kind}${people}`;
+}
+
+function hideSuggestions() {
+  document.getElementById("suggest-popover")?.remove();
+}
+
+function chooseSuggestion(resolution, candidate) {
+  hideSuggestions();
+  const plan = derivedPlan({ ...resolution, place: { ...candidate, detail: "" } });
+  if (!plan) return;
+  state.plan = plan;
+  renderPlan(plan);
+  els.plan.scrollIntoView({ block: "nearest" });
+  showToast(`Using ${candidate.name}${candidate.country ? `, ${candidate.country}` : ""}`);
+}
+
+function showSuggestions(resolution) {
+  hideSuggestions();
+  const candidates = (resolution.candidates || []).slice(0, 3);
+  if (!candidates.length) return;
+  const box = document.createElement("div");
+  box.id = "suggest-popover";
+  box.className = "suggest-popover";
+  box.setAttribute("role", "dialog");
+  box.setAttribute("aria-label", "Did you mean");
+  box.innerHTML = `
+    <p class="suggest-title">${resolution.corrected ? "Did you mean" : "Did you mean one of these?"}</p>
+    <ul class="suggest-list">
+      ${candidates
+        .map(
+          (candidate, index) => `
+        <li>
+          <button type="button" class="suggest-item" data-suggest="${index}">
+            <span class="suggest-name">${escapeHtml(candidate.name)}</span>
+            <span class="suggest-meta">${escapeHtml(suggestionLabel(candidate))}</span>
+          </button>
+        </li>`
+        )
+        .join("")}
+    </ul>
+    <button type="button" class="suggest-dismiss" data-suggest="dismiss">Keep my wording</button>
+  `;
+  const rect = els.askForm.getBoundingClientRect();
+  box.style.top = `${Math.round(rect.bottom + window.scrollY + 8)}px`;
+  box.style.left = `${Math.round(rect.left + window.scrollX)}px`;
+  box.style.width = `${Math.round(Math.max(rect.width, 280))}px`;
+  box.addEventListener("click", (event) => {
+    const button = event.target.closest("[data-suggest]");
+    if (!button) return;
+    const key = button.getAttribute("data-suggest");
+    if (key === "dismiss") {
+      hideSuggestions();
+      return;
+    }
+    const candidate = candidates[Number(key)];
+    if (candidate) chooseSuggestion(resolution, candidate);
+  });
+  document.body.appendChild(box);
 }
 
 function planForCity(cityId) {
@@ -2726,12 +2820,18 @@ function bindStaticEvents() {
 
   els.askForm.addEventListener("submit", (event) => {
     event.preventDefault();
+    hideSuggestions();
     handleAsk(els.askInput.value);
+  });
+
+  document.addEventListener("keydown", (event) => {
+    if (event.key === "Escape") hideSuggestions();
   });
 
   els.suggestions.addEventListener("click", (event) => {
     const chip = event.target.closest("[data-question]");
     if (chip) {
+      hideSuggestions();
       els.askInput.value = chip.dataset.question;
       handleAsk(chip.dataset.question);
       return;

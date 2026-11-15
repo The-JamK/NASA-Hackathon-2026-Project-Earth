@@ -8,6 +8,7 @@
 import { readFileSync } from "node:fs";
 import {
   GEOCODERS,
+  foldPlace,
   handleResolve,
   indexGazetteer,
   matchGazetteer,
@@ -30,7 +31,10 @@ const gazetteer = read("public/data/gazetteer.json");
 const points = read("public/data/points.json");
 const variables = read("public/data/variables.json").variables;
 const grid = read("public/data/grid.json");
-const entries = indexGazetteer(gazetteer.places);
+const entries = [
+  ...indexGazetteer(gazetteer.places),
+  ...indexGazetteer(gazetteer.regions || [], { kind: "region" }),
+];
 const cells = grid.cells.map((cell) => ({ ...cell, isGrid: true }));
 
 check(entries.length >= 6000, `gazetteer indexed only ${entries.length} places`);
@@ -227,7 +231,9 @@ const NOMINATIM_BROADBEACH = [
     "open-meteo": { status: 500, body: {} },
     nominatim: { error: "network down" },
   });
-  const response = await call({ question: "Is Atlantis warming?" }, { fetchImpl: failing });
+  // A name nothing in the gazetteer is close to: with fuzzy matching, "Atlantis"
+  // now legitimately suggests Atlanta, so an outage needs a name with no match.
+  const response = await call({ question: "Is Zzqxmark warming?" }, { fetchImpl: failing });
   const body = await response.json();
   check(response.status === 502, `two failing providers returned ${response.status}`);
   check(body.error === "resolver_unavailable", `two failing providers reported ${body.error}`);
@@ -342,6 +348,49 @@ const NOMINATIM_BROADBEACH = [
   const local = matchGazetteer("Is Gold Coast getting hotter?", entries);
   check(Boolean(local), "the gazetteer cannot find Gold Coast");
   check(local.place.country === "Australia", `the gazetteer puts Gold Coast in ${local.place.country}`);
+}
+
+// 12. A name that is not one place, and a name that is misspelt, come back as a
+//     list of candidates with the reason — never as one silent guess.
+{
+  const fetchImpl = geocoderStub({});
+
+  const washington = await (
+    await call({ question: "Is Washington getting hotter?" }, { fetchImpl })
+  ).json();
+  check(washington.ok === true, `washington did not resolve: ${washington.error}`);
+  check(
+    foldPlace(washington.place?.name || "") === "washington d c",
+    `washington resolved to ${washington.place?.name}`
+  );
+  check(washington.expanded === true, "the abbreviations were not flagged as an expansion");
+  check(Array.isArray(washington.candidates) && washington.candidates.length >= 2, "no candidates for washington");
+  check(
+    washington.candidates?.[1]?.kind === "region",
+    `the second Washington candidate is a ${washington.candidates?.[1]?.kind}`
+  );
+  check(
+    washington.candidates?.every((candidate) => Number.isFinite(candidate.lat) && Number.isFinite(candidate.lon)),
+    "a candidate has no usable coordinate"
+  );
+
+  const typo = await (
+    await call({ question: "Is illonoisis getting hotter?" }, { fetchImpl })
+  ).json();
+  check(typo.ok === true, `the misspelling did not resolve: ${typo.error}`);
+  check(typo.place?.name === "Illinois", `the misspelling resolved to ${typo.place?.name}`);
+  check(typo.corrected === true, "the misspelling was not flagged as a correction");
+  check(typo.place?.kind === "region", `Illinois came back as a ${typo.place?.kind}`);
+
+  const state = await (await call({ question: "Is Illinois getting hotter?" }, { fetchImpl })).json();
+  check(state.ok === true, `Illinois did not resolve: ${state.error}`);
+  check(state.corrected === false, "an exact state name was flagged as a correction");
+  check(/state/i.test(state.providerLabel || ""), `the label lost the region: ${state.providerLabel}`);
+
+  const gold = await (await call({ question: "Is Gold Coast getting hotter?" }, { fetchImpl })).json();
+  check(gold.ambiguous === false, "Gold Coast was wrongly marked ambiguous");
+  check(gold.corrected === false, "Gold Coast was wrongly marked a correction");
+  check(gold.expanded === false, "Gold Coast was wrongly marked an expansion");
 }
 
 if (failures) {
