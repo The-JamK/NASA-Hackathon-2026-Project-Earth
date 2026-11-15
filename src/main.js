@@ -26,6 +26,8 @@ import { caseSlug, downloadCsv, reportRows, seriesRows, toCsv } from "./export.j
 import { SOURCE_LINKS } from "./sources.js";
 import { formatLatLon, haversineKm, nearestCell, nearestRecord } from "./geo.js";
 import { deriveSteepUnproven } from "./herring.js";
+import { describeFailure, derivedPlan, isResolvablePlan, resolveQuestion } from "./field.js";
+import { dehydrate, detailPath, hydrate, trendOf } from "./bundle.js";
 
 const state = {
   exportData: null,
@@ -54,6 +56,14 @@ const state = {
   plan: null,
   recommendation: null,
   hovered: null,
+  // Every ask gets a sequence number so a slow resolver cannot overwrite the
+  // plan for a question the reader has already replaced.
+  askSeq: 0,
+  // Detail shards already merged into state.points, newest first. The cap keeps
+  // a browsing session at a few hundred kB rather than the whole 5.8 MB record
+  // set. A shard holds roughly 44 stations.
+  detailShards: new Map(),
+  detailOrder: [],
 };
 
 const BASE_URL = import.meta.env.BASE_URL || "/";
@@ -249,6 +259,49 @@ function ensureSeaIce() {
   return seaIcePromise;
 }
 
+// The station index carries identity and a verdict summary; the full trend
+// records and annual series are fetched with the station's shard, once, when a
+// case is opened. A shard is merged in place, so every reader of a point keeps
+// working unchanged — and is dropped again when the cache turns over.
+const DETAIL_CACHE_LIMIT = 3;
+
+function touchDetailShard(path) {
+  state.detailOrder = [path, ...state.detailOrder.filter((item) => item !== path)];
+  const keep = new Set(state.detailOrder.slice(0, DETAIL_CACHE_LIMIT));
+  const openPath = state.selected?.id ? detailPath(state.selected.id, state.meta) : "";
+  if (openPath) keep.add(openPath);
+  for (const loaded of [...state.detailShards.keys()]) {
+    if (keep.has(loaded)) continue;
+    dehydrate(state.detailShards.get(loaded));
+    state.detailShards.delete(loaded);
+    state.detailPromises.delete(loaded);
+  }
+  // The order list is bookkeeping only; keep it as small as the cache.
+  state.detailOrder = state.detailOrder.filter((item) => keep.has(item));
+}
+
+async function ensurePointDetail(point) {
+  if (!point?.id) return point;
+  if (point.trends || point.isGrid) return point;
+  const path = detailPath(point.id, state.meta);
+  if (!path) return point;
+  if (!state.detailShards.has(path)) {
+    if (!state.detailPromises) state.detailPromises = new Map();
+    let promise = state.detailPromises.get(path);
+    if (!promise) {
+      promise = loadJson(assetUrl(path)).catch((error) => {
+        state.detailPromises.delete(path);
+        throw error;
+      });
+      state.detailPromises.set(path, promise);
+    }
+    const block = await promise;
+    if (!state.detailShards.has(path)) state.detailShards.set(path, hydrate(state.points, block));
+  }
+  touchDetailShard(path);
+  return point;
+}
+
 /* ------------------------------------------------------------------ globe */
 
 function buildGlobe() {
@@ -408,7 +461,7 @@ function pointColor(point) {
     if (trend.significant && trend.slope < 0) return "rgba(79, 147, 214, 0.92)";
     return "rgba(107, 122, 136, 0.42)";
   }
-  const trend = point.trends?.[state.variable]?.[state.windowKey];
+  const trend = trendOf(point, state.variable, state.windowKey);
   return trendColor(trend);
 }
 
@@ -796,7 +849,7 @@ function pointLabel(point) {
     const slope = trend ? `${signed(trend.slope, 2)} °C/decade` : "no fit";
     return `${point.name} · ${slope}`;
   }
-  const trend = point.trends?.[state.variable]?.[state.windowKey];
+  const trend = trendOf(point, state.variable, state.windowKey);
   const word = trend ? verdictInfo(trend, state.byCode.get(state.variable)).word : "no data";
   return `${point.name} · ${word}`;
 }
@@ -836,8 +889,14 @@ function refreshLayer() {
 
 /* --------------------------------------------------------------- selection */
 
-function selectPoint(point, options = {}) {
+async function selectPoint(point, options = {}) {
   if (!point) return;
+  try {
+    await ensurePointDetail(point);
+  } catch (error) {
+    showToast("That station's record did not load. Check the connection and try again.");
+    return;
+  }
   clearRecommendation();
   state.selected = point;
   state.selectedKind = point.isGrid ? "grid" : "city";
@@ -883,6 +942,47 @@ async function selectGlobal(windowKey = state.windowKey) {
   globe.pointOfView({ lat: 12, lng: 8, altitude: 3.0 }, 900);
   globe.controls().autoRotate = true;
   els.hint.textContent = "Global field · click a cell or a city";
+}
+
+/* ------------------------------------------------------ derived field case */
+
+// A place the bundle does not hold still has a coordinate. The resolver turns
+// the name into one, and the case is the nearest GISTEMP cell to it — the same
+// field, the same stored statistics, the same verdict contract. Nothing is
+// invented: the case says which cell it borrowed and how far away it is.
+const DERIVED_STATION_CHIP_KM = 400;
+
+async function selectDerived(place, resolution = null) {
+  if (!place) return;
+  clearRecommendation();
+  await ensureGrid();
+  const near = nearestCell(place.lat, place.lon, state.gridPoints);
+  if (!near) {
+    showToast("No GISTEMP cell covers that coordinate.");
+    return;
+  }
+  const station = nearestRecord(place.lat, place.lon, state.points);
+  state.selected = {
+    ...near.cell,
+    derived: true,
+    place,
+    distanceKm: near.km,
+    station: station
+      ? { id: station.point.id, name: station.point.name, km: station.km, direction: station.direction }
+      : null,
+    resolution,
+  };
+  state.selectedKind = "derived";
+  state.variable = "GISTEMP";
+  state.layer = "field";
+  if (!state.selected.trends?.[state.windowKey]) state.windowKey = state.meta.windows[0];
+  document.body.classList.add("has-case");
+  renderCase();
+  refreshLayer();
+  globe.pointOfView({ lat: place.lat, lng: place.lon, altitude: 1.55 }, 900);
+  globe.controls().autoRotate = false;
+  clearTimeout(autoRotateTimer);
+  els.hint.textContent = `${place.name} · derived from the nearest GISTEMP cell`;
 }
 
 function clearCase() {
@@ -1092,6 +1192,7 @@ function renderCase() {
   else if (state.selectedKind === "country") renderCountryCase();
   else if (state.selectedKind === "ocean") renderOceanCase();
   else if (state.selectedKind === "seaice") renderSeaIceCase();
+  else if (state.selectedKind === "derived") renderDerivedCase();
   else if (state.selectedKind === "city") renderCityCase();
   else renderEmptyCase();
   mountExport();
@@ -1696,6 +1797,127 @@ function renderGridCase() {
   els.casePanel.scrollTop = 0;
 }
 
+// The derived case is a grid cell wearing the place's name, and it says so in
+// three places: the subtitle, the notice above the verdict, and the narrative.
+function renderDerivedCase() {
+  const item = state.selected;
+  const place = item.place || { name: "This place", lat: item.lat, lon: item.lon };
+  const raw = item.trends?.[state.windowKey] || null;
+  const trend = normalizeGridTrend(raw);
+  const variable = state.byCode.get("GISTEMP");
+  const window = seriesWindow(item.values, state.grid.meta.years, state.windowKey);
+  const info = verdictInfo(trend, variable);
+  const id = caseId(`derived:${place.name}:${state.windowKey}`);
+  const here = formatLatLon(place.lat, place.lon);
+  const cellAt = formatLatLon(item.lat, item.lon);
+  const resolution = item.resolution || null;
+  const how =
+    resolution?.source === "geocoder"
+      ? `The coordinates come from ${escapeHtml(
+          resolution.providerLabel || "a public geocoder"
+        )} (${escapeHtml(
+          resolution.attribution || "open data"
+        )}); every number below comes from the cached field.`
+      : "The place name was resolved from the Natural Earth gazetteer; every number below comes from the cached field.";
+  setExport({
+    title: place.name,
+    detail: `Derived case · no station in this bundle · GISTEMP cell ${cellAt} · ${distanceText(
+      item.distanceKm
+    )} away`,
+    variable,
+    trend,
+    windowKey: state.windowKey,
+    years: window.years,
+    values: window.values,
+  });
+
+  els.casePanel.innerHTML = `
+    <div class="case-head">
+      <div class="case-id">${id}</div>
+      <button class="case-close" data-action="close-case" type="button">Close</button>
+    </div>
+    <h2 class="place-title">${escapeHtml(place.name)}</h2>
+    <p class="place-sub">Derived case · no station here${
+      place.country ? ` · ${escapeHtml(place.country)}` : ""
+    } · ${here}</p>
+    <div class="caveat">
+      The bundle holds no station at ${escapeHtml(place.name)}, so this case is the nearest
+      GISTEMP 4° cell — ${distanceText(item.distanceKm)} away at ${cellAt} — and its numbers
+      describe that cell, roughly a 440 km box, not the city boundary. ${how}
+    </div>
+    ${variableChips(variable, true)}
+    ${windowChips()}
+    <p class="narrative">${derivedNarrative(place, item, trend, variable, state.windowKey)}</p>
+    ${verdictBlock(trend, variable, info)}
+    ${caveatBlock(trend, variable, true)}
+    <div class="chart" id="case-chart"></div>
+    ${statsBlock(facts(trend, variable, true), "nearest cell · OLS + HAC")}
+    ${caseSources(null, variable)}
+    ${stationBlock(item)}
+    ${workBlock("grid")}
+  `;
+  renderSeriesChart(document.getElementById("case-chart"), {
+    years: window.years,
+    values: window.values,
+    trend,
+    variable,
+    xLabel: state.windowKey.replace("-", "–"),
+    yLabel: "°C anomaly",
+  });
+  els.casePanel.scrollTop = 0;
+}
+
+// A station the reader can actually open is the better case when one is close,
+// so the derived case always offers it rather than hiding it behind the field.
+function stationBlock(item) {
+  const station = item.station;
+  if (!station) return "";
+  const near = station.km <= DERIVED_STATION_CHIP_KM;
+  return `<div class="case-cities">
+    <div class="plan-cities-label">${
+      near ? "A real station is close by" : "Nearest station in the bundle"
+    }</div>
+    <div class="city-chips"><button class="chip chip-small" type="button" data-action="open-city" data-city-id="${escapeHtml(
+      station.id
+    )}">${escapeHtml(station.name)} · ${distanceText(station.km)} ${escapeHtml(
+      station.direction || ""
+    )}</button></div>
+  </div>`;
+}
+
+function derivedNarrative(place, item, trend, variable, windowKey) {
+  if (!trend) {
+    return `No complete annual series is available for the cell nearest ${place.name} in the ${windowKey.replace(
+      "-",
+      "–"
+    )} window.`;
+  }
+  const direction = trend.slope_per_decade >= 0 ? "rose" : "fell";
+  const correction = trend.significant
+    ? ` It remains significant after the grid-wide Benjamini–Hochberg correction (q = ${formatP(
+        trend.q_value
+      )}).`
+    : trend.p_value < 0.05
+      ? ` It is locally significant but does not survive the grid-wide correction (q = ${formatP(
+          trend.q_value
+        )}).`
+      : ` It does not survive the HAC test at the 5% level (q = ${formatP(trend.q_value)}).`;
+  return `There is no station at ${escapeHtml(
+    place.name
+  )}, so this is the surface air temperature anomaly of the nearest GISTEMP cell, which ${direction} by <strong>${signed(
+    trend.slope_per_decade
+  )} °C per decade</strong> relative to 1951–1980 over ${windowKey.replace(
+    "-",
+    "–"
+  )} (95% CI ${signed(trend.ci_low_per_decade)} to ${signed(
+    trend.ci_high_per_decade
+  )}; n = ${trend.n}; HAC p ${pText(trend.p_value)}).${correction} The cell is ${distanceText(
+    item.distanceKm
+  )} from the requested coordinate and covers roughly 440 km across, so read it as the region around ${
+    place.name
+  }, not as the town itself. This is a trend detection, not an attribution.`;
+}
+
 function renderGlobalCase() {
   const meta = state.grid.meta;
   const raw = meta.global.trends?.[state.windowKey] || null;
@@ -2093,6 +2315,10 @@ function renderSuggestions() {
   chips.push(
     `<button class="chip chip-ice" type="button" data-question="Is the Arctic sea ice shrinking?">Is the Arctic sea ice shrinking?</button>`
   );
+  // A place with no station: the derived path answers from the GISTEMP field.
+  chips.push(
+    `<button class="chip chip-derived" type="button" data-question="Is Gold Coast getting hotter?">Is Gold Coast getting hotter?</button>`
+  );
   // The demo's twist, derived from the bundle so a rebuild cannot rot it: the
   // steepest featured case the statistics refuse to call, one click away.
   const herring = deriveSteepUnproven(state.points, state.meta.windows[0]);
@@ -2117,15 +2343,18 @@ function renderPlan(plan) {
     return;
   }
   const confidence = Math.round(plan.confidence * 100);
-  els.plan.innerHTML = `<div class="plan">
-    <div class="plan-top">
-      <span class="panel-kicker">Case plan</span>
-      <span class="plan-confidence">${confidence}% match</span>
-    </div>
-    <div class="plan-title">${escapeHtml(
-      plan.kind === "country" ? `${plan.place.name} average` : plan.variable.label
-    )}</div>
-    <div class="plan-meta">${escapeHtml(plan.place.name)}${
+  const derived = plan.kind === "derived";
+  const title = derived
+    ? plan.place.name
+    : plan.kind === "country"
+      ? `${plan.place.name} average`
+      : plan.variable.label;
+  const meta = derived
+    ? `Derived case${plan.place.country ? ` · ${plan.place.country}` : ""} · ${formatLatLon(
+        plan.place.lat,
+        plan.place.lon
+      )} · nearest GISTEMP cell · ${plan.windowKey.replace("-", "–")} · °C`
+    : `${plan.place.name}${
       plan.kind === "country"
         ? ` · ${plan.place.stations} stations`
         : plan.kind === "ocean"
@@ -2133,7 +2362,14 @@ function renderPlan(plan) {
           : plan.kind === "seaice"
             ? " · 12-month mean"
             : ""
-    } · ${plan.windowKey.replace("-", "–")} · ${escapeHtml(plan.variable.units)}</div>
+    } · ${plan.windowKey.replace("-", "–")} · ${escapeHtml(plan.variable.units)}`;
+  els.plan.innerHTML = `<div class="plan">
+    <div class="plan-top">
+      <span class="panel-kicker">Case plan</span>
+      <span class="plan-confidence">${confidence}% match</span>
+    </div>
+    <div class="plan-title">${escapeHtml(title)}</div>
+    <div class="plan-meta">${escapeHtml(meta)}</div>
     <p class="plan-why">${escapeHtml(plan.explanation)}</p>
     <div class="plan-sources">${escapeHtml(plan.sources)}${
       plan.note ? `<br>${escapeHtml(plan.note)}` : ""
@@ -2168,10 +2404,13 @@ function renderPlan(plan) {
 }
 
 async function handleAsk(question) {
+  const clean = String(question || "").trim();
+  if (!clean) return;
+  const seq = (state.askSeq += 1);
   // A country name needs the country averages, which are not on the critical
   // path; this is the only place they enter memory.
   await Promise.all([ensureCountries(), ensureOcean(), ensureSeaIce()]);
-  const plan = planCase(question, {
+  const plan = planCase(clean, {
     rag: state.rag,
     points: state.points,
     variables: state.variables,
@@ -2179,10 +2418,31 @@ async function handleAsk(question) {
     ocean: state.ocean,
     seaIce: state.seaIce,
   });
+  if (seq !== state.askSeq) return;
   state.plan = plan;
   renderPlan(plan);
   // On a phone the intake panel scrolls; bring the plan's buttons into view.
   if (plan) els.plan.scrollIntoView({ block: "nearest" });
+  // A global plan the question did not ask for is the planner saying "no place
+  // in this bundle matches". That is the derived case: resolve the name, then
+  // answer from the field.
+  if (isResolvablePlan(plan)) await offerDerivedPlan(clean, seq);
+}
+
+// The resolver is the only network call the ask box makes, and it is only made
+// when the bundle has already failed to place the question.
+async function offerDerivedPlan(question, seq) {
+  const resolution = await resolveQuestion(question);
+  if (seq !== state.askSeq) return;
+  if (!resolution.ok) {
+    showToast(describeFailure(resolution));
+    return;
+  }
+  const plan = derivedPlan(resolution);
+  if (!plan) return;
+  state.plan = plan;
+  renderPlan(plan);
+  els.plan.scrollIntoView({ block: "nearest" });
 }
 
 function planForCity(cityId) {
@@ -2208,6 +2468,11 @@ async function runPlan() {
   const plan = state.plan;
   if (!plan) return;
   state.windowKey = plan.windowKey;
+  if (plan.kind === "derived") {
+    await selectDerived(plan.place, plan.resolution);
+    showToast(`Derived case: ${plan.place.name} · nearest GISTEMP cell`);
+    return;
+  }
   if (plan.kind === "seaice") {
     await selectSeaIce(plan.place, plan.variable.code);
     showToast(`Case opened: sea ice extent · ${plan.place.name}`);
@@ -2229,7 +2494,7 @@ async function runPlan() {
     const point = state.byId.get(plan.place.id);
     if (!point) return;
     state.variable = plan.variable.code === "GISTEMP" ? "T2M" : plan.variable.code;
-    selectPoint(point);
+    await selectPoint(point);
   }
   showToast(`Case opened: ${plan.variable.short} · ${plan.place.name}`);
 }
@@ -2560,7 +2825,12 @@ function bindStaticEvents() {
     }
     if (name === "select-window") {
       state.windowKey = action.dataset.window;
-      if (state.selectedKind === "grid" && !state.selected.trends?.[state.windowKey]) {
+      // A grid cell and a derived case are both read straight off the field, so
+      // both can be missing a window a station would have.
+      if (
+        (state.selectedKind === "grid" || state.selectedKind === "derived") &&
+        !state.selected.trends?.[state.windowKey]
+      ) {
         state.windowKey = state.meta.windows[0];
         showToast("That window has no complete series for this cell.");
       }

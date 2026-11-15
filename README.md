@@ -56,6 +56,91 @@ East 43, India 9, Central Asia 18, the Amazon interior 19 and the Sahel 18. Isla
 where MERRA-2 masks root-zone soil wetness are left out rather than filled with an
 interpolated or mask value.
 
+## The station bundle is two tiers
+
+`points.json` was 6.1 MB, of which 5.1 MB was trend diagnostics for 708 stations ×
+4 variables × 3 windows — all of it loaded before the globe drew. It is now:
+
+- `points.json` — identity plus a four-number summary per variable and window
+  (`s` slope, `p` HAC p, `n`, `v` verdict code): 869 kB raw, **199 kB gzip**. That
+  is everything the globe needs to colour and label a dot, and everything the red
+  herring needs to be derived.
+- `point-details/00…15.json` — the full trend records and annual series, one file
+  per shard, fetched when a case is opened and merged into that station in place.
+  At most three shards are held and a shard is dropped when the cache turns over,
+  so browsing does not accumulate 708 stations' series in memory.
+
+A station's shard is `sum(charCode) % 16` — the same function in `src/bundle.js`
+(the app), `scripts/bundle.mjs` (the Node checks) and `scripts/points_bundle.py`
+(the build). `node scripts/verify_bundle.mjs` fails if the three disagree, if the
+index still carries a series, if any summary disagrees with the record it
+summarises, or if the index stops being at most 32% of the whole bundle.
+`points_bundle.load_bundle()` merges the tiers back into the old shape, so the
+build and the Python verifiers read the whole record without knowing the layout.
+
+The first case now costs 289 kB gzip instead of 2,145 kB, and
+`verify_firstload.mjs` fails above 1,050 kB so the split cannot drift back.
+Re-split the committed bundle without rebuilding it (no credentials needed):
+
+```sh
+uv run python scripts/split_points.py
+```
+
+## Places the bundle does not hold
+
+Ask about a place with no station — **"Is Gold Coast getting hotter?"** — and the
+app still answers, because a coordinate is all it needs: GISTEMP covers the whole
+planet, and the case is the nearest 4° cell to that place. The place name is the
+only new thing, and two resolvers supply it:
+
+- **The gazetteer** (`scripts/build_gazetteer.py` → `public/data/gazetteer.json`):
+  6,421 populated places from Natural Earth's public-domain `ne_10m_populated_places`,
+  matched locally. Free, deterministic, and needs no key — so most names resolve
+  with the model switched off entirely. Longest name wins, and a name typed
+  without its space ("Goldcoast") is matched by running the words together.
+- **Keyless public geocoders**, for names the gazetteer does not carry — a suburb
+  like "Broadbeach", an informal name, an alternate spelling. Open-Meteo's
+  geocoding API first (no key, CC BY 4.0, under 10,000 calls a day), then
+  OpenStreetMap's Nominatim (no key, but its usage policy requires a User-Agent
+  that names the application and at most one request a second). **There is nothing
+  to configure**: no `.env` entry, no Worker secret, no account.
+
+`worker/resolve.js` is shared by both entry points, exactly like `worker/live.js`.
+It answers `POST /api/resolve` with a place and two numbers — never a trend. The
+place name is cut out of the question first (`placeQuery`: drop the question words,
+the climate vocabulary and the years, so "Is Gold Coast getting hotter?" searches
+`gold coast`), the answer is validated (finite `lat`/`lon` in range, non-empty
+place), and a resolution is cached per question for an hour. The endpoint is
+limited to 20 lookups a minute per isolate, because Nominatim allows one request a
+second for a whole application and no single visitor should spend the demo's
+budget. `GET /api/resolve` reports the gazetteer size and the provider chain.
+
+**Why a geocoder and not an LLM:** this step is a lookup, not a judgement — a
+geocoder is cheaper, faster, deterministic, needs no key, and cannot hallucinate a
+coordinate in the wrong hemisphere. An earlier revision used a small model
+(`gpt-oss-20b:free` on ElectronHub) behind a key; the geocoder replaced it and the
+key went away. A provider that errors or times out is skipped rather than reported
+as "no such place", so one busy service cannot become a false negative, and every
+notice carries its attribution (Open-Meteo CC BY 4.0, or © OpenStreetMap
+contributors, ODbL).
+
+**The case says what it is.** The subtitle reads *Derived case · no station here*,
+the notice above the verdict names the cell and its distance, and the narrative
+repeats both: a derived case is a ~440 km box around the place, not the town
+boundary. When a real station is within 400 km the case offers it as a chip. At
+Gold Coast, for instance, the nearest cell is 111 km away at 29.0°S 153.0°E
+(+0.27 °C/decade, proven) and Brisbane is 80 km NNW. Derived cases are
+temperature only — the field is GISTEMP — so a question about rainfall at a place
+with no station says so instead of answering from the wrong variable.
+
+Without a server — the static GitHub Pages build — there is no `/api/resolve`, so
+a place outside the 708-station bundle gets an honest message rather than a case.
+The gazetteer and the geocoders both need the endpoint; only the bundled cases
+work fully offline, exactly as before.
+`node scripts/verify_resolve.mjs` pins the contract with a stub model: the
+gazetteer hit, the 503 with no key, the fenced-JSON and out-of-range rejections,
+the timeout and upstream paths, caching, and the rate limit.
+
 ## Live conditions
 
 The “Live” chip on a city case is served by a small proxy so the Meteomatics

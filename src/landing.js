@@ -2,6 +2,7 @@ import "./style.css";
 import { renderSeriesChart } from "./chart.js";
 import { initHero } from "./hero.js";
 import { SOURCE_LINKS, SOURCE_ORDER } from "./sources.js";
+import { detailPath, hydrate } from "./bundle.js";
 
 const BASE_URL = import.meta.env.BASE_URL || "/";
 const POINT_ID = "nairobi";
@@ -46,6 +47,11 @@ async function render() {
       loadJson("/data/points.json"),
       loadJson("/data/variables.json"),
     ]);
+
+    // The sample case needs one station's full record. It lives in a detail
+    // shard now, so the landing page fetches exactly that one.
+    const shard = detailPath(POINT_ID, points.meta);
+    if (shard) hydrate(points.points, await loadJson(shard));
 
     const point = points.points.find((item) => item.id === POINT_ID);
     const variable = variables.variables.find((item) => item.code === CODE);

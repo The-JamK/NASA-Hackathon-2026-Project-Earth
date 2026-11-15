@@ -10,6 +10,11 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parent.parent
 PUBLIC = ROOT / "public" / "data"
 
+if __package__ in (None, ""):
+    sys.path.insert(0, str(ROOT))
+
+from scripts import points_bundle  # noqa: E402
+
 POINT_CODES = ("T2M", "PRECTOTCORR", "GWETROOT", "ALLSKY_SFC_SW_DWN")
 WINDOWS = ("1990-2025", "2000-2025", "2010-2025")
 
@@ -36,7 +41,9 @@ def close(actual: float, expected: float, tolerance: float = 1e-6) -> bool:
 
 def main() -> int:
     variables = read("variables.json")
-    points_payload = read("points.json")
+    # The station bundle is an index plus detail shards; this check recomputes
+    # every trend, so it needs the merged records.
+    points_payload = points_bundle.load_bundle(PUBLIC)
     grid = read("grid.json")
     rag = read("rag_index.json")
     sources = read("sources.json")

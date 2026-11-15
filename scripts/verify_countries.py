@@ -10,11 +10,17 @@ from __future__ import annotations
 
 import json
 import math
+import sys
 from collections import defaultdict
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 PUBLIC = ROOT / "public" / "data"
+
+if __package__ in (None, ""):
+    sys.path.insert(0, str(ROOT))
+
+from scripts import points_bundle  # noqa: E402
 CODES = ("T2M", "PRECTOTCORR", "GWETROOT", "ALLSKY_SFC_SW_DWN")
 
 
@@ -31,7 +37,7 @@ def load(name: str) -> dict:
 
 
 def main() -> int:
-    points = load("points.json")
+    points = points_bundle.load_bundle(PUBLIC)
     countries = load("countries.json")
     years = points["meta"]["years"]
 

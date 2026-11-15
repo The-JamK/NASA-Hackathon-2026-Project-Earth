@@ -8,6 +8,8 @@
  * tests refuse to call at the 5% level — and the steepest such record wins.
  */
 
+import { trendOf } from "./bundle.js";
+
 const DEFAULT_VARIABLE = "T2M";
 
 export function deriveSteepUnproven(points, windowKey, variable = DEFAULT_VARIABLE) {
@@ -16,7 +18,7 @@ export function deriveSteepUnproven(points, windowKey, variable = DEFAULT_VARIAB
   let best = null;
   for (const point of points) {
     if (!point?.featured) continue;
-    const trend = point.trends?.[variable]?.[windowKey];
+    const trend = trendOf(point, variable, windowKey);
     if (!trend || trend.exploratory) continue;
     // A verdict needs both tests; this entry only makes sense where the app
     // itself would stamp NOT PROVEN.

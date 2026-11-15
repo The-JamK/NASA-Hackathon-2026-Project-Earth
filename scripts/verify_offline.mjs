@@ -1,4 +1,5 @@
 import { existsSync, readFileSync, statSync } from "node:fs";
+import { loadPoints } from "./bundle.mjs";
 import { fileURLToPath } from "node:url";
 import { dirname, resolve } from "node:path";
 
@@ -47,8 +48,13 @@ for (const file of [
   }
 }
 
-const points = data("points.json");
+// The station bundle is an index plus detail shards; the merged view is what a
+// case shows, so that is what this check reads.
+const points = loadPoints(new URL("../", import.meta.url));
 const grid = data("grid.json");
+if (data("points.json").points.some((point) => point.series || point.trends)) {
+  fail("the station index still carries series or trends; the split is not live");
+}
 const nairobi = points.points.find((point) => point.id === "nairobi");
 if (!nairobi) fail("Nairobi is missing from the bundle");
 if (nairobi.series.T2M.filter((value) => typeof value === "number").length !== 36) {

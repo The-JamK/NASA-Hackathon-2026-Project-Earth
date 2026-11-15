@@ -2,7 +2,12 @@ name = "earth-trend-detective-case-files"
 main = "index.js"
 compatibility_date = "2025-11-01"
 
-# Serve the Vite build as static assets and let /api/live fall through to the Worker.
+# Serve the Vite build as static assets and let /api/live and /api/resolve fall
+# through to the Worker. Runtime secrets, set once per environment:
+#   wrangler secret put METEOMATICS_USERNAME
+#   wrangler secret put METEOMATICS_PASSWORD
+# The place resolver (/api/resolve) needs no secret at all: the gazetteer ships
+# in this bundle and the geocoders it falls back to are keyless.
 [assets]
 directory = "../dist"
 binding = "ASSETS"
