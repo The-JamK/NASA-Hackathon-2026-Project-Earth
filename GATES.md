@@ -771,11 +771,10 @@ Last verified: 2026-11-14
   EXPECT: all checks passed
   EVIDENCE: `all checks passed`, with `hero: nine copy boxes, no leader lines` and the geometry, data and export checks unchanged, and `npm run build` clean.
 
-- [ ] G154: The result is committed to main and pushed.
+- [x] G154: The result is committed to main and pushed.
   CHECK: git status --porcelain --untracked-files=no
   EXPECT: (no output)
-  EVIDENCE: `git status --porcelain --untracked-files=no` prints nothing and `cloud_git push` reported `d5fb4c6..29ba0ea  HEAD -> main`. `b7651f4` carries the note and the pointer-events change, `29ba0ea` merges `main` (which had added its own G145 and touched the refit script) with these gates renumbered G146-G149, and `all checks passed` holds on the merged tree.
-
+  EVIDENCE: `git status --porcelain --untracked-files=no` prints nothing and `cloud_git push` reported `a48bc90..47ec4a0  HEAD -> main`. `b7651f4` carries the note and the pointer-events change, and later merges fold in `main`'s own gates with these renumbered, `all checks passed` holding on each merged tree.
 - [x] G155: The deployed live snapshot refreshes itself on a schedule, so the site stays current with nobody pushing.
   CHECK: grep -c "refresh_live.py" .github/actions/refresh-live/action.yml
   EXPECT: 1
@@ -786,6 +785,11 @@ Last verified: 2026-11-14
   EXPECT: notice: no Meteomatics credentials, so the committed snapshot ships unchanged
   EVIDENCE: The refresh can now only ever fail softly. In both workflows the step carries `continue-on-error: true`, so a broken refresh still lets `npm run build` and the deploy run and ship the committed snapshot — the same output as before the schedule existed — and `timeout-minutes: 10` stops a hung dependency install from holding the job (and the `pages` concurrency group) open. Inside the script, readings are validated before they can replace a working one: `usable()` requires a parseable `valid_time` and three finite numbers, and it returns False for a null temperature, a bool, a NaN wind, a missing measure, `not-a-date`, and `{}` while returning True for a complete record. Every reading is collected before anything is written, so a failure cannot leave the bundle part-refreshed, and each file is written to a dot-temp name and moved with `os.replace`, so a crash cannot leave truncated JSON where the build reads it; both files are re-read before success is printed. Tested by running with deliberately wrong credentials: all six points printed `upstream did not answer, keeping the stored snapshot`, then `notice: no usable reading, the bundle is unchanged`, exit 0 — and `shasum public/data/points.json` was byte-identical before and after, so the bundle is genuinely untouched. A real run still refreshes 6 of 6 (`2026-11-15T10:00:00Z`), leaves no `.tmp` files behind, and `refit_bundle.py --check` still prints `BUNDLE SELF-CONSISTENT`, so the statistics are untouched. Worst case for the deadline: the deploy job fails, GitHub Pages keeps serving the last successful deployment and the Worker keeps its current version, so the site a judge sees is the one that works today.
 
-MET: 153
-UNMET: 3
+- [x] G157: The live check still proves the deployed bundle is ours, without failing on the one thing a build is allowed to change: the current conditions it refreshes when it runs.
+  CHECK: bash scripts/verify_live.sh
+  EXPECT: live verified
+  EVIDENCE: The byte hash for `points.json` failed after this hour's deploy with `points.json differs (local e9e9ab...d3f3, live 2c90d3...9dcd)`, and a field-by-field comparison shows why: `points.points[0].live.t_2m is 23.3 here and 24.8 live`, the hour's readings the build refreshed. `scripts/compare_points.mjs` now compares that file with the build field by field, setting aside only the `live` blocks and the bundle's own stamps, and it still prints the first real difference and fails. `bash scripts/verify_live.sh` then exits 0 with `points.json matches dist apart from 1416 refreshed live blocks`, `rag_index.json matches dist`, `countries.json matches dist`, `every dist/data/*.json is served` and `live plan verified`, so a wrong build, a nested deploy or a missing data file still fails.
+
+MET: 155
+UNMET: 2
 ABANDONED: 0
