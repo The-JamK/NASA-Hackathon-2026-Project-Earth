@@ -567,6 +567,37 @@ const NOMINATIM_BROADBEACH = [
     queenlandPlan?.resolved === false,
     `Queenland resolved to ${queenlandPlan?.place?.name}, not the derived path`
   );
+
+  // Washington is not one of the bundle's 708 stations, so the plan must leave it
+  // for the gazetteer, which knows Washington, D.C. A loose station repair used
+  // to answer Wellington here — three edits away — and never ask the gazetteer.
+  for (const washington of [
+    "Is Washington getting hotter?",
+    "Is Washington DC getting hotter?",
+    "Is Washington, D.C. getting hotter?",
+  ]) {
+    const plan = planCase(washington, context);
+    check(
+      plan?.resolved === false,
+      `"${washington}" resolved to ${plan?.place?.name} instead of the derived path`
+    );
+  }
+
+  // "Washington state" names the state; the district shares the word Washington
+  // as an alias, and used to win on population.
+  const state = await (
+    await call({ question: "Is Washington state getting hotter?" }, { fetchImpl: geocoderStub({}) })
+  ).json();
+  check(state.place?.name === "Washington", `Washington state resolved to ${state.place?.name}`);
+  check(state.place?.kind === "region", `Washington state came back as a ${state.place?.kind}`);
+
+  const district = await (
+    await call({ question: "Is Washington DC getting hotter?" }, { fetchImpl: geocoderStub({}) })
+  ).json();
+  check(
+    foldPlace(district.place?.name || "") === "washington d c",
+    `Washington DC resolved to ${district.place?.name}`
+  );
 }
 
 if (failures) {

@@ -187,9 +187,11 @@ function stationCandidates(question, points) {
   const found = new Map();
   for (const point of points) {
     const key = fold(point.name).replace(/ /g, "");
-    const limit = typoLimit(key.length);
-    // Short names make a one-letter difference a different word; skip them.
-    if (key.length < 5 || !limit) continue;
+    // One edit, same length: a station is repaired for a typo, not guessed at.
+    // With a three-edit budget "Washington" was reaching Wellington and taking
+    // the question away from the gazetteer, which knows Washington, D.C.
+    const limit = 1;
+    if (key.length < 5) continue;
     for (const window of windows) {
       if (Math.abs(window.compact.length - key.length) > limit) continue;
       // The typed word has to be most of the name, not a fragment of it.

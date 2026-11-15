@@ -278,6 +278,10 @@ function rateTypo(key, compact) {
  * should come back with what it probably meant instead of a refusal. The caller
  * decides whether to use the best one silently or to ask.
  */
+// "Washington state" names the state, not the city that happens to share the
+// name; asking for a state, province or territory is a reason to prefer one.
+const REGION_WORDS = /\b(state|province|prefecture|territory)\b/i;
+
 export function searchPlaces(question, entries = [], { limit = 4 } = {}) {
   const folded = foldPlace(question);
   if (folded.length < 3 || !entries.length) return [];
@@ -300,12 +304,21 @@ export function searchPlaces(question, entries = [], { limit = 4 } = {}) {
     // "Guandong" to Andong and "Cataonia" to Catania, so a repair is ranked by
     // how much of the word it has to change — and a state breaks an exact tie
     // with a town, because that is the larger thing to be wrong about.
+    // Asking for a state prefers a region, and among regions prefers the one whose
+    // own name is what the question started with: "Washington state" is the state
+    // called Washington, not the district that also carries Washington as an
+    // alias.
+    const wantsRegion = REGION_WORDS.test(question) && entry.kind === "region";
+    const ownName = foldPlace(entry.name);
+    const regionBonus = wantsRegion
+      ? 0.3 + (` ${place} `.includes(` ${ownName} `) ? 0.15 : 0)
+      : 0;
     const score =
-      hit.match === "typo"
+      (hit.match === "typo"
         ? hit.base +
           0.05 * (1 - Math.abs(hit.keyLength - compact.length) / Math.max(hit.keyLength, compact.length, 1)) +
           (entry.kind === "region" ? 0.01 : 0)
-        : hit.base + populationPrior(entry.population);
+        : hit.base + populationPrior(entry.population)) + regionBonus;
     const current = found.get(id);
     if (current && current.score >= score) return;
     found.set(id, { entry, score, match: hit.match, distance: hit.distance || 0 });

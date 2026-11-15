@@ -327,7 +327,11 @@ Washington below it. States and provinces come from Natural Earth's admin-1 laye
 so `Is Queensland getting wetter?` is answerable too — the case is the GISTEMP 4°
 cell nearest the division's label point, and the notice says so. Every candidate
 carries its own coordinates, so choosing one costs no extra request on either host.
-`scripts/verify_search.mjs` pins that behaviour.
+`scripts/verify_search.mjs` pins that behaviour. Ask for a **state** and you mean
+the state: `Washington state` is the state of Washington, while plain `Washington`
+is Washington, D.C., and the popup offers all three. A station name is only
+repaired for a real typo — one edit at the same length — so `Nairobii` reaches
+Nairobi but `Washington` never becomes Wellington.
 
 The same tolerance covers the rest of the question. A station name one letter off
 (`Nairobii`, `Melborne`) is matched to the bundle's own station and offered in a
