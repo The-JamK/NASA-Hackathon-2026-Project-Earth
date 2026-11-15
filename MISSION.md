@@ -7,7 +7,7 @@
 
 ## Mission statement
 
-Every trend is a claim. Our mission is to turn a question about the planet into a **case file a human can defend** — the variable, the place, the rate, the uncertainty, and the verdict — without letting the AI do the math.
+Every trend is a claim. Our mission is to turn a question about the planet into a **case file a human can defend** — the variable, the place, the rate, the uncertainty, and the verdict — without letting the SI do the math.
 
 ## Why this mission
 
@@ -20,14 +20,14 @@ A trend line is easy to draw and hard to trust. Most tools stop at the line. We 
 ## Chain of command
 
 - **Lead detective (human):** asks the question, approves the case plan, owns the verdict.
-- **Intake assistant (AI/RAG):** recommends variables, place, and time; cites sources.
+- **Intake assistant (SI/RAG):** recommends variables, place, and time; cites sources.
 - **Forensics lab (stats engine):** computes annual means, OLS + HAC, confidence interval, Sen's slope, Mann–Kendall, and the verdict.
 - **Evidence locker (data):** GISTEMP, NASA POWER, Meteomatics live conditions, and Sentinel-2 L2A context imagery via Planetary Computer; cached, cited, reproducible. Blue Marble is the labelled fallback.
-- **Case writer (AI):** explains the evidence in plain English; falls back to a template if the LLM is unavailable.
+- **Case writer (SI):** explains the evidence in plain English; falls back to a template if the LLM is unavailable.
 
 ## Rules of engagement
 
-1. AI may propose; it may not compute.
+1. SI may propose; it may not compute.
 2. Every number comes from code.
 3. No causal claims. "Not significant" means "not proven."
 4. Below 20 annual observations = exploratory; no significance claim.
@@ -36,7 +36,7 @@ A trend line is easy to draw and hard to trust. Most tools stop at the line. We 
 
 ## The enemy
 
-The confident line that isn't significant. The black box that says "AI found a trend." The causal claim we can't support.
+The confident line that isn't significant. The black box that says "SI found a trend." The causal claim we can't support.
 
 ## Mission success
 
@@ -49,15 +49,15 @@ The confident line that isn't significant. The black box that says "AI found a t
 ## Demo arc
 
 1. **The question:** "Is the Sahel getting drier?"
-2. **The intake:** AI proposes variables and a plan, with sources.
+2. **The intake:** SI proposes variables and a plan, with sources.
 3. **The investigation:** deterministic statistics run.
 4. **The verdict:** significant / not proven / cold case.
 5. **The reveal:** show your work.
 6. **The twist:** red herring.
-7. **The close:** "AI can write the report. It doesn't get to decide the truth."
+7. **The close:** "SI can write the report. It doesn't get to decide the truth."
 
 ## Taglines
 
 - Every trend is a claim. We test it.
-- AI writes the case file. The data decides the verdict.
+- SI writes the case file. The data decides the verdict.
 - Don't trust the line. Test it.
