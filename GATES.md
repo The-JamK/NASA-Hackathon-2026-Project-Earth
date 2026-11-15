@@ -626,11 +626,11 @@ Last verified: 2026-11-14
   MANUAL: screenshots of the opening case at two moments.
   EVIDENCE: `artifacts/motion-case-mid.png` is the case frozen 80 ms into its settle: the panel itself is fully opaque (`opacity 1`, background `rgba(9, 15, 23, 0.9)`), the case id, title and chips are at 0.92–0.83, the narrative and the blocks under it at 0.78–0.63, and the layout is identical to rest — a cascade, not a fade-in. `artifacts/motion-case-rest.png` is the same screen 500 ms later. In an untouched flow after a variable switch all 15 children read `opacity 1` with no running animations, and after opening a different case all 14 do with the panel at `opacity 1`, so nothing stays dim. The first deliberate check caught a real defect: freezing every animation on the page also rewound the panel's own pre-existing 0.5s fade, and the frame looked washed out — which is why the settle now starts at 0.45 and no longer fades the panel body.
 
-- [ ] G124: The result is committed to main and pushed.
+- [x] G124: The result is committed to main and pushed.
   CHECK: git status --porcelain --untracked-files=no
   EXPECT: (no output)
-  EVIDENCE: pending
+  EVIDENCE: `git status --porcelain --untracked-files=no` prints nothing and `cloud_git push` reported `989b76b..0eefae5  HEAD -> main`. Two commits plus a merge: `71f5315` (the quiet motion and its check), `0eefae5` (merge of `main`'s comparative-vocabulary change, with this ledger's gates renumbered G120–G124 around its new G118–G119). `main` moved once during the work, from `64e6dfb` to `989b76b`. The only untracked path is `artifacts/`, the screenshots and deck renders that have never been in the repository.
 
-MET: 122
-UNMET: 2
+MET: 123
+UNMET: 1
 ABANDONED: 0
