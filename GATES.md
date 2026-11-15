@@ -443,6 +443,12 @@ Last verified: 2026-11-14
   MANUAL: Cloud browser, built site, 1440x900, temporary probe removed before committing.
   EVIDENCE: Two samples 5.127 s apart read `rotation.y` 0.64713 -> 1.29217 = 0.12581 rad/s, i.e. one turn in 49.94 s, against the 0.12566 target (0.1% high, timing noise) and the 0.08976 measured at the 70 s setting. `camera.up` was `[0, 1, 0]` at both samples, so the Earth is still upright. The final build reports `typeof window.__heroProbe === "undefined"` and `grep -c __heroProbe src/hero.js` is 0. Screenshots 4 s apart: `artifacts/hero-upright-50s.png`, `artifacts/hero-upright-50s-t1.png`. `scripts/verify_all.sh` passes on this build.
 
-MET: 86
+- [x] G87: A static host answers "Is Gold Coast getting hotter?" with a real derived case, using the gazetteer the page already ships.
+  CHECK: python3 -m http.server 5186 --directory dist, then ask that question in the page and open the plan
+  EXPECT: the plan reads `74% match · Gold Coast · Derived case` and the case renders +0.27 °C/decade
+  EVIDENCE: `src/field.js` imports `indexGazetteer`, `matchGazetteer` and `readIntent` from `worker/resolve.js` — the same matcher the Worker runs — and loads `data/gazetteer.json` lazily, only after `/api/resolve` has failed with 404/405, an unreadable body or no route at all. Served from a plain static server, which answers POST with 501 and has no resolver: typing the question produced `CASE PLAN · 74% MATCH · Gold Coast · Derived case · Australia · 28.08°S 153.45°E`, and opening it rendered `CASE-DC68 · DERIVED CASE · NO STATION HERE` at +0.27 °C/decade with the chart, fetching `data/gazetteer.json` and no resolver call that succeeded. A name the gazetteer lacks behaves honestly: Broadbeach returned "No resolver server is reachable here, and the bundled gazetteer does not carry that name. Try a larger nearby city — suburbs and spelling variants need the Worker deployment." The same question on the live GitHub Pages build, in a fresh session, gave the same 74% plan, the same `CASE-DC68` case and +0.27 °C/decade, with `data/gazetteer.json` in the network log. The Worker is unchanged and still answers from `/api/resolve` first (200, source `gazetteer`).
+  NOTE: The app bundle grew from 186 kB to 191 kB. A visitor holding the previous `assets/app.js` in cache (Pages sets `max-age=600`) keeps the old, refusing behaviour until it expires, which is why the live check needed an uncached session.
+
+MET: 87
 UNMET: 1
 ABANDONED: 0
