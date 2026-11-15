@@ -248,6 +248,11 @@ a.source-pill:focus-visible {
 .case-panel {
   right: 24px;
   width: 418px;
+  /* The panel now runs closer to both edges: it starts just under the top bar
+     and stops a short gap above the map's legend, so the bar has its own row. */
+  top: 72px;
+  bottom: 58px;
+  max-height: none;
 }
 
 /* No case open, no case panel: the right side stays clear for the globe. */
@@ -550,16 +555,9 @@ body.has-case .case-panel { display: block; }
 .case-head {
   display: flex;
   align-items: flex-start;
-  justify-content: space-between;
+  justify-content: flex-end;
   gap: 12px;
   margin-bottom: 12px;
-}
-
-.case-id {
-  font-size: 9px;
-  letter-spacing: 0.18em;
-  text-transform: uppercase;
-  color: var(--dim);
 }
 
 .case-close {
@@ -1048,7 +1046,8 @@ details.work p {
   z-index: 20;
   display: flex;
   align-items: center;
-  justify-content: space-between;
+  /* Legend and layer switch sit left of the case panel, not under it. */
+  justify-content: flex-start;
   gap: 18px;
   pointer-events: none;
 }
@@ -1403,7 +1402,7 @@ details.work p {
   .plan-sources,
   .plan-meta { font-size: 10px; }
 
-  /* The sheet scrolls a long way, so the case id and Close stay pinned. */
+  /* The sheet scrolls a long way, so Close stays pinned. */
   .case-panel { padding-top: 0; }
   .case-head {
     position: sticky;

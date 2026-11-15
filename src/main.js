@@ -1247,7 +1247,6 @@ function renderCountryCase() {
   const series = country.series?.[code] || [];
   const window = seriesWindow(series, state.meta.years, state.windowKey);
   const info = verdictInfo(trend, variable);
-  const id = caseId(`${country.id}:${code}:${state.windowKey}`);
   setExport({
     title: country.name,
     detail: `Country average · ${country.stations} stations · ${country.continent}`,
@@ -1260,7 +1259,6 @@ function renderCountryCase() {
 
   els.casePanel.innerHTML = `
     <div class="case-head">
-      <div class="case-id">${id}</div>
       <button class="case-close" data-action="close-case" type="button">Close</button>
     </div>
     <h2 class="place-title">${escapeHtml(country.name)}</h2>
@@ -1419,7 +1417,6 @@ function renderOceanCase() {
   const years = state.oceanMeta?.years || state.meta.years;
   const window = seriesWindow(series, years, state.windowKey);
   const info = verdictInfo(trend, variable);
-  const id = caseId(`ocean:${region.id}:${state.windowKey}`);
   setExport({
     title: region.name,
     detail: `Ocean region · ${region.cells} GISTEMP cells · ${region.extent}`,
@@ -1433,7 +1430,6 @@ function renderOceanCase() {
 
   els.casePanel.innerHTML = `
     <div class="case-head">
-      <div class="case-id">${id}</div>
       <button class="case-close" data-action="close-case" type="button">Close</button>
     </div>
     <h2 class="place-title">${escapeHtml(region.name)}</h2>
@@ -1616,7 +1612,6 @@ function renderSeaIceCase() {
   const extentWindow = seriesWindow(record.series?.SEAICE || [], years, state.windowKey);
   const concWindow = seriesWindow(record.series?.SEAICECONC || [], years, state.windowKey);
   const info = verdictInfo(trend, variable);
-  const id = caseId(`ice:${record.id}:${code}:${state.windowKey}`);
   setExport({
     title: record.name,
     detail: `${variable.label} · annual mean of 12 monthly values · ${variable.units}`,
@@ -1630,7 +1625,6 @@ function renderSeaIceCase() {
 
   els.casePanel.innerHTML = `
     <div class="case-head">
-      <div class="case-id">${id}</div>
       <button class="case-close" data-action="close-case" type="button">Close</button>
     </div>
     <h2 class="place-title">${escapeHtml(record.name)}</h2>
@@ -1688,7 +1682,6 @@ function renderCityCase() {
   const series = point.series?.[code] || [];
   const window = seriesWindow(series, state.meta.years, state.windowKey);
   const info = verdictInfo(trend, variable);
-  const id = caseId(`${point.id}:${code}:${state.windowKey}`);
   const lat = `${Math.abs(point.lat).toFixed(2)}°${point.lat >= 0 ? "N" : "S"}`;
   const lon = `${Math.abs(point.lon).toFixed(2)}°${point.lon >= 0 ? "E" : "W"}`;
   setExport({
@@ -1703,7 +1696,6 @@ function renderCityCase() {
 
   els.casePanel.innerHTML = `
     <div class="case-head">
-      <div class="case-id">${id}</div>
       <button class="case-close" data-action="close-case" type="button">Close</button>
     </div>
     <h2 class="place-title">${escapeHtml(point.name)}</h2>
@@ -1740,7 +1732,6 @@ function renderGridCase() {
   const variable = state.byCode.get("GISTEMP");
   const window = seriesWindow(cell.values, state.grid.meta.years, state.windowKey);
   const info = verdictInfo(trend, variable);
-  const id = caseId(`grid:${cell.lat}:${cell.lon}:${state.windowKey}`);
   const lat = `${Math.abs(cell.lat).toFixed(1)}°${cell.lat >= 0 ? "N" : "S"}`;
   const lon = `${Math.abs(cell.lon).toFixed(1)}°${cell.lon >= 0 ? "E" : "W"}`;
   setExport({
@@ -1755,7 +1746,6 @@ function renderGridCase() {
 
   els.casePanel.innerHTML = `
     <div class="case-head">
-      <div class="case-id">${id}</div>
       <button class="case-close" data-action="close-case" type="button">Close</button>
     </div>
     <h2 class="place-title">Grid cell</h2>
@@ -1795,7 +1785,6 @@ function renderDerivedCase() {
   const variable = state.byCode.get("GISTEMP");
   const window = seriesWindow(item.values, state.grid.meta.years, state.windowKey);
   const info = verdictInfo(trend, variable);
-  const id = caseId(`derived:${place.name}:${state.windowKey}`);
   const here = formatLatLon(place.lat, place.lon);
   const cellAt = formatLatLon(item.lat, item.lon);
   const resolution = item.resolution || null;
@@ -1821,7 +1810,6 @@ function renderDerivedCase() {
 
   els.casePanel.innerHTML = `
     <div class="case-head">
-      <div class="case-id">${id}</div>
       <button class="case-close" data-action="close-case" type="button">Close</button>
     </div>
     <h2 class="place-title">${escapeHtml(place.name)}</h2>
@@ -1925,7 +1913,6 @@ function renderGlobalCase() {
   const window = seriesWindow(meta.global.series, meta.years, state.windowKey);
   const counts = meta.counts_by_window?.[state.windowKey] || meta.counts;
   const info = verdictInfo(trend, variable);
-  const id = caseId(`global:${state.windowKey}`);
   setExport({
     title: "Global mean",
     detail: `GISTEMP v4 · 4° grid · ${counts.cells.toLocaleString()} cells · baseline 1951–1980`,
@@ -1938,7 +1925,6 @@ function renderGlobalCase() {
 
   els.casePanel.innerHTML = `
     <div class="case-head">
-      <div class="case-id">${id}</div>
       <button class="case-close" data-action="close-case" type="button">Close</button>
     </div>
     <h2 class="place-title">The whole field</h2>
@@ -2797,14 +2783,6 @@ function formatP(value) {
 function pText(value) {
   const formatted = formatP(value);
   return formatted.startsWith("<") ? formatted : `= ${formatted}`;
-}
-
-function caseId(seed) {
-  let hash = 0;
-  for (let i = 0; i < seed.length; i += 1) {
-    hash = (hash * 31 + seed.charCodeAt(i)) >>> 0;
-  }
-  return `CASE-${hash.toString(16).toUpperCase().padStart(4, "0").slice(-4)}`;
 }
 
 function escapeHtml(value) {
