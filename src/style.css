@@ -1809,7 +1809,7 @@ html.landing body {
   bottom: 26px;
   z-index: 45;
   margin: 0;
-  padding: 9px 16px 9px 14px;
+  padding: 9px 16px;
   border: 1px solid rgba(255, 255, 255, 0.18);
   border-radius: 999px;
   background: rgba(5, 8, 14, 0.9);
@@ -1826,17 +1826,6 @@ html.landing body {
   transition: opacity 0.22s ease, transform 0.22s ease;
 }
 
-.hero-toast::before {
-  content: "";
-  display: inline-block;
-  width: 6px;
-  height: 6px;
-  margin-right: 9px;
-  vertical-align: 1px;
-  border-radius: 50%;
-  background: #ff6b4a;
-}
-
 .hero-toast.is-shown {
   opacity: 1;
   transform: translate(-50%, 0);
@@ -1849,7 +1838,7 @@ html.landing body {
 }
 
 @media (max-width: 640px) {
-  .hero-toast { bottom: 16px; padding: 8px 14px 8px 12px; font-size: 12px; }
+  .hero-toast { bottom: 16px; padding: 8px 14px; font-size: 12px; }
   .topbar { height: 54px; padding: 0 14px; }
   .topbar .brand { font-size: 9.5px; letter-spacing: 0.18em; }
 }
