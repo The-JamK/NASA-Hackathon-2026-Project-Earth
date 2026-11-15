@@ -723,11 +723,11 @@ Last verified: 2026-11-14
   EXPECT: all checks passed
   EVIDENCE: `all checks passed`, including `hero: nine copy boxes, no leader lines` and every data, routing and export check from before, with `npm run build` succeeding afterwards.
 
-- [ ] G144: The result is committed to main and pushed.
+- [x] G144: The result is committed to main and pushed.
   CHECK: git status --porcelain --untracked-files=no
   EXPECT: (no output)
-  EVIDENCE: pending
+  EVIDENCE: `git status --porcelain --untracked-files=no` prints nothing and `cloud_git push` reported `d0437a9..49ed0eb  HEAD -> main`. `49ed0eb` carries the statement box, the stage change that gives it room and the wider columns on very wide screens, with `verify_hero` and `verify_app` moved to nine boxes. Only `artifacts/`, the screenshots, stays untracked.
 
-MET: 142
-UNMET: 2
+MET: 143
+UNMET: 1
 ABANDONED: 0
