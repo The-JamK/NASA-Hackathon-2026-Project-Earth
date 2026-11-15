@@ -640,6 +640,25 @@ body.has-case .case-panel { display: block; }
 
 .compare-body { flex: 1 1 auto; overflow-y: auto; min-height: 0; padding-right: 2px; }
 
+/* Scrollbars follow the app's palette rather than the browser default, which was
+   a bright white bar down the side of a dark dialog. The dialog body hides its own
+   entirely: the panel is a surface of its own, and its content visibly continues
+   below the fold. */
+html { scrollbar-width: thin; scrollbar-color: #34434f transparent; }
+
+::-webkit-scrollbar { width: 10px; height: 10px; }
+::-webkit-scrollbar-track { background: rgba(255, 255, 255, 0.03); }
+::-webkit-scrollbar-thumb {
+  background: #34434f;
+  border: 2px solid transparent;
+  border-radius: 6px;
+  background-clip: padding-box;
+}
+::-webkit-scrollbar-thumb:hover { background: #46596b; background-clip: padding-box; }
+
+.compare-body { scrollbar-width: none; }
+.compare-body::-webkit-scrollbar { width: 0; height: 0; }
+
 /* --- context line ------------------------------------------------------ */
 .compare-hero { margin: 0 0 12px; }
 
@@ -770,7 +789,10 @@ body.has-case .case-panel { display: block; }
   white-space: nowrap;
 }
 
-.compare-table .actions { width: 76px; text-align: right; white-space: nowrap; }
+/* 76px was the exact width of Open plus the remove button once the cell's own
+   padding was counted, so subpixel rounding pushed a few pixels past the body and
+   produced a horizontal scrollbar. 92px leaves the cell room. */
+.compare-table .actions { width: 92px; text-align: right; white-space: nowrap; }
 
 .compare-place { display: block; font-size: 13px; letter-spacing: -0.01em; color: var(--text); }
 

@@ -146,6 +146,10 @@ check(/\.case-star \{[\s\S]{0,120}margin-left: auto/.test(css), "the star keeps 
 check(/\.compare-table \{/.test(css), "the comparison table is styled");
 check(/\.compare-dot\.explore/.test(css), "an exploratory verdict keeps its own colour");
 check(/\.compare-section \{/.test(css), "a section is styled");
+check(/html \{ scrollbar-width: thin; scrollbar-color: #34434f transparent; \}/.test(css), "scrollbars follow the dark palette instead of the browser default");
+check(/::-webkit-scrollbar-thumb \{/.test(css), "the webkit scrollbar is themed too");
+check(/\.compare-body \{ scrollbar-width: none; \}/.test(css), "the dialog body shows no scrollbar");
+check(/\.compare-table \.actions \{ width: 92px/.test(css), "row actions have room inside the dialog");
 check(/\.compare-section-head h3 \{/.test(css), "a section heading is styled");
 check(/\.compare-vars \{/.test(css) && /\.compare-var\.on \{/.test(css), "the variable switcher shows its active state");
 check(/\.compare-add input \{/.test(css), "the add field is styled");

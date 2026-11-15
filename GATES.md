@@ -945,6 +945,14 @@ Last verified: 2026-11-15
   EXPECT: stars ui verified
   EVIDENCE: The top-bar button used to hide itself at zero stars, and the only star lives inside an opened case, so a fresh browser (or the deployed site, where the saved list is empty) showed no way into the menu at all. It now stays visible as "Saved 0" with the label "No saved places yet, open to add some". Live at 1280x800 from an empty store: the button measured visible, the dialog opened on its empty state with the add field and no CSV button, searching "oyem" found and added the station, and the draft section and count appeared. stars ui and app verified; prose check passes.
 
+- [x] G189: The comparison dialog shows no bright browser scrollbar and no horizontal overflow.
+  CHECK: node scripts/verify_stars_ui.mjs
+  EXPECT: stars ui verified
+  EVIDENCE: Scrollbars are themed dark and thin (`scrollbar-width: thin`, `scrollbar-color: #34434f`, plus the webkit pseudo-elements) and the dialog body hides its own. The horizontal bar was real, not cosmetic: the 76 px action cell was exactly the width of Open plus the remove button and its padding, so rounding pushed the row 4 px past the body. With the cell at 92 px the body measures clientWidth 834 and scrollWidth 834, and the remove button ends at 1045 inside the body's 1057. Computed style on the open dialog reads `scrollbar-width: none`; the page root reads `thin / rgb(52, 67, 79)`.
+
+MET: 188
+UNMET: 1
+
 MET: 187
 UNMET: 1
 ABANDONED: 0
