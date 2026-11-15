@@ -166,6 +166,28 @@ check(/@media \(prefers-reduced-motion: reduce\)/.test(css), "the stylesheet sti
 check(/@media \(max-width: 560px\)/.test(css), "the phone layout still exists");
 check(!/\.compare-verdict\.warm/.test(css), "no verdict is a filled block");
 
+/* ------------------------------------------------- phone sheet geometry */
+
+// The saved-places panel is a full-height sheet on a phone, and the [open] in
+// the selector is load-bearing: the desktop rule is three class-levels deep, so
+// a two-deep `.method-dialog.compare-dialog` lost the width and height back and
+// the panel sat against the left edge with a dead gutter down the right.
+const phoneSheet = css.match(
+  /@media \(max-width: 640px\) \{[\s\S]*?\.method-dialog\.compare-dialog\[open\] \{([\s\S]*?)\n  \}/
+);
+check(phoneSheet !== null, "the phone layout sizes the saved-places sheet itself, carrying [open]");
+if (phoneSheet) {
+  const decl = phoneSheet[1];
+  check(/width: 100%/.test(decl), "the phone sheet spans the viewport width");
+  check(/max-width: 100%/.test(decl), "the phone sheet is not capped at the desktop width");
+  check(/height: 100dvh/.test(decl) && /max-height: 100dvh/.test(decl), "the phone sheet spans the viewport height");
+  check(/margin: 0/.test(decl), "the phone sheet is flush with the viewport, not left in a gutter");
+  check(/border: 0/.test(decl) && /border-radius: 0/.test(decl), "the phone sheet has no desktop frame");
+}
+check(/\.row-open \{[\s\S]{0,200}?min-height: 38px/.test(css), "row Open is a real tap target on a phone");
+check(/\.row-remove \{ width: 38px; height: 38px/.test(css), "row remove is a real tap target on a phone");
+check(/Hover or tap a place to dim the others/.test(main), "the lede does not tell a phone to hover");
+
 /* ------------------------------------------------------------- stars.js */
 
 check(/export const MAX_STARS = 12;/.test(stars), "the cap is twelve places");

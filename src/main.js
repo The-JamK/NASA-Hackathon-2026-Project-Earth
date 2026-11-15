@@ -1632,7 +1632,7 @@ function renderCompare() {
         <span aria-hidden="true">·</span><span>${escapeHtml(windowText)}</span>
         <span aria-hidden="true">·</span><span>${state.stars.length} place${state.stars.length === 1 ? "" : "s"}</span>
       </div>
-      <p class="compare-lede">Each section below has its own chart, then the places in it. Hover a place to dim the others.</p>
+      <p class="compare-lede">Each section below has its own chart, then the places in it. Hover or tap a place to dim the others.</p>
     </div>
 
     ${compareVariableButtons(available, code)}

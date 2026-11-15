@@ -950,9 +950,26 @@ Last verified: 2026-11-15
   EXPECT: stars ui verified
   EVIDENCE: Scrollbars are themed dark and thin (`scrollbar-width: thin`, `scrollbar-color: #34434f`, plus the webkit pseudo-elements) and the dialog body hides its own. The horizontal bar was real, not cosmetic: the 76 px action cell was exactly the width of Open plus the remove button and its padding, so rounding pushed the row 4 px past the body. With the cell at 92 px the body measures clientWidth 834 and scrollWidth 834, and the remove button ends at 1045 inside the body's 1057. Computed style on the open dialog reads `scrollbar-width: none`; the page root reads `thin / rgb(52, 67, 79)`.
 
-MET: 188
-UNMET: 1
+- [x] G190: The saved-places panel fills the phone viewport instead of a desktop-width box pinned to the left edge.
+  CHECK: node scripts/verify_stars_ui.mjs
+  EXPECT: stars ui verified
+  EVIDENCE: The cause was specificity, not a missing rule: `.method-dialog.compare-dialog[open]` is three class-levels deep, so it out-ranked both phone rules (one and two deep) and kept the 880 px width, the 93vh max-height and the 22 px padding, while `margin: 0` from the phone sheet still applied. Measured live at 390: the dialog was x0 y0, 512x704 inside a 544 viewport, a 32 px gutter down the right, square corners and desktop padding. The phone block now carries [open] with width and max-width 100%, height and max-height 100dvh, margin 0, border and radius 0, and 14 px padding plus the safe-area inset. Measured after: 390 gives x0 y0 390x844, 360 gives 360x780, 320 gives 320x640; the body clientWidth equals its scrollWidth (362, 332, 292) and documentElement.scrollWidth equals the viewport at all three, so there is no gutter and no overflow. The 640 media block and the generic .method-dialog phone rule now state the same sheet instead of fighting.
 
-MET: 187
+- [x] G191: Every row action is a thumb-sized target on a phone and unchanged on desktop.
+  CHECK: node scripts/verify_stars_ui.mjs
+  EXPECT: stars ui verified
+  EVIDENCE: Open was 8.5 px of bare text and remove a 24 px box, both flush left under the card. At 560 and below they are now 38 px tall with a hairline border and an 8 px gap between them; measured live at 390, 360 and 320 they are 58x38 and 38x38. Desktop is untouched: the same row still measures 43x20 inside the 92 px actions cell, and the dialog body reports 0 px of horizontal overflow.
+
+- [x] G192: The comparison does not tell a phone reader to hover.
+  CHECK: node scripts/verify_stars_ui.mjs
+  EXPECT: stars ui verified
+  EVIDENCE: The lede read "Hover a place to dim the others." on every width. It now reads "Hover or tap a place to dim the others.", and the assertion for it is in verify_stars_ui. The prose check still passes, so the sentence keeps the house style.
+
+- [x] G193: The phone sheet regresses nothing the saved-places dialog already promised.
+  CHECK: node scripts/verify_stars.mjs && node scripts/verify_stars_ui.mjs && node scripts/verify_prose.mjs && node scripts/verify_motion.mjs && node scripts/verify_security.mjs && node scripts/verify_firstload.mjs && npm run build
+  EXPECT: stars verified, stars ui verified, prose verified, motion verified, security verified, first load verified, and a successful build
+  EVIDENCE: In one run: `stars verified`, `stars ui verified`, PROSE CHECK PASS, MOTION CHECK PASS, `security verified`, `first load verified` (critical path 301 kB gzip), `built in 6.54s`. Desktop reviewed live at 1280x800: the dialog is 880 wide at x200, centred within 2 px, body overflow 0, and the sections, charts and footer are unchanged. The empty state at 390 fills the sheet and still carries the add field. The new assertions were run against the previous stylesheet (`git show HEAD:src/style.css`) as a negative control and all three phone checks failed there, so they can fail.
+
+MET: 192
 UNMET: 1
 ABANDONED: 0
