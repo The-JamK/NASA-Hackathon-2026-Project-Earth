@@ -36,6 +36,9 @@ const CACHE_LIMIT = 128;
 // visitor spend the demo's budget. Twenty lookups a minute is plenty for a room.
 const RATE_WINDOW_MS = 60_000;
 const RATE_LIMIT = 20;
+// The only body this endpoint parses is a 240-character question, so anything
+// larger is refused before it is read into memory or handed to JSON.parse.
+const MAX_BODY_BYTES = 8_192;
 
 // Nominatim's usage policy: a stock library User-Agent is not acceptable, and a
 // request without one may be blocked.
@@ -133,7 +136,11 @@ const lookups = [];
 function jsonResponse(body, status = 200, headers = {}) {
   return new Response(JSON.stringify(body), {
     status,
-    headers: { "content-type": "application/json; charset=utf-8", ...headers },
+    headers: {
+      "content-type": "application/json; charset=utf-8",
+      "x-content-type-options": "nosniff",
+      ...headers,
+    },
   });
 }
 
@@ -472,7 +479,26 @@ export async function handleResolve(request, options = {}) {
 
   let question = "";
   try {
-    const body = await request.json();
+    // Checked before reading, so a declared megabyte never becomes a string.
+    const declared = Number(request.headers.get("content-length"));
+    if (Number.isFinite(declared) && declared > MAX_BODY_BYTES) {
+      return jsonResponse(
+        { ok: false, error: "body_too_large", limit: MAX_BODY_BYTES },
+        413,
+        { "cache-control": "no-store" }
+      );
+    }
+    const raw = await request.text();
+    // A chunked body carries no content-length, so the size is checked again
+    // once it has been read.
+    if (raw.length > MAX_BODY_BYTES) {
+      return jsonResponse(
+        { ok: false, error: "body_too_large", limit: MAX_BODY_BYTES },
+        413,
+        { "cache-control": "no-store" }
+      );
+    }
+    const body = JSON.parse(raw);
     question = String(body?.question || "").trim();
   } catch {
     return jsonResponse({ ok: false, error: "invalid_json" }, 400, { "cache-control": "no-store" });

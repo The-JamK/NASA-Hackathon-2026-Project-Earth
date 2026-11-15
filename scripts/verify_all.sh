@@ -19,6 +19,7 @@ node scripts/verify_locate.mjs
 node scripts/verify_offline.mjs
 node scripts/verify_textures.mjs
 node scripts/verify_clean.mjs
+node scripts/verify_security.mjs
 node scripts/verify_live_proxy.mjs
 node scripts/verify_red_herring.mjs
 node scripts/verify_ocean.mjs

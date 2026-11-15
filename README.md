@@ -148,7 +148,9 @@ credentials never reach the browser:
 
 - `worker/live.js` — allowlists the bundle's points, queries Meteomatics for them
   in one request, caches for 10 minutes, and answers `live_unconfigured` when
-  credentials are absent.
+  credentials are absent. The `ids` list is deduplicated, sorted and capped at 60
+  points, and a cache miss is budgeted at 1,000 upstream coordinates a minute per
+  isolate, so a public URL cannot spend the metered quota in a loop.
 - `worker/index.js` — Workers entry: `/api/live` plus the static app.
 - `vite.config.js` — the same handler behind the dev and preview servers, reading
   `METEOMATICS_USERNAME` and `METEOMATICS_PASSWORD` from `.env`.

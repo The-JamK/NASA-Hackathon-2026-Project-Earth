@@ -11,15 +11,38 @@ const CACHE_TTL_MS = 10 * 60 * 1000;
 const CACHE_LIMIT = 32;
 const MAX_COORDINATES_PER_QUERY = 25;
 const UPSTREAM_TIMEOUT_MS = 15_000;
+// A case asks for one point, so a bounded set per request costs nothing the app
+// uses and stops one visitor from asking for the whole bundle on every call.
+const MAX_IDS_PER_REQUEST = 60;
+const MAX_IDS_QUERY_LENGTH = 2_000;
+// The upstream is metered at 1,000 queries a day. Budgeting the coordinates a
+// minute (not the requests) is what actually bounds that spend, because one
+// request for 708 points is 29 upstream queries all by itself.
+const MAX_COORDINATES_PER_MINUTE = 1_000;
+const RATE_WINDOW_MS = 60_000;
 const CACHE_HEADERS = { "cache-control": "public, max-age=120, s-maxage=300" };
 
 const cache = new Map();
+const spends = [];
 
 function jsonResponse(body, status = 200, headers = {}) {
   return new Response(JSON.stringify(body), {
     status,
-    headers: { "content-type": "application/json; charset=utf-8", ...headers },
+    headers: {
+      "content-type": "application/json; charset=utf-8",
+      "x-content-type-options": "nosniff",
+      ...headers,
+    },
   });
+}
+
+// Only a cache miss reaches upstream, so only a miss spends the budget.
+function takeBudget(coordinates, now) {
+  while (spends.length && now.getTime() - spends[0].at > RATE_WINDOW_MS) spends.shift();
+  const used = spends.reduce((total, entry) => total + entry.coordinates, 0);
+  if (used + coordinates > MAX_COORDINATES_PER_MINUTE) return false;
+  spends.push({ at: now.getTime(), coordinates });
+  return true;
 }
 
 export function hourStamp(date) {
@@ -108,9 +131,28 @@ export async function handleLive(request, options) {
 
   const allowed = points.filter((point) => Number.isFinite(point.lat) && Number.isFinite(point.lon));
   const requested = url.searchParams.get("ids");
-  const selected = requested
-    ? allowed.filter((point) => requested.split(",").includes(point.id))
-    : allowed;
+  if (requested && requested.length > MAX_IDS_QUERY_LENGTH) {
+    return jsonResponse({ ok: false, error: "ids_too_long" }, 400, { "cache-control": "no-store" });
+  }
+  const wanted = requested
+    ? new Set(
+        requested
+          .split(",")
+          .map((id) => id.trim())
+          .filter(Boolean)
+      )
+    : null;
+  if (wanted && wanted.size > MAX_IDS_PER_REQUEST) {
+    return jsonResponse(
+      { ok: false, error: "too_many_points", limit: MAX_IDS_PER_REQUEST },
+      400,
+      { "cache-control": "no-store" }
+    );
+  }
+  const selected = wanted ? allowed.filter((point) => wanted.has(point.id)) : allowed;
+  // Sorted, so `?ids=b,a` and `?ids=a,b` are one cache entry instead of two: an
+  // order-sensitive key let anyone double the metered spend for free.
+  if (wanted) selected.sort((one, other) => (one.id < other.id ? -1 : one.id > other.id ? 1 : 0));
 
   if (!selected.length) {
     return jsonResponse({ ok: false, error: "no_matching_points" }, 400, { "cache-control": "no-store" });
@@ -134,6 +176,18 @@ export async function handleLive(request, options) {
   const cached = cache.get(cacheKey);
   if (cached && current.getTime() - cached.storedAt < CACHE_TTL_MS) {
     return jsonResponse({ ...cached.body, cache: "hit" }, 200, CACHE_HEADERS);
+  }
+
+  if (!takeBudget(selected.length, current)) {
+    return jsonResponse(
+      {
+        ok: false,
+        error: "rate_limited",
+        detail: `At most ${MAX_COORDINATES_PER_MINUTE} upstream coordinates a minute.`,
+      },
+      429,
+      { "cache-control": "no-store", "retry-after": "60" }
+    );
   }
 
   const readings = {};
