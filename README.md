@@ -338,7 +338,11 @@ precipitation`. Countries and ocean basins are covered the same way — `Austrai
 answers the Australia average, `Pacfic` answers a Pacific basin, `Indain Ocean`
 answers the Indian Ocean rather than the global one — while a name that is
 already right is never swapped for a neighbour (`Australia` and `Austria` are one
-edit apart, and each answers itself). Only words of five or six letters or more
+edit apart, and each answers itself). States and provinces come through the same
+gazetteer matcher (`Illonois` → Illinois), and sea ice has its own repairs: a
+misspelt `Antartic sea ice` gets that hemisphere's record rather than the global
+one, and `Arctic see ice` is still recognised as an ice question instead of being
+answered by the nearest land station. Only words of five or six letters or more
 are repaired, and only when nothing matched exactly, so a correct question never
 gets "corrected".
 

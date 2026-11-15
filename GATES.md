@@ -527,6 +527,16 @@ Last verified: 2026-11-14
   EXPECT: search verified
   EVIDENCE: `"Australia"` is one edit from `"Austria"`, and an early version of this swapped them; the guard added for that is pinned in `verify_resolve.mjs`: `"Is Austria warming?"` → Austria with `corrected: false`, `"Is Australia warming?"` → Australia with `corrected: false`, `"Is the Indian Ocean warming?"` → Indian Ocean with `corrected: false`, while `"Is the ocean warming?"` still answers the global ocean. In the browser the Austria control read `Austria average · 3 stations` with the plain wording. A repaired country or basin also cannot outrank a station the question really names. `verify_search.mjs` and `verify_resolve.mjs` pass, the build succeeds, and first-load stays at 294 kB gzip.
 
-MET: 102
+- [x] G104: A misspelt state or province resolves to it, in the ask box and in the popup.
+  CHECK: node scripts/verify_resolve.mjs
+  EXPECT: resolver verified
+  EVIDENCE: States and provinces ride the gazetteer's shared matcher, so they were already typo-tolerant once the gazetteer carried them; this pins it. `verify_resolve.mjs` asserts `"Is Illonois getting hotter?"` → Illinois with `kind: "region"` and `corrected: true`, `"Is Pensylvannia getting hotter?"` → Pennsylvania, and the exact control `"Is Pennsylvania getting hotter?"` → Pennsylvania with `corrected: false`. In the browser the same question produced a "Did you mean" popup whose only entry was `Illinois state · United States of America`, and the plan behind it read `Derived case · United States of America · 39.95°N 89.20°W · nearest GISTEMP cell` — on the dev server and on the plain static build alike, since the page carries its own gazetteer.
+
+- [x] G105: A misspelt sea-ice name answers that hemisphere's record instead of the global one or a land station.
+  CHECK: node scripts/verify_resolve.mjs
+  EXPECT: resolver verified
+  EVIDENCE: Two separate misses were fixed. `"Is Antartic sea ice shrinking?"` matched only the words "sea ice" — the global record — and now repairs to Antarctic sea ice via a strict alias match (one edit, same length); `"Is the Arctic see ice shrinking?"` never looked like an ice question at all, so the station table's `arctic` alias answered with Tromsø air temperature, and `mentionsIce()` now recognises "see ice" as "sea ice" within one letter. `defaultSeaIceRecord()` also repairs a hemisphere word ("artic", "antartic") instead of defaulting to both poles. `verify_resolve.mjs` pins `Antartic` → Antarctic sea ice (corrected), `Artic` → Arctic sea ice (corrected), `Arctic see ice` → Arctic sea ice (corrected, `kind: "seaice"`), and the controls `"Is Arctic sea ice shrinking?"` and `"Is global sea ice shrinking?"` → not corrected. `"Is Antarctica warming?"` still answers the Antarctica country average rather than being eaten by the ice record. In the browser the plan read `Sea ice extent · Antarctic sea ice · 12-month mean`, and running it opened `CASE-68B7 · SEA ICE EXTENT` on the static build.
+
+MET: 104
 UNMET: 1
 ABANDONED: 0

@@ -489,6 +489,70 @@ const NOMINATIM_BROADBEACH = [
   check(control?.corrected === false, "a correctly spelled ocean was flagged as a typo");
 }
 
+// 15. Misspelt states, provinces and sea-ice names are repaired; correctly
+//     spelled ones are not, and a continent next to the ice record is not eaten
+//     by it.
+{
+  const illinois = await (
+    await call({ question: "Is Illonois getting hotter?" }, { fetchImpl: geocoderStub({}) })
+  ).json();
+  check(illinois.ok === true, `Illonois did not resolve: ${illinois.error}`);
+  check(illinois.place?.name === "Illinois", `Illonois resolved to ${illinois.place?.name}`);
+  check(illinois.place?.kind === "region", `Illonois came back as a ${illinois.place?.kind}`);
+  check(illinois.corrected === true, "the state typo was not flagged");
+
+  const pennsylvania = await (
+    await call({ question: "Is Pensylvannia getting hotter?" }, { fetchImpl: geocoderStub({}) })
+  ).json();
+  check(pennsylvania.place?.name === "Pennsylvania", `Pensylvannia resolved to ${pennsylvania.place?.name}`);
+  check(pennsylvania.corrected === true, "the province typo was not flagged");
+
+  const control = await (
+    await call({ question: "Is Pennsylvania getting hotter?" }, { fetchImpl: geocoderStub({}) })
+  ).json();
+  check(control.place?.name === "Pennsylvania", `the control resolved to ${control.place?.name}`);
+  check(control.corrected === false, "a correctly spelled state was flagged as a typo");
+
+  const context = {
+    rag: read("public/data/rag_index.json"),
+    points: points.points,
+    variables,
+    countries: read("public/data/countries.json").countries,
+    ocean: read("public/data/ocean.json").regions,
+    seaIce: read("public/data/seaice.json").records,
+  };
+
+  const antarctic = planCase("Is Antartic sea ice shrinking?", context);
+  check(antarctic?.kind === "seaice", `Antartic sea ice became a ${antarctic?.kind} case`);
+  check(antarctic?.place?.name === "Antarctic sea ice", `Antartic sea ice resolved to ${antarctic?.place?.name}`);
+  check(antarctic?.corrected === true, "the sea-ice typo was not flagged");
+  check(
+    /was read as antarctic sea ice/i.test(antarctic?.explanation || ""),
+    `the plan does not say what it read: ${antarctic?.explanation}`
+  );
+
+  const seeIce = planCase("Is the Arctic see ice shrinking?", context);
+  check(seeIce?.kind === "seaice", `"see ice" became a ${seeIce?.kind} case — the ice question was missed`);
+  check(seeIce?.place?.name === "Arctic sea ice", `"see ice" resolved to ${seeIce?.place?.name}`);
+  check(seeIce?.corrected === true, "the misspelt sea ice was not flagged");
+
+  const artic = planCase("Is the Artic sea ice shrinking?", context);
+  check(artic?.place?.name === "Arctic sea ice", `Artic resolved to ${artic?.place?.name}`);
+  check(artic?.corrected === true, "the hemisphere typo was not flagged");
+
+  const exactIce = planCase("Is Arctic sea ice shrinking?", context);
+  check(exactIce?.place?.name === "Arctic sea ice", `the control resolved to ${exactIce?.place?.name}`);
+  check(exactIce?.corrected === false, "a correctly spelled ice record was flagged as a typo");
+
+  const globalIce = planCase("Is global sea ice shrinking?", context);
+  check(globalIce?.place?.name === "Global sea ice", `global sea ice resolved to ${globalIce?.place?.name}`);
+  check(globalIce?.corrected === false, "global sea ice was flagged as a typo");
+
+  const antarctica = planCase("Is Antarctica warming?", context);
+  check(antarctica?.kind === "country", `Antarctica became a ${antarctica?.kind} case`);
+  check(antarctica?.corrected === false, "Antarctica was flagged as a typo");
+}
+
 if (failures) {
   console.error(`\n${failures} resolver check(s) failed`);
   process.exit(1);

@@ -141,7 +141,7 @@ function covers(outer, inner) {
  * Short aliases ("us", "uk") are exact-only, because a one-letter difference
  * there is a different word.
  */
-function fuzzyRecord(question, records) {
+function fuzzyRecord(question, records, { slack = 1, maxEdits = null } = {}) {
   if (!Array.isArray(records) || !records.length) return null;
   const windows = typoWindows(question);
   if (!windows.length) return null;
@@ -150,10 +150,12 @@ function fuzzyRecord(question, records) {
   for (const record of records) {
     for (const alias of record.aliases || []) {
       const key = fold(alias).replace(/ /g, "");
-      const limit = typoLimit(key.length);
+      const limit = maxEdits ?? typoLimit(key.length);
       if (key.length < 5 || !limit) continue;
       for (const window of windows) {
-        if (Math.abs(window.compact.length - key.length) > limit) continue;
+        // A typo keeps the length; a word that is much shorter or longer is a
+        // different name. Without this, "Antarctica" matched "antarctic ice".
+        if (Math.abs(window.compact.length - key.length) > Math.min(slack, limit)) continue;
         if (key.length / Math.max(window.compact.length, 1) < 0.6) continue;
         const distance = editDistance(window.compact, key, limit);
         if (!distance || distance > limit) continue;
@@ -262,6 +264,12 @@ export function resolveSeaIce(question, seaIce) {
       if (!best || alias.length > best.alias.length) best = { record, alias };
     }
   }
+  // "Antartic sea ice" matched only the word "sea ice" — the global record — so
+  // the repair has to replace a generic exact alias, exactly as oceans do.
+  const fuzzy = fuzzyRecord(question, seaIce, { maxEdits: 1 });
+  if (fuzzy && (!best || covers(fuzzy.alias, best.alias))) {
+    return { record: fuzzy.record, alias: fuzzy.alias, corrected: true, typed: fuzzy.typed };
+  }
   return best;
 }
 
@@ -273,6 +281,12 @@ export function defaultSeaIceRecord(seaIce, question) {
   const byId = (id) => seaIce.find((record) => record.id === id) || null;
   if (/\b(arctic|north pole|polar north|northern)\b/i.test(text)) return byId("arctic-sea-ice");
   if (/\b(antarctic|south pole|polar south|southern)\b/i.test(text)) return byId("antarctic-sea-ice");
+  // "Antartic" and "artic" name a hemisphere without spelling it the way the
+  // record list does; without this a misspelt hemisphere answered both poles.
+  for (const window of typoWindows(question)) {
+    if (editDistance(window.compact, "antarctic", 1) === 1) return byId("antarctic-sea-ice");
+    if (editDistance(window.compact, "arctic", 1) === 1) return byId("arctic-sea-ice");
+  }
   return byId("global-sea-ice") || seaIce[0] || null;
 }
 
@@ -324,6 +338,20 @@ export function seaIceVariableCode(question) {
 // answer "Arctic sea ice" with Tromsø air temperature. Ice now goes to the sea
 // ice record, or to the basin it names when that record is unavailable.
 const ICE_TERMS = /\b(sea[- ]ice|ice extent|ice cover|ice sheet|ice shelf|glacier|glaciers)\b/i;
+
+/**
+ * Whether the question is about ice, including a misspelt "sea ice".
+ *
+ * Without the repair, "Arctic see ice" never reached the ice record at all: the
+ * station table carries an "arctic" alias, so the question answered Tromsø air
+ * temperature. One letter in "sea ice" is a spelling, not a different question.
+ */
+function mentionsIce(question) {
+  if (ICE_TERMS.test(question)) return true;
+  return typoWindows(question).some(
+    (window) => window.compact.length >= 5 && editDistance(window.compact, "seaice", 1) === 1
+  );
+}
 
 /**
  * The basin under a point, using the same wrapped box test the build script used
@@ -546,7 +574,7 @@ export function planCase(question, { rag, points, variables, countries, ocean, s
   const countryHit = resolveCountry(clean, countries);
   const oceanHit = resolveOcean(clean, ocean);
   const seaIceHit = resolveSeaIce(clean, seaIce);
-  const iceQuestion = ICE_TERMS.test(clean);
+  const iceQuestion = mentionsIce(clean);
   // Either signal is enough: "arctic ice" names a record without matching the
   // ice vocabulary, and "sea ice" names the concept without naming a region.
   const iceRecord =
@@ -603,7 +631,9 @@ export function planCase(question, { rag, points, variables, countries, ocean, s
 
   const terms = matchedTerms(clean, variable);
   const placePhrase = iceRecord
-    ? `"${alias}" is a hemisphere-scale sea ice record, so this is the annual mean of its twelve monthly extents`
+    ? seaIceHit?.corrected
+      ? `"${seaIceHit.typed}" was read as ${place.name}, so this is the annual mean of its twelve monthly extents`
+      : `"${alias}" is a hemisphere-scale sea ice record, so this is the annual mean of its twelve monthly extents`
     : useOcean
     ? oceanHit?.corrected
       ? `"${oceanHit.typed}" was read as ${place.name}, so this averages its ${place.cells} GISTEMP ocean cells by area (${place.extent})`
@@ -675,11 +705,13 @@ export function planCase(question, { rag, points, variables, countries, ocean, s
     // A station the question only nearly spelled: the caller offers the station
     // rather than quietly answering from it, and keeps the typed word for the
     // explanation.
-    corrected: useOcean
-      ? Boolean(oceanHit?.corrected)
-      : useCountry
-        ? Boolean(countryHit?.corrected)
-        : Boolean(city.corrected),
+    corrected: iceRecord
+      ? Boolean(seaIceHit?.corrected)
+      : useOcean
+        ? Boolean(oceanHit?.corrected)
+        : useCountry
+          ? Boolean(countryHit?.corrected)
+          : Boolean(city.corrected),
     candidates: city.candidates || [],
     variableCorrection: chosen.corrected || null,
   };
