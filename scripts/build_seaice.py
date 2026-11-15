@@ -6,15 +6,15 @@ Output:
   public/data/seaice.json
 
 Source: NSIDC/NOAA Sea Ice Index (G02135) monthly extent and area, served as CSV
-timeseries by NOAA's Physical Sciences Laboratory — two files per hemisphere, no
+timeseries by NOAA's Physical Sciences Laboratory, two files per hemisphere, no
 Earthdata account. The same index is published by NSIDC as 24 per-month CSVs;
 that host throttles a bulk fetch (mixed 500s, then connection refusals after ~30
 rapid requests), and series with identical provenance are the better dependency
 for a build that has to be reproducible.
 
 Two measures come out of it:
-  SEAICE      extent, 10⁶ km² — the area with at least 15% ice cover
-  SEAICECONC  concentration, % — 100 × ice area ÷ extent, the mean concentration
+  SEAICE      extent, 10⁶ km², the area with at least 15% ice cover
+  SEAICECONC  concentration, %, 100 × ice area ÷ extent, the mean concentration
               of the ice-covered area (area weights each cell by its ice fraction)
 
 The app's contract is annual means only, so the twelve monthly values for a year

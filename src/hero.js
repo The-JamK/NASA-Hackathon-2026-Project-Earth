@@ -14,7 +14,7 @@ const START_LAT = -6.5;
 const START_LNG = 145.0;
 // Lower altitude = larger globe on screen.
 const altitudeFor = (width) => (width < 700 ? 2.05 : width < 1080 ? 1.82 : 1.44);
-// Earth stands upright here — no axial lean — and spins eastward once per 40 s.
+// Earth stands upright here, no axial lean, and spins eastward once per 40 s.
 const SPIN_IDLE = (2 * Math.PI) / 40;
 const SPIN_HOVER = SPIN_IDLE / 5;
 const CASE_URL = "./app.html";

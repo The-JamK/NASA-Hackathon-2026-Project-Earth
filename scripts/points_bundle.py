@@ -2,8 +2,8 @@
 
 `points.json` used to be 6.1 MB: every station carried 4 variables x 3 windows of
 full trend records plus a 36-year series, and the app loaded all of it before the
-globe drew. Only 171 kB of that is identity — the name, the country, the
-coordinate — and only 774 kB is the series. The 5.1 MB of trend diagnostics is
+globe drew. Only 171 kB of that is identity, the name, the country, the
+coordinate, and only 774 kB is the series. The 5.1 MB of trend diagnostics is
 read one station at a time, when a case is opened.
 
 So the bundle is written in two tiers:
@@ -19,8 +19,8 @@ without an index of the index. `SHARD_COUNT` is duplicated in `src/bundle.js`
 (the app) and `scripts/bundle.mjs` (the Node checks); `verify_bundle.mjs` fails
 if the three disagree.
 
-Everything that needs the whole record — the build, the Python verifiers, the
-Node verifiers — goes through `load_bundle`, so no consumer has to know the
+Everything that needs the whole record, the build, the Python verifiers, the
+Node verifiers, goes through `load_bundle`, so no consumer has to know the
 layout.
 """
 

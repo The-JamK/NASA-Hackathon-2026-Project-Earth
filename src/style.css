@@ -1268,7 +1268,7 @@ details.work p {
    milliseconds after the one above it, so the eye lands on the place name first
    and the verdict last. It starts near full strength and travels three pixels,
    because a glass panel that fades from nothing reads as a flash rather than a
-   settle — and switching variable re-runs it, so it has to stay quiet. */
+   settle, and switching variable re-runs it, so it has to stay quiet. */
 .case-panel > * { animation: settle 0.22s cubic-bezier(0.2, 0.7, 0.2, 1) both; }
 .case-panel > :nth-child(2) { animation-delay: 0.02s; }
 .case-panel > :nth-child(3) { animation-delay: 0.03s; }
@@ -1652,8 +1652,8 @@ html.landing body {
 
 .hero-box {
   position: absolute;
-  width: clamp(248px, 20vw, 300px);
-  padding: 13px 15px 14px;
+  width: clamp(214px, 16.6vw, 258px);
+  padding: 11px 13px 12px;
   border: 1px solid rgba(255, 255, 255, 0.14);
   border-radius: 2px;
   background: rgba(4, 7, 12, 0.78);
@@ -1664,23 +1664,30 @@ html.landing body {
   animation: hero-box-in 0.7s ease forwards;
 }
 .hero.is-ready .hero-box--name { animation-delay: 0.18s; }
-.hero.is-ready .hero-box--members { animation-delay: 0.33s; }
-.hero.is-ready .hero-box--about { animation-delay: 0.48s; }
-.hero.is-ready .hero-box--challenge { animation-delay: 0.63s; }
-.hero.is-ready .hero-box--event { animation-delay: 0.78s; }
-.hero.is-ready .hero-box--data { animation-delay: 0.93s; }
+.hero.is-ready .hero-box--public { animation-delay: 0.3s; }
+.hero.is-ready .hero-box--members { animation-delay: 0.42s; }
+.hero.is-ready .hero-box--about { animation-delay: 0.54s; }
+.hero.is-ready .hero-box--challenge { animation-delay: 0.24s; }
+.hero.is-ready .hero-box--analyst { animation-delay: 0.36s; }
+.hero.is-ready .hero-box--event { animation-delay: 0.48s; }
+.hero.is-ready .hero-box--data { animation-delay: 0.6s; }
 
 @keyframes hero-box-in {
   to { opacity: 1; }
 }
 
-/* The sphere passes in front of these, so only their inner edge is covered. */
-.hero-box--name { left: calc(var(--box-left) + var(--box-bend)); top: 9vh; width: clamp(248px, 21vw, 312px); }
-.hero-box--members { left: var(--box-left); top: 47vh; }
-.hero-box--about { left: calc(var(--box-left) + var(--box-bend)); bottom: 9vh; }
-.hero-box--challenge { right: calc(var(--box-left) + var(--box-bend)); top: 12vh; }
-.hero-box--event { right: var(--box-left); top: 45vh; }
-.hero-box--data { right: calc(var(--box-left) + var(--box-bend)); bottom: 11vh; }
+/* Eight boxes ride around the sphere in two arcs of four. The sphere passes in
+   front of them, so only their inner edge is covered, and the arc follows it:
+   the rows nearest the equator stand furthest out, while the top and bottom rows
+   step inwards with the circle. */
+.hero-box--name { left: calc(var(--box-left) + var(--box-bend)); top: 5vh; width: clamp(238px, 19vw, 290px); }
+.hero-box--public { left: var(--box-left); top: 29vh; }
+.hero-box--members { left: var(--box-left); top: 53vh; }
+.hero-box--about { left: calc(var(--box-left) + var(--box-bend)); bottom: 5vh; }
+.hero-box--challenge { right: calc(var(--box-left) + var(--box-bend)); top: 7.5vh; }
+.hero-box--analyst { right: var(--box-left); top: 31.5vh; }
+.hero-box--event { right: var(--box-left); top: 55.5vh; }
+.hero-box--data { right: calc(var(--box-left) + var(--box-bend)); bottom: 7.5vh; }
 
 .hero-name {
   margin: 0 0 8px;
@@ -1777,11 +1784,13 @@ html.landing body {
   .hero-boxes { display: contents; }
   .hero-box { position: static; width: min(100%, 640px); padding: 14px 16px; }
   .hero-box--name { order: 1; }
-  .hero-box--about { order: 3; }
+  .hero-box--about { order: 2; }
+  .hero-box--public { order: 3; }
   .hero-box--members { order: 4; }
-  .hero-box--data { order: 5; }
+  .hero-box--analyst { order: 5; }
   .hero-box--challenge { order: 6; }
   .hero-box--event { order: 7; }
+  .hero-box--data { order: 8; }
   .hero-name { font-size: clamp(34px, 9.4vw, 46px); }
   .hero-box-text { max-width: 42ch; }
   .hero-cursor { display: none; }

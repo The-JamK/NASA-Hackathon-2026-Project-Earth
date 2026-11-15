@@ -1,6 +1,6 @@
-# NASA Hackathon 2026 - Project Earth 
+# NASA Hackathon 2026 - Project Earth
 
-Signal & Noise — an Earth system trend detective for NASA Space Apps 2026. 
+Signal & Noise, an Earth system trend detective for NASA Space Apps 2026.
 
 ## Run locally
 
@@ -9,7 +9,7 @@ npm install
 npm run dev
 ```
 
-The app uses prebuilt data under `public/data`; rebuild the data bundle with:  
+The app uses prebuilt data under `public/data`; rebuild the data bundle with:
 
 ```sh
 uv run python scripts/build_data.py --env-file path/to/.env
@@ -26,9 +26,9 @@ places of every country and territory, ranked by Natural Earth's `POP_MAX`:
 - `scripts/build_data.py` merges those candidates with the curated table: one that
   is already a case, or within 15 km of one (the same conurbation), is skipped, and
   a candidate is kept only when NASA POWER returns all four variables for it.
-- A third pass fills regions the top-three rule leaves thin — Russia, northern
+- A third pass fills regions the top-three rule leaves thin, Russia, northern
   China, the Sahara and Sahel, North America, South America, Australia, Southeast
-  Asia, the Middle East, the Indian interior, Central Asia and the Amazon interior —
+  Asia, the Middle East, the Indian interior, Central Asia and the Amazon interior,
   with the largest city that no existing point covers within 500 km (minimum
   population 20,000), so a huge country is not represented by three metro areas
   while Europe carries a hundred.
@@ -48,7 +48,7 @@ France's stations alongside a list of its cities, so a country question is answe
 by the country rather than silently by its biggest city.
 
 The result is 708 points across 222 countries and territories: 696 carry all four
-variables and twelve keep three — the eleven Antarctic stations and Greenland's
+variables and twelve keep three, the eleven Antarctic stations and Greenland's
 Ittoqqortoormiit, where MERRA-2 masks root-zone soil wetness over ice. The Arctic holds
 17 stations and Antarctica 11, up from 7 and 1; Russia 32, North America 102, northern
 China 12, North Africa 30, South America 66, Australia 12, Southeast Asia 38, the Middle
@@ -59,18 +59,18 @@ interpolated or mask value.
 ## The station bundle is two tiers
 
 `points.json` was 6.1 MB, of which 5.1 MB was trend diagnostics for 708 stations ×
-4 variables × 3 windows — all of it loaded before the globe drew. It is now:
+4 variables × 3 windows, all of it loaded before the globe drew. It is now:
 
-- `points.json` — identity plus a four-number summary per variable and window
+- `points.json`, identity plus a four-number summary per variable and window
   (`s` slope, `p` HAC p, `n`, `v` verdict code): 869 kB raw, **199 kB gzip**. That
   is everything the globe needs to colour and label a dot, and everything the red
   herring needs to be derived.
-- `point-details/00…15.json` — the full trend records and annual series, one file
+- `point-details/00…15.json`, the full trend records and annual series, one file
   per shard, fetched when a case is opened and merged into that station in place.
   At most three shards are held and a shard is dropped when the cache turns over,
   so browsing does not accumulate 708 stations' series in memory.
 
-A station's shard is `sum(charCode) % 16` — the same function in `src/bundle.js`
+A station's shard is `sum(charCode) % 16`, the same function in `src/bundle.js`
 (the app), `scripts/bundle.mjs` (the Node checks) and `scripts/points_bundle.py`
 (the build). `node scripts/verify_bundle.mjs` fails if the three disagree, if the
 index still carries a series, if any summary disagrees with the record it
@@ -88,17 +88,17 @@ uv run python scripts/split_points.py
 
 ## Places the bundle does not hold
 
-Ask about a place with no station — **"Is Gold Coast getting hotter?"** — and the
+Ask about a place with no station, **"Is Gold Coast getting hotter?"**, and the
 app still answers, because a coordinate is all it needs: GISTEMP covers the whole
 planet, and the case is the nearest 4° cell to that place. The place name is the
 only new thing, and two resolvers supply it:
 
 - **The gazetteer** (`scripts/build_gazetteer.py` → `public/data/gazetteer.json`):
   6,421 populated places from Natural Earth's public-domain `ne_10m_populated_places`,
-  matched locally. Free, deterministic, and needs no key — so most names resolve
+  matched locally. Free, deterministic, and needs no key, so most names resolve
   with the model switched off entirely. Longest name wins, and a name typed
   without its space ("Goldcoast") is matched by running the words together.
-- **Keyless public geocoders**, for names the gazetteer does not carry — a suburb
+- **Keyless public geocoders**, for names the gazetteer does not carry, a suburb
   like "Broadbeach", an informal name, an alternate spelling. Open-Meteo's
   geocoding API first (no key, CC BY 4.0, under 10,000 calls a day), then
   OpenStreetMap's Nominatim (no key, but its usage policy requires a User-Agent
@@ -106,7 +106,7 @@ only new thing, and two resolvers supply it:
   to configure**: no `.env` entry, no Worker secret, no account.
 
 `worker/resolve.js` is shared by both entry points, exactly like `worker/live.js`.
-It answers `POST /api/resolve` with a place and two numbers — never a trend. The
+It answers `POST /api/resolve` with a place and two numbers, never a trend. The
 place name is cut out of the question first (`placeQuery`: drop the question words,
 the climate vocabulary and the years, so "Is Gold Coast getting hotter?" searches
 `gold coast`), the answer is validated (finite `lat`/`lon` in range, non-empty
@@ -115,7 +115,7 @@ limited to 20 lookups a minute per isolate, because Nominatim allows one request
 second for a whole application and no single visitor should spend the demo's
 budget. `GET /api/resolve` reports the gazetteer size and the provider chain.
 
-**Why a geocoder and not an LLM:** this step is a lookup, not a judgement — a
+**Why a geocoder and not an LLM:** this step is a lookup, not a judgement, a
 geocoder is cheaper, faster, deterministic, needs no key, and cannot hallucinate a
 coordinate in the wrong hemisphere. An earlier revision used a small model
 (`gpt-oss-20b:free` on ElectronHub) behind a key; the geocoder replaced it and the
@@ -130,10 +130,10 @@ repeats both: a derived case is a ~440 km box around the place, not the town
 boundary. When a real station is within 400 km the case offers it as a chip. At
 Gold Coast, for instance, the nearest cell is 111 km away at 29.0°S 153.0°E
 (+0.27 °C/decade, proven) and Brisbane is 80 km NNW. Derived cases are
-temperature only — the field is GISTEMP — so a question about rainfall at a place
+temperature only, the field is GISTEMP, so a question about rainfall at a place
 with no station says so instead of answering from the wrong variable.
 
-Without a server — the static GitHub Pages build — there is no `/api/resolve`, so
+Without a server, the static GitHub Pages build, there is no `/api/resolve`, so
 a place outside the 708-station bundle gets an honest message rather than a case.
 The gazetteer and the geocoders both need the endpoint; only the bundled cases
 work fully offline, exactly as before.
@@ -146,14 +146,14 @@ the timeout and upstream paths, caching, and the rate limit.
 The “Live” chip on a city case is served by a small proxy so the Meteomatics
 credentials never reach the browser:
 
-- `worker/live.js` — allowlists the bundle's points, queries Meteomatics for them
+- `worker/live.js`, allowlists the bundle's points, queries Meteomatics for them
   in one request, caches for 10 minutes, and answers `live_unconfigured` when
   credentials are absent.
-- `worker/index.js` — Workers entry: `/api/live` plus the static app.
-- `vite.config.js` — the same handler behind the dev and preview servers, reading
+- `worker/index.js`, Workers entry: `/api/live` plus the static app.
+- `vite.config.js`, the same handler behind the dev and preview servers, reading
   `METEOMATICS_USERNAME` and `METEOMATICS_PASSWORD` from `.env`.
 
-If the proxy is not running — the static GitHub Pages build, for example — the
+If the proxy is not running, the static GitHub Pages build, for example, the
 app falls back to the snapshot captured during the data build and labels the
 chip **Snapshot**.
 
@@ -161,9 +161,10 @@ To host the proxy, build with `npm run build`, deploy `worker/` with Wrangler
 (`worker/wrangler.toml` serves `dist/` as static assets), and store
 `METEOMATICS_USERNAME` and `METEOMATICS_PASSWORD` as Worker secrets. That
 deployment is live at
-<https://earth-trend-detective-case-files.gaussian-frontiers.workers.dev/app.html>
-— the same build as GitHub Pages, with `/api/live` and `/api/resolve` in front of
-it, so places outside the bundle resolve there and not on the Pages site.
+<https://earth-trend-detective-case-files.gaussian-frontiers.workers.dev/app.html>.
+It is the same build as GitHub Pages, with `/api/live` and `/api/resolve` in
+front of it, so places outside the bundle resolve there and not on the Pages
+site.
 
 A push to `main` redeploys the Worker the way it already publishes Pages:
 `.github/workflows/deploy-worker.yml` runs `npm ci && npm run build` and then
@@ -177,7 +178,7 @@ cannot be left serving a half-published build by a broken credential.
 ## The ocean
 
 The ocean is presented as places, not as points. The GISTEMP field already
-covers water, so a basin is the area-weighted mean of the ocean cells inside it —
+covers water, so a basin is the area-weighted mean of the ocean cells inside it,
 the same shape as a country average, with no marker added to the globe:
 
 ```sh
@@ -198,8 +199,8 @@ uv run python scripts/build_ocean.py
 
 Ask "Is the Pacific warming?" for a basin case, or use the third map layer to
 see the field filtered to water. In that layer a tap on water opens the basin
-under the tap — not the nearest station, and not a single cell's surface
-temperature — using the same wrapped box test the build used to partition the
+under the tap, not the nearest station, and not a single cell's surface
+temperature, using the same wrapped box test the build used to partition the
 cells, so the map and the averages cannot disagree. Water outside every named
 basin (the tropical Atlantic, 339 of the 2,672 cells) opens the global ocean
 rather than being reported as land; a tap on land says so and opens nothing. `node scripts/verify_ocean.mjs` recomputes every mean, pins the
@@ -209,14 +210,14 @@ mask at named anchors, and round-trips each basin's cells through the tap test.
 
 Sea ice is a record, not a cloud of points on the cap. NSIDC publishes the
 monthly extent of each hemisphere, so a case is the annual mean of twelve
-monthly extents — the same annual-mean contract as every other record:
+monthly extents, the same annual-mean contract as every other record:
 
 ```sh
 uv run python scripts/build_seaice.py
 ```
 
 - The source is the NSIDC/NOAA Sea Ice Index (G02135), read as four CSV
-  timeseries from NOAA PSL — extent and area, per hemisphere
+  timeseries from NOAA PSL, extent and area, per hemisphere
   (`n_iceextent.mon.csv`, `n_icearea.mon.csv`, `s_iceextent.mon.csv`,
   `s_icearea.mon.csv`; 1978→present, 10⁶ km²). NSIDC also serves the index as
   24 per-month CSVs; that host throttles a bulk fetch (500s, then refused
@@ -226,16 +227,16 @@ uv run python scripts/build_seaice.py
 - The Arctic is a proven decline: −0.539 ×10⁶ km²/decade, 95% CI −0.640 to
   −0.438, HAC p 1.4e-12, q 4e-12. The Antarctic is not proven: −0.233, CI −0.543
   to +0.077, HAC p 0.136. Same instrument, same window, opposite verdicts.
-- Extent is the area with at least 15% ice cover — not concentration, not
-  thickness — and averaging the twelve months hides the seasonal cycle. The
+- Extent is the area with at least 15% ice cover, not concentration, not
+  thickness, and averaging the twelve months hides the seasonal cycle. The
   case panel says both, and nothing is added to the globe.
 
 ### Two measures, side by side
 
 The index also carries ice **area**, so a second measure rides on the same
 records: concentration = 100 × area ÷ extent, the mean concentration of the
-ice-covered area. It answers a different question from extent — how much of that
-area is actually ice, rather than how far the ice reaches — and the two do not
+ice-covered area. It answers a different question from extent, how much of that
+area is actually ice, rather than how far the ice reaches, and the two do not
 have to agree:
 
 | measure | Arctic | Antarctic |
@@ -244,7 +245,7 @@ have to agree:
 | concentration | +0.379 pp/decade, not proven | +0.161, not proven |
 
 The Arctic pack is retreating, and the ice that remains is on average slightly
-more concentrated — but the HAC and Mann–Kendall tests disagree on that second
+more concentrated, but the HAC and Mann–Kendall tests disagree on that second
 point (p 0.017 vs 0.086), so the app does not call it. Every sea-ice case lists
 both measures with their verdicts, and the measure switch changes the narrative
 and facts.
@@ -262,8 +263,8 @@ every alias to plan a sea-ice case.
 
 ## The globe
 
-The planet is NASA Blue Marble shaded relief and bathymetry at **8192 × 4096** —
-30 texels per degree at the equator, 3.1 MB — served from NASA GIBS and committed as
+The planet is NASA Blue Marble shaded relief and bathymetry at **8192 × 4096**,
+30 texels per degree at the equator, 3.1 MB, served from NASA GIBS and committed as
 `public/textures/earth-blue-marble.jpg`, with a 4096 × 2048 greyscale shaded-relief
 map driving the bump shading. `scripts/verify_textures.mjs` reads the image headers, so a downsized
 texture cannot ship while the interface claims a higher resolution; it runs as part
@@ -271,19 +272,19 @@ of `scripts/verify_all.sh`.
 
 ## Export the numbers
 
-Every open case carries **Check the numbers** — two CSVs, no account and no round
+Every open case carries **Check the numbers**, two CSVs, no account and no round
 trip, so a reader can redo the statistics rather than take the panel's word. The
 bar is pinned to the bottom of the case panel: a case runs to about 1,300px in a
 324px-tall panel, so anything placed in the flow is unreachable exactly when it is
 wanted, and the pinned version stays in view from the verdict to the method notes.
 
-- `<case>-series.csv` — one row per year in the window: `year,value,fit,residual`.
+- `<case>-series.csv`, one row per year in the window: `year,value,fit,residual`.
   `fit` is the fitted line at that year (`intercept + slope_per_decade / 10 ×
   year`), so the slope can be refitted by hand and the residuals inspected for the
   serial correlation the HAC errors assume away. There is no per-year confidence
   band on purpose: the stored interval belongs to the slope, and spreading it
   across the years would invent an uncertainty the bundle does not carry.
-- `<case>-statistics.csv` — `field,value` for place and detail, variable, units,
+- `<case>-statistics.csv`, `field,value` for place and detail, variable, units,
   source, window, n, slope, 95% CI, HAC p, BH q (or an explicit note that the
   record is not in a family), r², Sen's slope, the Hamed–Rao corrected
   Mann–Kendall terms, lag-1 residual, Durbin–Watson, the verdict rule and the
@@ -305,7 +306,7 @@ bundle) and the statistics file copies the bundle unrounded.
 to keep in sync by hand. In the repository settings, **Pages → Build and
 deployment → Source** must be **GitHub Actions**: left on "deploy from a branch",
 GitHub also builds the repository root on every push, and the two publishers
-overwrite each other — one deploy serves the built site, the next serves the Vite
+overwrite each other, one deploy serves the built site, the next serves the Vite
 sources, which is exactly the failure that sent `/dist/index.html` links around.
 `scripts/verify_live.sh` now fails if the live `/app.html` is the source shell or
 if `/dist/index.html` answers again.
@@ -315,7 +316,7 @@ bundle does not hold ("Is Gold Coast getting hotter?") is still answered there:
 `src/field.js` falls back to the same Natural Earth gazetteer the Worker resolves
 from, which `public/data/gazetteer.json` already ships in the bundle, so the
 6,421 places it carries open a derived case on either host. Only the names the
-gazetteer lacks — suburbs like Broadbeach, alternate spellings — need the Worker,
+gazetteer lacks, suburbs like Broadbeach, alternate spellings, need the Worker,
 because the keyless geocoders live there and not in the page. There the app says
 so plainly instead of guessing.
 
@@ -324,13 +325,13 @@ space, `illonoisis` comes back as **Illinois**, and a name that means more than 
 place offers the choices instead of silently picking one: asking about **Washington**
 shows "Did you mean one of these?" with Washington, D.C. first and the state of
 Washington below it. States and provinces come from Natural Earth's admin-1 layer,
-so `Is Queensland getting wetter?` is answerable too — the case is the GISTEMP 4°
+so `Is Queensland getting wetter?` is answerable too, the case is the GISTEMP 4°
 cell nearest the division's label point, and the notice says so. Every candidate
 carries its own coordinates, so choosing one costs no extra request on either host.
 `scripts/verify_search.mjs` pins that behaviour. Ask for a **state** and you mean
 the state: `Washington state` is the state of Washington, while plain `Washington`
 is Washington, D.C., and the popup offers all three. A station name is only
-repaired for a real typo — one edit at the same length — so `Nairobii` reaches
+repaired for a real typo, one edit at the same length, so `Nairobii` reaches
 Nairobi but `Washington` never becomes Wellington.
 
 The variable comes from the words too, including comparatives: `hotter` and
@@ -341,12 +342,12 @@ still needs no special phrasing.
 
 The same tolerance covers the rest of the question. A station name one letter off
 (`Nairobii`, `Melborne`) is matched to the bundle's own station and offered in a
-"Did you mean" popup — choosing it opens that station's record instead of a
+"Did you mean" popup, choosing it opens that station's record instead of a
 derived cell. A misspelt climate word (`precipitiation`, `temperture`, `drougt`)
 still asks the right variable, and the plan says so: `read "precipitiation" as
-precipitation`. Countries and ocean basins are covered the same way — `Austraila`
+precipitation`. Countries and ocean basins are covered the same way, `Austraila`
 answers the Australia average, `Pacfic` answers a Pacific basin, `Indain Ocean`
-answers the Indian Ocean rather than the global one — while a name that is
+answers the Indian Ocean rather than the global one, while a name that is
 already right is never swapped for a neighbour (`Australia` and `Austria` are one
 edit apart, and each answers itself). `scripts/verify_typos.mjs` measures that
 across the whole table: one letter dropped from the middle of 300 sampled cities
@@ -387,9 +388,9 @@ the case.
 
 Two pages are built from `vite.config.js` (`build.rollupOptions.input`):
 
-- `index.html` — the landing page at the site root: one full-screen Earth carrying
+- `index.html`, the landing page at the site root: one full-screen Earth carrying
   the project's six cards. Clicking the globe is the only way in.
-- `app.html` — the app itself: globe, question box, map link and the case file, which appears only while a case is open.
+- `app.html`, the app itself: globe, question box, map link and the case file, which appears only while a case is open.
 
 On GitHub Pages they are served at `/NASA-Hackathon-2026-Project-Earth/` and
 `/NASA-Hackathon-2026-Project-Earth/app.html`. Both pages use relative links and

@@ -2,7 +2,7 @@
 
 The app ships 708 stations. A question about a place outside that network ("Is
 Gold Coast getting hotter?") still has a coordinate, so it can still be answered
-from the GISTEMP field — but only if the place name can be turned into a latitude
+from the GISTEMP field, but only if the place name can be turned into a latitude
 and longitude first.
 
 This writes `public/data/gazetteer.json`: a compact, public-domain list of

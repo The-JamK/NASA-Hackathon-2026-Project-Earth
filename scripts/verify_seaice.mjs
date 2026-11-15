@@ -2,7 +2,7 @@
 // the ice reaches) and concentration (100 × area ÷ extent, how much of that area
 // is ice). This check recomputes both from the cached source series, proves the
 // global sum is the sum of the two hemispheres, and requires the planner to
-// reach the record instead of a station — the bug this feature replaced.
+// reach the record instead of a station, the bug this feature replaced.
 import { existsSync, readFileSync } from "node:fs";
 import { planCase } from "../src/rag.js";
 

@@ -124,7 +124,7 @@ for (const absent of ["Andalucia", "Lombardy", "Scotland", "Brittany", "Normandy
 }
 
 // Ordinary sentences must not produce a repair at all. Country names are not in
-// this table — `resolveCountry` answers them before the gazetteer is asked — so
+// this table, `resolveCountry` answers them before the gazetteer is asked, so
 // the clean set is place names and state names only.
 for (const clean of ["Is Nairobi getting hotter?", "Is Queensland getting drier?", "Is Chennai warming?", "Is Chicago changing?"]) {
   const hits = searchPlaces(clean, entries);

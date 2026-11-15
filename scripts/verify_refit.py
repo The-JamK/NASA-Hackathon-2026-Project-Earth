@@ -4,7 +4,7 @@ Three things this guards, all of them things a judge can check by hand:
 
 1. `grid.json` names the analysed grid and the candidate grid separately, and the
    analysed count matches the cells actually shipped.
-2. The case the audit caught — jeddah / GWETROOT / 1990-2025 — no longer ships as
+2. The case the audit caught, jeddah / GWETROOT / 1990-2025, no longer ships as
    significant on a p-value that its own series does not reproduce.
 3. The method copy states the caveats a reader would otherwise read as errors:
    shared POWER cells, the global-ocean overlap, absent soil moisture at the ice

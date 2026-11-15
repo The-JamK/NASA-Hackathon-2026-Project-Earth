@@ -88,7 +88,7 @@ const meta = index.meta || {};
   if (incomplete.length) fail(`${incomplete.length} merged stations have no T2M record`);
 }
 
-// 5. Every four-number summary is the record it summarises — a stale index that
+// 5. Every four-number summary is the record it summarises, a stale index that
 //    disagrees with its shard would colour the globe by a trend it does not have.
 {
   const CODES = { si: "significant increasing", sd: "significant decreasing", ns: "no significant trend", ex: "exploratory" };

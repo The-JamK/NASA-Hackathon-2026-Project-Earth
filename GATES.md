@@ -631,6 +631,31 @@ Last verified: 2026-11-14
   EXPECT: (no output)
   EVIDENCE: `git status --porcelain --untracked-files=no` prints nothing and `cloud_git push` reported `989b76b..0eefae5  HEAD -> main`. Two commits plus a merge: `71f5315` (the quiet motion and its check), `0eefae5` (merge of `main`'s comparative-vocabulary change, with this ledger's gates renumbered G120–G124 around its new G118–G119). `main` moved once during the work, from `64e6dfb` to `989b76b`. The only untracked path is `artifacts/`, the screenshots and deck renders that have never been in the repository.
 
-MET: 123
-UNMET: 1
+
+- [x] G125: The landing screen carries eight copy boxes, and the two new ones state who the site is for: the general public, with simple search and a clear answer; technical analysts, with the numbers, the calculations and data ready to download.
+  CHECK: node scripts/verify_hero.mjs
+  EXPECT: HERO CHECK PASS
+  EVIDENCE: `HERO CHECK PASS`, exit 0: eight boxes, one per position, each with copy; `the public box says it is made for the general public, through simple search and a clear answer`; `the analyst box says it is made for technical analysts, with detailed numbers and calculations fully explained`; `the analyst box says the data is organised and ready to download`; the formats named as CSV, Excel and R; `no leader lines or anchor dots`. `verify_app.mjs` now asserts the same two sentences and the count of eight, so the landing cannot quietly lose a box.
+
+- [x] G126: No em-dash remains anywhere a reader can meet one: the two pages, the app's source strings, the stylesheet's prose, the README, the demo notes, and the shipped data's labels.
+  CHECK: node scripts/verify_prose.mjs
+  EXPECT: PROSE CHECK PASS
+  EVIDENCE: `PROSE CHECK PASS`, exit 0, `scanned 25 files, 139 en-dashes kept in ranges` (the en-dashes in 1990–2025 stay). The first run failed with `121 em-dashes left (U+2014)`, and the sweep was done twice: the first attempt collapsed comma-plus-punctuation sequences and thereby ate JavaScript spread operators and Python variadic tuples in ten files (`{ points...creds }`, `tuple[str, Any]...`), which `node --check` and `py_compile` caught. The redo touches only the em-dash character and was gated on a before/after count of 17 spread operators, unchanged, with every JS and Python file compiling and all nine data files parsing afterwards.
+
+- [x] G127: All eight boxes hug the Earth and none of them collide, clip the viewport or spill across the sphere's centre, measured at several screen sizes.
+  MANUAL: box rectangles against the stage and the globe, photographed.
+  EVIDENCE: `getBoundingClientRect` in the browser at five sizes. Arc layout, the sphere between two columns of four: 1202x700, 1202x800, 1280x800, 1440x900 and 1920x1080, all `overlaps: []`, `clipped: []`, no page scroll. At 1440x900 the inner edges sit 360px (name), 441px (public and members) and 395px (about) from the centre line with the sphere between them, and the right column mirrors those numbers. Below 1200px the page keeps its existing stacked layout, name above the globe and the rest below: 1024x768 and 390x844 stack, scroll, and overlap nothing. Screenshots: `artifacts/hero-1440.png`, `artifacts/hero-1280.png`, `artifacts/hero-1024.png`, `artifacts/hero-390.png`, `artifacts/hero-390-full.png`.
+
+- [x] G128: Every check that passed before still passes with the new landing and the rewritten prose.
+  CHECK: SKIP_LIVE=1 bash scripts/verify_all.sh
+  EXPECT: all checks passed
+  EVIDENCE: `all checks passed` with the three new steps inside it (`MOTION CHECK PASS`, `PROSE CHECK PASS`, `HERO CHECK PASS`) and every earlier check unchanged, including `app verified`, `hero: eight copy boxes, no leader lines`, `case layout: narrative paragraph above the verdict block` and `verdict: tone fills the box, no left bar`. `npm run build` succeeds and first-load stays inside its 1,025 kB budget.
+
+- [ ] G129: The result is committed to main and pushed.
+  CHECK: git status --porcelain --untracked-files=no
+  EXPECT: (no output)
+  EVIDENCE: pending
+
+MET: 127
+UNMET: 2
 ABANDONED: 0

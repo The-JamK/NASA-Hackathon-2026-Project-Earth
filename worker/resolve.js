@@ -1,15 +1,15 @@
 // Resolver for questions the bundle cannot place: "Is Gold Coast getting hotter?"
 //
 // The bundle holds 708 stations. A question about a place outside that network
-// has no case file — but it still has a coordinate, and the GISTEMP field covers
+// has no case file, but it still has a coordinate, and the GISTEMP field covers
 // every coordinate. This module turns a place name into a latitude and longitude
 // and hands the coordinate back to the app, which then answers from the field.
 //
 // Two resolvers, in this order:
-//   1. the gazetteer — 6,400-odd Natural Earth populated places, matched locally.
+//   1. the gazetteer, 6,400-odd Natural Earth populated places, matched locally.
 //      Free, deterministic, and it answers most questions without touching the
 //      network at all.
-//   2. keyless public geocoders — Open-Meteo first (no key, CC BY 4.0, under
+//   2. keyless public geocoders, Open-Meteo first (no key, CC BY 4.0, under
 //      10,000 calls/day), then OpenStreetMap's Nominatim (no key, but its policy
 //      requires a User-Agent that names the app and at most 1 request/second).
 //      They cover names the gazetteer does not carry: suburbs, hamlets,
@@ -18,7 +18,7 @@
 // No API key is involved anywhere, so the feature works on a Worker with no
 // secrets configured. Nothing here computes a trend: the coordinate goes to the
 // same deterministic statistics every other case uses, and the model never
-// existed — a geocoder is both cheaper and better at this job than a language
+// existed, a geocoder is both cheaper and better at this job than a language
 // model.
 //
 // This file is shared by the Workers entry (worker/index.js) and the Vite
@@ -210,11 +210,11 @@ function populationPrior(population) {
 /**
  * How well one gazetteer key fits the question, or null.
  *
- * - `exact` — the key appears as whole words ("gold coast").
- * - `exact` with initials — the question is a prefix and only abbreviations
+ * - `exact`, the key appears as whole words ("gold coast").
+ * - `exact` with initials, the question is a prefix and only abbreviations
  *   follow, which is how "washington" reaches "Washington, D.C.".
- * - `prefix` — the question is the start of a longer name ("san" -> San Diego).
- * - `compact` — the spaces were left out ("goldcoast").
+ * - `prefix`, the question is the start of a longer name ("san" -> San Diego).
+ * - `compact`, the spaces were left out ("goldcoast").
  */
 function rateKey(key, folded, place, compact) {
   // How much of the typed name a key accounts for. "gold coast" is covered by
@@ -234,7 +234,7 @@ function rateKey(key, folded, place, compact) {
   const compactKey = key.replace(/ /g, "");
   // Dropping the spaces is the whole test: "goldcoast" is "gold coast" with the
   // space removed. A key that only sits inside the typed word is a different,
-  // shorter name — "Guandong" contains "Andong", and that is not an unspaced
+  // shorter name, "Guandong" contains "Andong", and that is not an unspaced
   // match of Andong.
   if (compact === compactKey) {
     return { base: 0.85, match: "compact", coverage: 1 };
@@ -274,7 +274,7 @@ function rateTypo(key, compact) {
  * Every plausible place for a question, best first.
  *
  * Searching returns a list rather than one answer because a name alone is
- * ambiguous — there are 20-odd Washingtons — and because a near miss ("illonoisis")
+ * ambiguous, there are 20-odd Washingtons, and because a near miss ("illonoisis")
  * should come back with what it probably meant instead of a refusal. The caller
  * decides whether to use the best one silently or to ask.
  */
@@ -302,7 +302,7 @@ export function searchPlaces(question, entries = [], { limit = 4 } = {}) {
     // meant (Washington, D.C. over the state), not which of several differently
     // spelled names a typo meant. Ranking a repair by population sent
     // "Guandong" to Andong and "Cataonia" to Catania, so a repair is ranked by
-    // how much of the word it has to change — and a state breaks an exact tie
+    // how much of the word it has to change, and a state breaks an exact tie
     // with a town, because that is the larger thing to be wrong about.
     // Asking for a state prefers a region, and among regions prefers the one whose
     // own name is what the question started with: "Washington state" is the state
