@@ -187,3 +187,165 @@ export function renderSeriesChart(container, { years, values, trend, variable, x
       <text class="axis-label" x="${width - pad.right}" y="9" text-anchor="end">${xLabel || ""}</text>
     </svg>`;
 }
+
+// Place names arrive from a data bundle, so every label is escaped here rather
+// than trusted: a station name is data, not markup.
+function escapeText(value) {
+  return String(value ?? "").replace(/[&<>"']/g, (character) => {
+    if (character === "&") return "&amp;";
+    if (character === "<") return "&lt;";
+    if (character === ">") return "&gt;";
+    if (character === '"') return "&quot;";
+    return "&#39;";
+  });
+}
+
+function shortLabel(value, limit = 22) {
+  const text = String(value ?? "");
+  return text.length > limit ? `${text.slice(0, limit - 1)}…` : text;
+}
+
+// The same convention the case file uses for a rate: a true minus, two decimals,
+// and an explicit plus so a reader can see the direction before reading the digit.
+function signedAxis(value) {
+  if (!Number.isFinite(value)) return "";
+  return `${value < 0 ? "\u2212" : "+"}${Math.abs(value).toFixed(2)}`;
+}
+
+// A place keeps its colour whichever variable is on screen, so the chart and the
+// rows below it can be read together. Eight entries are enough for the twelve
+// places the saved list allows, and the cycle is stable.
+const TREND_PALETTE = ["#ff6b4a", "#5fd3e0", "#c9a227", "#4f93d6", "#b06ce0", "#5fbf8f", "#e07a9a", "#9aa7b4"];
+
+export function trendPalette(index) {
+  const safe = Number.isFinite(index) ? Math.abs(index) : 0;
+  return TREND_PALETTE[safe % TREND_PALETTE.length];
+}
+
+/**
+ * Annual series for one section, drawn in the variable's own units. Unlike the
+ * case chart, this is not indexed: every place in a section shares one variable,
+ * so one shared axis is the honest comparison and indexing would hide how far
+ * apart they actually are.
+ *
+ * Each line carries `data-key` so the dialog can dim the others on hover.
+ */
+export function renderTrendChart(container, { lines, units, height = 168, xLabel = "Year" }) {
+  if (!container) return;
+  const drawn = (lines || []).filter((line) => Array.isArray(line.pairs) && line.pairs.length >= 3);
+  if (!drawn.length) {
+    container.innerHTML = `<div class="warn-note">No annual series for this variable in these places.</div>`;
+    return;
+  }
+
+  const style = getComputedStyle(container);
+  const chrome =
+    Number.parseFloat(style.paddingLeft || "0") + Number.parseFloat(style.paddingRight || "0");
+  const measured = (container.clientWidth || 620) - chrome;
+  const width = Math.round(Math.min(Math.max(measured, 260), 860));
+  const pad = { top: 12, right: 12, bottom: 36, left: width < 420 ? 34 : 44 };
+
+  const all = drawn.flatMap((line) => line.pairs);
+  const x = d3
+    .scaleLinear()
+    .domain(d3.extent(all, (pair) => pair.year))
+    .range([pad.left, width - pad.right]);
+  const y = d3
+    .scaleLinear()
+    .domain(d3.extent(all, (pair) => pair.value))
+    .nice()
+    .range([height - pad.bottom, pad.top]);
+
+  const yTicks = y.ticks(4);
+  const grid = yTicks
+    .map(
+      (tick) =>
+        `<line class="grid-line" x1="${pad.left}" x2="${width - pad.right}" y1="${y(tick).toFixed(
+          1
+        )}" y2="${y(tick).toFixed(1)}"/>`
+    )
+    .join("");
+  const yLabels = yTicks
+    .map(
+      (tick) =>
+        `<text class="tick-label" x="${pad.left - 6}" y="${(y(tick) + 2.5).toFixed(
+          1
+        )}" text-anchor="end">${d3.format(".2~f")(tick)}</text>`
+    )
+    .join("");
+
+  const years = d3.extent(all, (pair) => pair.year);
+  const xTicks = d3.ticks(years[0], years[1], width < 420 ? 3 : 5);
+  const xLabels = xTicks
+    .map(
+      (tick) =>
+        `<text class="tick-label" x="${x(tick).toFixed(1)}" y="${
+          height - pad.bottom + 13
+        }" text-anchor="middle">${tick}</text>`
+    )
+    .join("");
+
+  const axis =
+    `<line class="axis-line" x1="${pad.left}" x2="${width - pad.right}" y1="${
+      height - pad.bottom
+    }" y2="${height - pad.bottom}"/>` +
+    `<line class="axis-line" x1="${pad.left}" x2="${pad.left}" y1="${pad.top}" y2="${
+      height - pad.bottom
+    }"/>` +
+    `<text class="axis-title" x="${((pad.left + width - pad.right) / 2).toFixed(1)}" y="${
+      height - 6
+    }" text-anchor="middle">${escapeText(String(xLabel).toUpperCase())}</text>` +
+    (units
+      ? `<text class="axis-title" transform="translate(11, ${(height / 2).toFixed(
+          1
+        )}) rotate(-90)" text-anchor="middle">${escapeText(String(units).toUpperCase())}</text>`
+      : "");
+
+  const domain = y.domain();
+  const zeroLine =
+    domain[0] <= 0 && domain[1] >= 0
+      ? `<line class="zero-line" x1="${pad.left}" x2="${width - pad.right}" y1="${y(0).toFixed(
+          1
+        )}" y2="${y(0).toFixed(1)}"/>`
+      : "";
+
+  const showDots = drawn.length <= 3;
+  const paths = drawn
+    .map((line) => {
+      const path = "M" + line.pairs.map((pair) => `${x(pair.year).toFixed(1)},${y(pair.value).toFixed(1)}`).join("L");
+      const dots = showDots
+        ? line.pairs
+            .map(
+              (pair) =>
+                `<circle class="trend-dot" cx="${x(pair.year).toFixed(1)}" cy="${y(pair.value).toFixed(
+                  1
+                )}" r="1.7" fill="${line.color}"/>`
+            )
+            .join("")
+        : "";
+      return `<g class="trend-series" data-key="${escapeText(line.key)}"><path class="trend-line" d="${path}" stroke="${
+        line.color
+      }" fill="none"/>${dots}</g>`;
+    })
+    .join("");
+
+  const spoken = drawn
+    .map((line) => {
+      const first = line.pairs[0];
+      const last = line.pairs[line.pairs.length - 1];
+      return `${line.label} from ${first.value.toFixed(2)} in ${first.year} to ${last.value.toFixed(2)} in ${last.year}`;
+    })
+    .join("; ");
+
+  container.innerHTML = `
+    <svg viewBox="0 0 ${width} ${height}" width="${width}" height="${height}" role="img" aria-label="Annual ${escapeText(
+      units || "values"
+    )} for ${escapeText(drawn.map((line) => line.label).join(", "))}. ${escapeText(spoken)}">
+      ${grid}
+      ${zeroLine}
+      ${axis}
+      ${paths}
+      ${yLabels}
+      ${xLabels}
+    </svg>`;
+}

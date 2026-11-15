@@ -21,7 +21,19 @@ import { mesh as topojsonMesh } from "topojson-client";
 import world from "world-atlas/countries-110m.json";
 import "./style.css";
 import { oceanRegionAt, oceanVariable, planCase, seaIceVariable } from "./rag.js";
-import { renderCompareChart, renderSeriesChart, trendColor } from "./chart.js";
+import { renderCompareChart, renderSeriesChart, renderTrendChart, trendColor, trendPalette } from "./chart.js";
+import {
+  MAX_STARS,
+  compareRows,
+  isStarred,
+  loadStars,
+  saveStars,
+  sectionsFor,
+  starKey,
+  starsToCsv,
+  toggleStar,
+  variablesAcross,
+} from "./stars.js";
 import { caseSlug, downloadCsv, reportRows, seriesRows, toCsv } from "./export.js";
 import { SOURCE_LINKS } from "./sources.js";
 import { formatLatLon, haversineKm, nearestCell, nearestRecord } from "./geo.js";
@@ -63,6 +75,19 @@ const state = {
   // set. A shard holds roughly 44 stations.
   detailShards: new Map(),
   detailOrder: [],
+  // Saved places, the only state that outlives the page. `starTarget` is what the
+  // star in the current case head would toggle; `starRecords` holds the station
+  // trend records fetched for the comparison's intervals.
+  stars: [],
+  starsUnstored: false,
+  starTarget: null,
+  // Normalised series and trends per saved place, once the charts ask for them.
+  starSeries: new Map(),
+  compareVariable: null,
+  // The comparison keeps its own window, so changing it here never moves the case
+  // the reader left open behind the dialog.
+  compareWindow: null,
+  compareLoading: false,
 };
 
 const BASE_URL = import.meta.env.BASE_URL || "/";
@@ -104,6 +129,14 @@ const els = {
   methodDone: document.getElementById("method-done"),
   recommendation: document.getElementById("recommendation"),
   oceanLegend: document.getElementById("ocean-legend"),
+  starsBtn: document.getElementById("stars-btn"),
+  starsCount: document.getElementById("stars-count"),
+  compareDialog: document.getElementById("compare-dialog"),
+  compareBody: document.getElementById("compare-body"),
+  compareNote: document.getElementById("compare-note"),
+  closeCompare: document.getElementById("close-compare"),
+  compareDone: document.getElementById("compare-done"),
+  compareCsv: document.getElementById("compare-csv"),
 };
 
 let globe;
@@ -138,6 +171,7 @@ async function init() {
     state.windowKey = points.meta.windows[0];
     state.byCode = new Map(state.variables.map((variable) => [variable.code, variable]));
     state.byId = new Map(state.points.map((point) => [point.id, point]));
+    loadSavedStars();
 
     if (import.meta.env.DEV) {
       window.__caseFiles = {
@@ -995,6 +1029,713 @@ function clearCase() {
   els.hint.textContent = "Drag to rotate · scroll to zoom · tap anywhere to find the nearest record";
 }
 
+/* ------------------------------------------------------------ saved places */
+
+// The app keeps nothing between visits except this. `stars.js` owns the rules
+// (the cap, duplicates, a corrupt stored value); the functions below only decide
+// where a star appears and what the comparison says. Starring is deliberately
+// quiet: it paints one button and raises a toast, and never re-renders the case,
+// moves the camera or opens the comparison by itself.
+
+let starStorage = null;
+let starStorageProbed = false;
+
+function starsStorage() {
+  if (starStorageProbed) return starStorage;
+  starStorageProbed = true;
+  try {
+    // A probe, because reading the property succeeds in some browsers that then
+    // refuse every write.
+    const probe = "signal-noise:probe";
+    window.localStorage.setItem(probe, "1");
+    window.localStorage.removeItem(probe);
+    starStorage = window.localStorage;
+  } catch {
+    starStorage = null;
+  }
+  return starStorage;
+}
+
+function loadSavedStars() {
+  const saved = loadStars(starsStorage());
+  state.stars = saved.stars;
+  state.starsUnstored = saved.unavailable === true;
+  if (saved.repaired && saved.stars.length) {
+    showToast("A saved place could not be read and was set aside.");
+  }
+  refreshStarsButton();
+}
+
+function persistStars() {
+  if (state.starsUnstored) return;
+  if (saveStars(starsStorage(), state.stars)) return;
+  // Storage is full or blocked. The stars stay for this visit; say so once.
+  state.starsUnstored = true;
+}
+
+// What the star would save for the case that is open. Global and derived cases
+// have no star: one is not a place, the other borrows the nearest grid cell.
+function starTarget() {
+  const record = state.selected;
+  const kind = state.selectedKind;
+  if (!record) return null;
+
+  // A grid cell and a searched place borrow the same field, so both save as one
+  // "point": the cell's own identity, named by whatever the reader was looking at.
+  if (kind === "grid" || kind === "derived") {
+    if (!Number.isFinite(record.lat) || !Number.isFinite(record.lon)) return null;
+    const name = kind === "derived" ? record.place?.name || record.name : record.name;
+    return {
+      kind: "point",
+      id: `grid:${record.lat}:${record.lon}`,
+      name,
+      country: record.place?.country || null,
+      lat: record.lat,
+      lon: record.lon,
+      savedAt: new Date().toISOString(),
+    };
+  }
+
+  if (!["city", "country", "ocean", "seaice"].includes(kind)) return null;
+  if (!record.id || !record.name) return null;
+  return {
+    kind,
+    id: record.id,
+    name: record.name,
+    country: kind === "city" ? record.country || null : null,
+    lat: Number.isFinite(record.lat) ? record.lat : null,
+    lon: Number.isFinite(record.lon) ? record.lon : null,
+    savedAt: new Date().toISOString(),
+  };
+}
+
+function starLabel(star, on) {
+  return on ? `Remove ${star.name} from saved places` : `Save ${star.name} to compare`;
+}
+
+// Rendered inside the case head, beside Close, so starring adds no chrome and
+// cannot shift the panel. The header is redrawn with every case, so the button is
+// a paint of state rather than a second source of truth.
+function starButton() {
+  const star = starTarget();
+  state.starTarget = star;
+  if (!star) return "";
+  const on = isStarred(state.stars, star.kind, star.id);
+  const label = escapeHtml(starLabel(star, on));
+  return `<button class="case-star${on ? " on" : ""}" type="button" data-action="toggle-star" aria-pressed="${on}" aria-label="${label}" title="${label}"><span aria-hidden="true">${
+    on ? "\u2605" : "\u2606"
+  }</span></button>`;
+}
+
+function refreshStarsButton() {
+  if (!els.starsBtn) return;
+  const count = state.stars.length;
+  // No stars, no button: a reader who never uses this sees no new top-bar chrome.
+  els.starsBtn.hidden = count === 0;
+  if (els.starsCount) els.starsCount.textContent = String(count);
+  els.starsBtn.setAttribute(
+    "aria-label",
+    `${count} saved place${count === 1 ? "" : "s"}, compare them`
+  );
+}
+
+function toggleStarForCase() {
+  const star = state.starTarget;
+  if (!star) return;
+  const result = toggleStar(state.stars, star);
+  if (result.changed === "full") {
+    showToast(`Saved places hold ${MAX_STARS}. Remove one to add ${star.name}.`);
+    return;
+  }
+  if (result.changed === "invalid") return;
+  state.stars = result.stars;
+  persistStars();
+  refreshStarsButton();
+
+  // Repaint the one button rather than re-rendering the case, so a star can never
+  // scroll the reader's case panel back to the top.
+  const on = result.changed === "added";
+  const button = els.casePanel.querySelector('[data-action="toggle-star"]');
+  if (button) {
+    const label = starLabel(star, on);
+    button.setAttribute("aria-pressed", String(on));
+    button.classList.toggle("on", on);
+    button.setAttribute("aria-label", label);
+    button.title = label;
+    const glyph = button.querySelector("span");
+    if (glyph) glyph.textContent = on ? "\u2605" : "\u2606";
+  }
+
+  if (!on) {
+    showToast(`Removed ${star.name} from saved places`);
+    return;
+  }
+  if (state.starsUnstored) {
+    showToast(`Saved ${star.name} for this visit only`);
+    return;
+  }
+  const count = state.stars.length;
+  showToast(`Saved ${star.name} · ${count} place${count === 1 ? "" : "s"}`);
+}
+
+// The record behind a star: the station index, a loaded bundle, or the station's
+// shard record once the reader asks for its interval.
+// One record per saved place: the annual series and the stored trends, normalised
+// to the same shape whatever bundle it came from. The comparison reads only this, so
+// it never has to know which dataset a place belongs to.
+function starSeriesRecord(star) {
+  if (star.kind === "country") {
+    const country = state.countriesById.get(star.id);
+    if (!country) return null;
+    return { years: state.meta.years, series: country.series || {}, trends: country.trends || {} };
+  }
+  if (star.kind === "ocean") {
+    const region = state.oceanById.get(star.id);
+    if (!region) return null;
+    return {
+      years: state.oceanMeta?.years || state.meta.years,
+      series: region.series || {},
+      trends: region.trends || {},
+    };
+  }
+  if (star.kind === "seaice") {
+    const record = state.seaIceById.get(star.id);
+    if (!record) return null;
+    return {
+      years: state.seaIceMeta?.years || state.meta.years,
+      series: record.series || {},
+      trends: record.trends || {},
+    };
+  }
+  if (star.kind === "point") {
+    const cell = state.gridPoints.find((entry) => entry.id === star.id);
+    if (!cell) return null;
+    // A grid cell carries one field, so its trends are keyed by window rather than
+    // by variable. They are lifted into the same shape the rest of the dialog reads.
+    const trends = {};
+    for (const [code, byWindow] of Object.entries(cell.trends || {})) {
+      trends[code] = Object.fromEntries(
+        Object.entries(byWindow || {}).map(([windowKey, trend]) => [windowKey, normalizeGridTrend(trend)])
+      );
+    }
+    return { years: state.grid?.meta?.years || [], series: { GISTEMP: cell.values }, trends };
+  }
+  return null;
+}
+
+/**
+ * Load what the charts need. Stations live in detail shards, so each distinct
+ * shard is fetched once and every saved station in it is taken from that one
+ * response; the other bundles are already cached by the app. A failure leaves a
+ * place with rows and no line rather than an empty dialog.
+ */
+async function loadStarSeries() {
+  const missing = state.stars.filter((star) => !state.starSeries.has(starKey(star)));
+  if (!missing.length) return;
+
+  const kinds = new Set(missing.map((star) => star.kind));
+  const jobs = [];
+  if (kinds.has("country")) jobs.push(ensureCountries());
+  if (kinds.has("ocean")) jobs.push(ensureOcean());
+  if (kinds.has("seaice")) jobs.push(ensureSeaIce());
+  if (kinds.has("point")) jobs.push(ensureGrid());
+  await Promise.allSettled(jobs);
+
+  const shards = new Map();
+  for (const star of missing.filter((entry) => entry.kind === "city")) {
+    const path = detailPath(star.id, state.meta);
+    if (!path) continue;
+    if (!shards.has(path)) shards.set(path, []);
+    shards.get(path).push(star);
+  }
+  for (const [path, stars] of shards) {
+    try {
+      const block = await loadJson(assetUrl(path));
+      for (const star of stars) {
+        const detail = block?.points?.[star.id];
+        if (!detail) continue;
+        state.starSeries.set(starKey(star), {
+          years: state.meta.years,
+          series: detail.series || {},
+          trends: detail.trends || {},
+        });
+      }
+    } catch {
+      // Offline or a slow shard: the place keeps its row and loses only its line.
+    }
+  }
+
+  for (const star of missing.filter((entry) => entry.kind !== "city")) {
+    if (state.starSeries.has(starKey(star))) continue;
+    const record = starSeriesRecord(star);
+    if (record) state.starSeries.set(starKey(star), record);
+  }
+}
+
+const KIND_LABEL = {
+  city: "Station",
+  country: "Country average",
+  point: "Grid point",
+  ocean: "Ocean region",
+  seaice: "Sea ice record",
+};
+
+// Distinct from the case file's `signed()`: a missing number must leave the cell
+// empty here, because "no interval" and "an interval around zero" are not the same
+// claim and the table has a column for each.
+function signedValue(value, digits = 2) {
+  if (!Number.isFinite(value)) return "";
+  const magnitude = Math.abs(value).toFixed(digits);
+  return `${value < 0 ? "\u2212" : "+"}${magnitude}`;
+}
+
+const VERDICT_TONE = {
+  "significant increasing": "warm",
+  "significant decreasing": "cool",
+  "no significant trend": "flat",
+};
+
+function verdictTone(row) {
+  if (row.exploratory) return "explore";
+  return VERDICT_TONE[row.verdict] || "flat";
+}
+
+function verdictWord(row) {
+  if (row.missing) return "no record";
+  if (row.exploratory) return "exploratory";
+  return row.verdict || "no verdict";
+}
+
+// A verdict is a dot and a word here, not a filled block: the same language the
+// globe legend already uses.
+function verdictPill(row) {
+  return `<span class="compare-verdict"><span class="compare-dot ${verdictTone(row)}"></span>${escapeHtml(
+    verdictWord(row)
+  )}</span>`;
+}
+
+function compareRow(row, color, variable) {
+  const kind = KIND_LABEL[row.kind] || row.kind;
+  const sub = [kind, row.country].filter(Boolean).join(" · ");
+  const shared = row.sharesCell
+    ? `<span class="compare-shared" title="Shares a NASA POWER cell with another saved place">same cell</span>`
+    : "";
+  const key = escapeHtml(row.key);
+
+  const bits = [];
+  if (row.hasInterval) bits.push(`${signedValue(row.low)} to ${signedValue(row.high)}`);
+  else if (!row.missing) bits.push("interval in case file");
+  if (row.n !== null) bits.push(`n ${row.n}`);
+  if (row.delta) bits.push(`Δ ${signedValue(row.delta)} vs first here`);
+
+  const label = String(variable || "record").toLowerCase();
+  const rate = row.missing
+    ? `<span class="compare-absent">no ${escapeHtml(label)} record</span>`
+    : signedValue(row.slope);
+
+  return `<tr data-key="${key}"${row.missing ? ' class="is-missing"' : ""}>
+      <th scope="row">
+        <span class="compare-place"><span class="compare-swatch" style="background:${color}"></span>${escapeHtml(
+          row.name
+        )}</span>
+        <span class="compare-kind">${escapeHtml(sub)}</span>
+      </th>
+      <td class="num compare-rate">
+        <span class="compare-slope">${rate}</span>
+        ${
+          bits.length
+            ? `<span class="compare-sub" title="95% interval for this slope, sample size, difference from the first place in this section">${escapeHtml(
+                bits.join(" · ")
+              )}</span>`
+            : ""
+        }
+      </td>
+      <td class="compare-verdict-cell">${verdictPill(row)}${shared}</td>
+      <td class="actions">
+        <button class="row-open" type="button" data-action="open-saved" data-key="${key}">Open</button>
+        <button class="row-remove" type="button" data-action="remove-saved" data-key="${key}" aria-label="${escapeHtml(
+          `Remove ${row.name} from saved places`
+        )}">×</button>
+      </td>
+    </tr>`;
+}
+
+function compareVariableButtons(available, active) {
+  if (!available.length) return "";
+  return `<div class="compare-vars" role="group" aria-label="Variable to compare">${available
+    .map(
+      (variable) =>
+        `<button class="compare-var${variable.code === active ? " on" : ""}" type="button" data-action="compare-variable" data-code="${escapeHtml(
+          variable.code
+        )}" aria-pressed="${variable.code === active}">${escapeHtml(
+          variable.short || variable.label || variable.code
+        )}<span>${variable.places}</span></button>`
+    )
+    .join("")}</div>`;
+}
+
+function compareSectionsHtml(sections, colors) {
+  return sections
+    .map((section) => {
+      const chart = state.compareLoading
+        ? `<p class="compare-hint compare-loading">Loading annual series…</p>`
+        : section.lines.length
+          ? `<figure class="compare-figure"><div class="compare-chart" id="compare-chart-${section.kind}"></div></figure>`
+          : `<p class="compare-hint compare-nochart">Nothing to draw here: none of these places has a ${escapeHtml(
+              String(section.variable || "").toLowerCase()
+            )} series.</p>`;
+      return `<section class="compare-section">
+        <header class="compare-section-head">
+          <h3>${escapeHtml(section.label)}</h3>
+          <span>${section.rows.length} place${section.rows.length === 1 ? "" : "s"}</span>
+        </header>
+        ${chart}
+        <table class="compare-table">
+          <caption class="sr-only">${escapeHtml(section.label)}: slopes for ${escapeHtml(
+            section.variable || ""
+          )}, one row per saved place</caption>
+          <thead>
+            <tr>
+              <th scope="col">Place</th>
+              <th scope="col" class="num">Per decade${section.units ? ` (${escapeHtml(section.units)})` : ""}</th>
+              <th scope="col">Verdict</th>
+              <th scope="col" class="actions"><span class="sr-only">Actions</span></th>
+            </tr>
+          </thead>
+          <tbody>${section.rows
+            .map((row) => compareRow(row, trendPalette(colors.get(row.key) ?? 0), section.variable))
+            .join("")}</tbody>
+        </table>
+      </section>`;
+    })
+    .join("");
+}
+
+// The same three windows a case offers, re-cutting only the dialog.
+function compareWindowChips() {
+  const active = compareWindow();
+  return `<div class="window-row compare-window-row"><span class="chip-label">Window</span><div class="var-chips">${(
+    state.meta?.windows || []
+  )
+    .map(
+      (key) =>
+        `<button class="var-chip${key === active ? " on" : ""}" type="button" data-action="compare-window" data-window="${escapeHtml(
+          key
+        )}" aria-pressed="${key === active}">${key.replace("-", "–")}</button>`
+    )
+    .join("")}</div></div>`;
+}
+
+function compareAddHtml() {
+  return `<div class="compare-add">
+    <label class="sr-only" for="compare-add-input">Add a place to compare</label>
+    <input id="compare-add-input" type="search" autocomplete="off" spellcheck="false"
+      placeholder="Add a station, country, ocean or sea-ice record" />
+    <div class="compare-add-results" id="compare-add-results" hidden></div>
+  </div>`;
+}
+
+/* ------------------------------------------------------- adding a place */
+
+// The picker searches what the app already holds. Stations are in memory from the
+// first byte of the index; the other three bundles are small and load once, on the
+// first time the picker is used.
+let comparePool = null;
+let comparePoolReady = false;
+
+// Countries, ocean regions and sea-ice records are three small bundles the picker
+// needs before it can match anything, so they are fetched together the first time
+// the field is used, not when the dialog opens.
+async function ensureComparePool() {
+  if (comparePoolReady) return;
+  await Promise.allSettled([ensureCountries(), ensureOcean(), ensureSeaIce()]);
+  comparePool = null;
+  comparePoolReady = true;
+}
+
+function compareCandidates() {
+  if (comparePool) return comparePool;
+  const pool = [];
+  for (const point of state.points) {
+    pool.push({ kind: "city", id: point.id, name: point.name, country: point.country, lat: point.lat, lon: point.lon, label: "Station" });
+  }
+  for (const country of state.countries) {
+    pool.push({ kind: "country", id: country.id, name: country.name, country: country.continent, lat: country.lat, lon: country.lon, label: "Country" });
+  }
+  for (const region of state.ocean) {
+    pool.push({ kind: "ocean", id: region.id, name: region.name, country: "", lat: region.lat, lon: region.lon, label: "Ocean" });
+  }
+  for (const record of state.seaIce) {
+    pool.push({ kind: "seaice", id: record.id, name: record.name, country: "", lat: record.lat, lon: record.lon, label: "Sea ice" });
+  }
+  comparePool = pool;
+  return pool;
+}
+
+function renderCompareCandidates(query) {
+  const box = document.getElementById("compare-add-results");
+  if (!box) return;
+  const text = String(query || "").trim().toLowerCase();
+  if (text.length < 2) {
+    box.hidden = true;
+    box.innerHTML = "";
+    return;
+  }
+  // The bundles arrive after the first keystroke, so opening the dialog stays as
+  // cheap as it was; whatever is already loaded is matched straight away.
+  if (!comparePoolReady) {
+    ensureComparePool().then(() => {
+      const input = document.getElementById("compare-add-input");
+      if (input && input.value.trim().length >= 2) renderCompareCandidates(input.value);
+    });
+  }
+  const saved = new Set(state.stars.map(starKey));
+  // Rank by how the name matched, so "arctic" puts the Arctic records above the
+  // eight Antarctic research stations that merely contain the word.
+  const rank = (place) => {
+    const name = place.name.toLowerCase();
+    if (name.startsWith(text)) return 0;
+    if (name.includes(text)) return 1;
+    return 2;
+  };
+  const matches = compareCandidates()
+    .filter((place) => !saved.has(`${place.kind}:${place.id}`))
+    .filter(
+      (place) =>
+        place.name.toLowerCase().includes(text) || (place.country || "").toLowerCase().includes(text)
+    )
+    .sort((left, right) => rank(left) - rank(right) || left.name.length - right.name.length)
+    .slice(0, 8);
+  box.hidden = false;
+  box.innerHTML = matches.length
+    ? matches
+        .map(
+          (place) =>
+            `<button class="compare-candidate" type="button" data-action="add-saved" data-kind="${place.kind}" data-id="${escapeHtml(
+              place.id
+            )}" data-name="${escapeHtml(place.name)}" data-country="${escapeHtml(
+              place.country || ""
+            )}" data-lat="${Number(place.lat)}" data-lon="${Number(place.lon)}"><span>${escapeHtml(
+              place.name
+            )}</span><em>${escapeHtml(place.label)}${
+              place.country ? ` · ${escapeHtml(place.country)}` : ""
+            }</em></button>`
+        )
+        .join("")
+    : `<p class="compare-candidate-empty">No place matches that name.</p>`;
+}
+
+function addSavedPlace(dataset) {
+  if (!dataset?.kind || !dataset?.id) return;
+  const star = {
+    kind: dataset.kind,
+    id: dataset.id,
+    name: dataset.name,
+    country: dataset.country || null,
+    lat: Number(dataset.lat),
+    lon: Number(dataset.lon),
+    savedAt: new Date().toISOString(),
+  };
+  const result = toggleStar(state.stars, star);
+  if (result.changed === "full") {
+    showToast(`Saved places hold ${MAX_STARS}. Remove one to add ${star.name}.`);
+    return;
+  }
+  if (result.changed !== "added") return;
+  state.stars = result.stars;
+  persistStars();
+  refreshStarsButton();
+  showToast(`Saved ${star.name} · ${state.stars.length} place${state.stars.length === 1 ? "" : "s"}`);
+  loadStarSeries().then(() => {
+    renderCompare();
+    document.getElementById("compare-add-input")?.focus();
+  });
+}
+
+/* ---------------------------------------------------------------- hover */
+
+// Hovering a place dims the others, in its chart and in every row. The state lives
+// in classes rather than CSS keyed on a data attribute, so any number of keys can
+// be dimmed without generating a selector per place.
+function setCompareFocus(key) {
+  if (!els.compareBody) return;
+  for (const element of els.compareBody.querySelectorAll("[data-key]")) {
+    const active = key !== null && element.dataset.key === key;
+    element.classList.toggle("is-focus", active);
+    element.classList.toggle("is-dim", key !== null && !active);
+  }
+}
+
+/* ------------------------------------------------------------- rendering */
+
+function compareWindow() {
+  const windows = state.meta?.windows || [];
+  if (state.compareWindow && windows.includes(state.compareWindow)) return state.compareWindow;
+  return state.windowKey;
+}
+
+function activeCompareVariable(available) {
+  if (!available.length) return null;
+  if (available.some((variable) => variable.code === state.compareVariable)) return state.compareVariable;
+  if (available.some((variable) => variable.code === state.variable)) return state.variable;
+  return available[0].code;
+}
+
+// Sea ice rides on the same records as stations but is not one of the app's
+// station variables, so its two measures are described here or a section would
+// fall back to printing "SEAICE".
+function compareVariableList() {
+  const list = [...state.variables];
+  for (const code of ["SEAICE", "SEAICECONC"]) {
+    if (!list.some((entry) => entry.code === code)) list.push(seaIceVariable(code));
+  }
+  return list;
+}
+
+function renderCompare() {
+  if (!els.compareBody) return;
+  const records = new Map(
+    state.stars.map((star) => [starKey(star), state.starSeries.get(starKey(star)) || null])
+  );
+  const variables = compareVariableList();
+  const available = variablesAcross([...records.values()].filter(Boolean), variables);
+  const code = activeCompareVariable(available);
+  state.compareVariable = code;
+  const windowKey = compareWindow();
+  const sections = code
+    ? sectionsFor(state.stars, records, { code, windowKey, variables })
+    : [];
+  const rows = sections.flatMap((section) => section.rows);
+  const shared = rows.filter((row) => row.sharesCell);
+  const colors = new Map(state.stars.map((star, index) => [starKey(star), index]));
+  const windowText = windowKey.replace("-", "–");
+  const variable = available.find((entry) => entry.code === code) || null;
+
+  if (els.compareCsv) els.compareCsv.hidden = rows.length === 0;
+  if (els.compareNote) {
+    els.compareNote.textContent = rows.length
+      ? `${variable?.short || code || "Saved places"} · ${windowText} · saved in this browser only`
+      : "Saved in this browser only";
+  }
+
+  if (!state.stars.length) {
+    els.compareBody.innerHTML = `
+      <div class="compare-empty-state">
+        <span class="compare-empty-star" aria-hidden="true">☆</span>
+        <p class="compare-empty">No saved places yet. Open a place's case file and press the star beside Close, or add one below.</p>
+        <p class="compare-hint">Stations, countries, grid points, ocean regions and sea-ice records all compare here, grouped by kind.</p>
+      </div>
+      ${compareAddHtml()}`;
+    return;
+  }
+
+  els.compareBody.innerHTML = `
+    <div class="compare-hero">
+      <div class="compare-meta">
+        <b>${escapeHtml(variable?.label || code || "Loading")}</b>
+        <span aria-hidden="true">·</span><span>${escapeHtml(windowText)}</span>
+        <span aria-hidden="true">·</span><span>${state.stars.length} place${state.stars.length === 1 ? "" : "s"}</span>
+      </div>
+      <p class="compare-lede">Each section below has its own chart, then the places in it. Hover a place to dim the others.</p>
+    </div>
+
+    ${compareVariableButtons(available, code)}
+    ${compareWindowChips()}
+    ${compareAddHtml()}
+    ${compareSectionsHtml(sections, colors)}
+
+    ${
+      shared.length
+        ? `<p class="compare-note warn">${escapeHtml(
+            shared.map((row) => row.name).join(" and ")
+          )} share a NASA POWER cell with another saved place, so ${
+            shared.length === 1 ? "that pair is" : "those places are"
+          } not independent observations: the same series is being counted twice.</p>`
+        : ""
+    }
+    <p class="compare-footnote"><span class="compare-footnote-kicker">Note</span>These are published slopes and series side by side, not a test between places. The bundle carries no covariance between them, so an interval for a difference would be invented. A significant slope is distinguishable from noise, not necessarily large.</p>`;
+
+  if (state.compareLoading) return;
+  for (const section of sections) {
+    renderTrendChart(document.getElementById(`compare-chart-${section.kind}`), {
+      lines: section.lines.map((line) => ({ ...line, color: trendPalette(colors.get(line.key) ?? 0) })),
+      units: section.units,
+    });
+  }
+}
+
+// A row can open its own case, so the comparison hands the reader back to the app
+// instead of asking them to close it and hunt for the place again.
+function openSavedPlace(key) {
+  const star = state.stars.find((entry) => starKey(entry) === key);
+  if (!star) return;
+  if (els.compareDialog?.open) els.compareDialog.close();
+  if (star.kind === "city") {
+    const point = state.byId.get(star.id);
+    if (point) selectPoint(point);
+    return;
+  }
+  if (star.kind === "point") {
+    const cell = state.gridPoints.find((entry) => entry.id === star.id);
+    if (cell) selectPoint(cell);
+    return;
+  }
+  if (star.kind === "country") {
+    const country = state.countriesById.get(star.id);
+    if (country) selectCountry(country);
+    return;
+  }
+  if (star.kind === "ocean") {
+    const region = state.oceanById.get(star.id);
+    if (region) selectOcean(region);
+    return;
+  }
+  if (star.kind === "seaice") {
+    const record = state.seaIceById.get(star.id);
+    if (record) selectSeaIce(record, record.trends?.SEAICE ? "SEAICE" : "SEAICECONC");
+  }
+}
+
+function removeSavedPlace(key) {
+  const star = state.stars.find((entry) => starKey(entry) === key);
+  if (!star) return;
+  state.stars = toggleStar(state.stars, star).stars;
+  state.starSeries.delete(key);
+  persistStars();
+  refreshStarsButton();
+  showToast(`Removed ${star.name} from saved places`);
+  if (!state.stars.length && els.compareDialog?.open) els.compareDialog.close();
+  renderCompare();
+}
+
+async function openCompare() {
+  if (!els.compareDialog) return;
+  // Open first: the charts measure the box they are drawn into, and a closed dialog
+  // has no width to measure.
+  els.compareDialog.showModal();
+  state.compareWindow = state.windowKey;
+  state.compareLoading = true;
+  renderCompare();
+  await loadStarSeries();
+  state.compareLoading = false;
+  renderCompare();
+}
+
+function exportCompare() {
+  const code = state.compareVariable;
+  const windowKey = compareWindow();
+  const rows = compareRows(state.stars, (star) => {
+    const record = state.starSeries.get(starKey(star));
+    return record?.trends?.[code]?.[windowKey] || null;
+  });
+  if (!rows.length) return;
+  downloadCsv(
+    `saved-places-${code || "places"}-${windowKey}.csv`,
+    toCsv(starsToCsv(rows, { variable: code, windowKey }))
+  );
+  showToast(`Exported ${rows.length} saved place${rows.length === 1 ? "" : "s"} as CSV`);
+}
+
 /* ----------------------------------------------------- tap recommendation */
 
 // Tapping the globe answers "what do you have near here?" without leaving it: a
@@ -1270,6 +2011,7 @@ function renderCountryCase() {
   els.casePanel.innerHTML = `
     <div class="case-head">
       <div class="case-id">${id}</div>
+      ${starButton()}
       <button class="case-close" data-action="close-case" type="button">Close</button>
     </div>
     <h2 class="place-title">${escapeHtml(country.name)}</h2>
@@ -1444,6 +2186,7 @@ function renderOceanCase() {
   els.casePanel.innerHTML = `
     <div class="case-head">
       <div class="case-id">${id}</div>
+      ${starButton()}
       <button class="case-close" data-action="close-case" type="button">Close</button>
     </div>
     <h2 class="place-title">${escapeHtml(region.name)}</h2>
@@ -1644,6 +2387,7 @@ function renderSeaIceCase() {
   els.casePanel.innerHTML = `
     <div class="case-head">
       <div class="case-id">${id}</div>
+      ${starButton()}
       <button class="case-close" data-action="close-case" type="button">Close</button>
     </div>
     <h2 class="place-title">${escapeHtml(record.name)}</h2>
@@ -1717,6 +2461,7 @@ function renderCityCase() {
   els.casePanel.innerHTML = `
     <div class="case-head">
       <div class="case-id">${id}</div>
+      ${starButton()}
       <button class="case-close" data-action="close-case" type="button">Close</button>
     </div>
     <h2 class="place-title">${escapeHtml(point.name)}</h2>
@@ -1769,6 +2514,7 @@ function renderGridCase() {
   els.casePanel.innerHTML = `
     <div class="case-head">
       <div class="case-id">${id}</div>
+      ${starButton()}
       <button class="case-close" data-action="close-case" type="button">Close</button>
     </div>
     <h2 class="place-title">Grid cell</h2>
@@ -1835,6 +2581,7 @@ function renderDerivedCase() {
   els.casePanel.innerHTML = `
     <div class="case-head">
       <div class="case-id">${id}</div>
+      ${starButton()}
       <button class="case-close" data-action="close-case" type="button">Close</button>
     </div>
     <h2 class="place-title">${escapeHtml(place.name)}</h2>
@@ -2892,6 +3639,10 @@ function bindStaticEvents() {
       clearCase();
       return;
     }
+    if (name === "toggle-star") {
+      toggleStarForCase();
+      return;
+    }
     if (name === "open-city") {
       const point = state.byId.get(action.dataset.cityId);
       if (point) selectPoint(point);
@@ -2973,6 +3724,56 @@ function bindStaticEvents() {
   els.methodBtn.addEventListener("click", openMethod);
   els.closeMethod.addEventListener("click", () => els.methodDialog.close());
   els.methodDone.addEventListener("click", () => els.methodDialog.close());
+
+  // Saved places. The dialog is native, so Escape, the inert background and the
+  // return of focus to the button that opened it all come from the platform.
+  if (els.starsBtn) els.starsBtn.addEventListener("click", openCompare);
+  if (els.compareDialog) {
+    const closeCompare = () => els.compareDialog.close();
+    els.closeCompare?.addEventListener("click", closeCompare);
+    els.compareDone?.addEventListener("click", closeCompare);
+    els.compareCsv?.addEventListener("click", exportCompare);
+    // One delegated listener for the row actions, so a row can be opened or
+    // unstarred without rebuilding the listener with every render.
+    els.compareBody?.addEventListener("click", (event) => {
+      const action = event.target.closest("[data-action]");
+      if (!action) return;
+      const name = action.dataset.action;
+      if (name === "open-saved") openSavedPlace(action.dataset.key);
+      if (name === "remove-saved") removeSavedPlace(action.dataset.key);
+      if (name === "compare-variable") {
+        state.compareVariable = action.dataset.code;
+        renderCompare();
+      }
+      if (name === "compare-window") {
+        state.compareWindow = action.dataset.window;
+        renderCompare();
+      }
+      if (name === "add-saved") addSavedPlace(action.dataset);
+    });
+    els.compareBody?.addEventListener("input", (event) => {
+      if (event.target?.id === "compare-add-input") renderCompareCandidates(event.target.value);
+    });
+    // The charts are drawn in CSS pixels and the dialog is nearly full width, so a
+    // resize or a phone rotation leaves them wider than their box unless they are
+    // measured again.
+    let compareResizeFrame = 0;
+    window.addEventListener("resize", () => {
+      if (!els.compareDialog?.open) return;
+      cancelAnimationFrame(compareResizeFrame);
+      compareResizeFrame = requestAnimationFrame(() => renderCompare());
+    });
+
+    // Hovering a place dims the others in every section at once.
+    els.compareBody?.addEventListener("pointerover", (event) => {
+      const host = event.target.closest?.("[data-key]");
+      if (host?.dataset?.key) setCompareFocus(host.dataset.key);
+    });
+    els.compareBody?.addEventListener("pointerleave", () => setCompareFocus(null));
+    els.compareDialog.addEventListener("click", (event) => {
+      if (event.target === els.compareDialog) closeCompare();
+    });
+  }
   els.methodDialog.addEventListener("click", (event) => {
     if (event.target === els.methodDialog) els.methodDialog.close();
   });

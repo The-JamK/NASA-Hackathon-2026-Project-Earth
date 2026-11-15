@@ -3,7 +3,7 @@
 OWNS: whole project
 Scope: a fresh, static web app with a Google-Earth-style 3D globe, real NASA/Meteomatics data bundles, deterministic trend statistics, local vector RAG for case plans, and a case-file UI.
 
-Last verified: 2026-11-14
+Last verified: 2026-11-15
 
 - [x] G1: The data build produces a bundle with at least 25 points, at least 2,000 global grid cells, and four variables, all from real cached sources.
   CHECK: uv run python scripts/verify_data.py
@@ -790,6 +790,156 @@ Last verified: 2026-11-14
   EXPECT: live verified
   EVIDENCE: The byte hash for `points.json` failed after this hour's deploy with `points.json differs (local e9e9ab...d3f3, live 2c90d3...9dcd)`, and a field-by-field comparison shows why: `points.points[0].live.t_2m is 23.3 here and 24.8 live`, the hour's readings the build refreshed. `scripts/compare_points.mjs` now compares that file with the build field by field, setting aside only the `live` blocks and the bundle's own stamps, and it still prints the first real difference and fails. `bash scripts/verify_live.sh` then exits 0 with `points.json matches dist apart from 1416 refreshed live blocks`, `rag_index.json matches dist`, `countries.json matches dist`, `every dist/data/*.json is served` and `live plan verified`, so a wrong build, a nested deploy or a missing data file still fails.
 
-MET: 155
+- [x] G158: Saved places survive a reload, and a storage that is corrupt, blocked or full never breaks the app.
+  CHECK: node scripts/verify_stars.mjs
+  EXPECT: stars verified
+  EVIDENCE: `src/stars.js` is pure and takes an injected storage, so `scripts/verify_stars.mjs` exercises the rules without a browser. A null storage, a storage that throws on read, and a storage that throws on write all yield `unavailable: true` with no throw; `parseStars` on `not json at all`, `{"nope": true}` and `[nairobi, {kind:"mars"}, {kind:"city"}, null, 7]` returns a list and `repaired: true` rather than a crash, and one bad entry does not take its neighbours with it. A round trip preserves order, ids and names, whitespace is trimmed, a non-numeric coordinate becomes null, a nameless star falls back to its id, and saving drops an invalid record instead of storing it. In the browser: starring Nairobi wrote `signal-noise:stars:v1`, a reload rebuilt the top-bar button from that value (`topbarText: "Saved 1"`, `savedCount: 1`), and clearing site data left the app on an empty, working page.
+
+- [x] G159: A place is saved once at most, twelve at most, and toggling never mutates the list it was handed.
+  CHECK: node scripts/verify_stars.mjs
+  EXPECT: stars verified
+  EVIDENCE: `toggleStar` returns `added`, `removed`, `full` or `invalid` and a new array every time: a frozen input list is byte-identical after the call, and the returned array is a different object. Duplicates in stored JSON collapse to one with `repaired: true`; a 15-entry stored list loads as 12; a 12-place list refuses a 13th with `changed: "full"` while still allowing a removal. `isStarred` distinguishes kinds that share an id, so a city and a country called Kenya are separate stars. In the browser the count moved 0 to 1 to 2 and back to 1 to 2 as the star was toggled, and the toast named each change.
+
+- [x] G160: The comparison ranks places by slope, carries the interval and sample size, marks an exploratory record, and shows a place with no record instead of dropping it.
+  CHECK: node scripts/verify_stars.mjs
+  EXPECT: stars verified
+  EVIDENCE: `compareRows` sorts highest slope first with missing records last and ties in the order they were saved. A full record carries `hasInterval: true` with `ci_low_per_decade` and `ci_high_per_decade`; a summary record keeps its slope and `n`, reports `hasInterval: false`, and is never given an invented interval. `exploratory: true` survives into the row and keeps its own verdict word and colour. A star whose variable has no record is kept with `missing: true` and no slope, rather than disappearing. In the browser the table read Nairobi `+0.31`, `36`, significant increasing; Delhi `−0.21`, `−0.36 to −0.06`, `36`, significant decreasing, sorted by slope with Delhi `−0.52` against the first saved place.
+
+- [x] G161: Two saved stations that resolve to one NASA POWER cell are both flagged, and the note appears only when it applies.
+  CHECK: node scripts/verify_stars.mjs
+  EXPECT: stars verified
+  EVIDENCE: `sameCell` buckets a city star by its stored coordinates (0.5° latitude by 0.625° longitude) and returns false for country averages, which have no cell to share, and for a star without coordinates. Two stars in one bucket are both flagged by `compareRows`; a lone star in a bucket is not, and a single `sameCell` pair and a two-star list produce exactly the 2 and 0 flags the check expects. The dialog prints the caution names and says the same series would be counted twice. The browser comparison of Nairobi and Delhi showed no caution, which is right: they are in different cells.
+
+- [x] G162: A saved comparison exports as CSV with a header, one row per place, and an empty interval cell where the index has no interval.
+  CHECK: node scripts/verify_stars.mjs
+  EXPECT: stars verified
+  EVIDENCE: `starsToCsv` emits one row per star plus a header naming `place`, `slope_per_decade`, `ci_low_per_decade`, `verdict` and `delta_vs_first_saved_per_decade`; a summary record leaves the interval cells empty rather than repeating the slope, and the verdict word survives. The rows are handed to the case export's own `toCsv`, so a saved comparison gets the same BOM, CRLF and quoting as a case file.
+
+- [x] G163: The saved-places UI ships quiet and is wired without touching the case flow.
+  CHECK: node scripts/verify_stars_ui.mjs
+  EXPECT: stars ui verified
+  EVIDENCE: The dialog ships without `open` and labelled by its heading; the top-bar button and both footer actions ship `hidden`, and the star appears in exactly the four place templates (`${starButton()}` appears four times, never in the global, derived or grid case). Starring is one delegated `data-action="toggle-star"` branch, repaints that one button, and does not call `renderCase`, so the case panel is not re-rendered. The comparison opens through `showModal()` and closes through `close()`. `loadStarIntervals` writes to `starRecords`, never to the case panel's `detailShards`, so comparing cannot evict the record a case is showing. In the browser: the top bar had no button at zero stars, showed `SAVED 1` after the first star, the dialog did not open by itself, Escape closed it and returned focus to `stars-btn`, and starring left the case panel's `scrollTop` at 120 rather than snapping it to the top.
+
+- [x] G164: A place name is never interpolated raw into the page, so a hostile name in a bundle cannot become markup.
+  CHECK: node scripts/verify_stars_ui.mjs
+  EXPECT: stars ui verified
+  EVIDENCE: The row builder is the only place a comparison name reaches `innerHTML`, and its `row.name` occurrences equal its `escapeHtml(row.name)` occurrences, which the verifier counts rather than trusts. The star's label is escaped into its attributes, the missing-record cell escapes the variable name, and the slope chart escapes both its row labels and the spoken `aria-label`. Toasts are written with `textContent`, never `innerHTML`.
+
+- [x] G165: The feature does not regress what the site already promised.
+  CHECK: node scripts/verify_prose.mjs && node scripts/verify_motion.mjs && node scripts/verify_security.mjs && node scripts/verify_bundle.mjs && node scripts/verify_firstload.mjs && APP_URL=http://127.0.0.1:5199 node scripts/verify_app.mjs
+  EXPECT: prose verified, motion verified, security verified, bundle verified and the app checks pass, with the first case still under budget
+  EVIDENCE: All six printed their success lines against this change, and `verify_firstload` still clears the 1025 kB budget, so a star and a dialog did not cost a heavy first load. `npm run build` succeeds, `verify_export`, `verify_ocean` and `verify_seaice` pass against the running dev server, and the new pair `verify_stars` and `verify_stars_ui` are wired into `scripts/verify_all.sh` after `verify_bundle`. `verify_data.py` also passes and pytest reports 13 passed, though this change touches neither data nor Python. Not rerun: `refit_bundle.py --check` and `verify_refit.py`, because the bundles are byte-identical to the previous commit.
+
+- [x] G166: A reader can star three places, compare them, open one from the comparison, and find the stars after a reload.
+  CHECK: manual click-through in the dev server preview, since the repo has no browser harness
+  EXPECT: the star toggles in place, the count follows, the table agrees with the case file, and the stars survive a reload
+  EVIDENCE: Driven in the running app, not a script: the suggestion chip filled `Is Nairobi warming?`, `RUN THIS CASE` opened `CASE-6CA4`, and the star read `Save Nairobi to compare` at `aria-pressed="false"`; pressing it wrote the star, set `aria-pressed="true"`, showed `Saved 1`, and left the dialog closed. After a reload the top bar still read `SAVED 1`. A second case for Delhi starred to `2`, and the comparison showed both rows sorted by slope with Nairobi `+0.31` (95% interval in its case file) and Delhi `−0.21` with `−0.36 to −0.06`, `n = 36`, and `Δ` of `+0.00` and `−0.52`. `Load 95% intervals` fetched Nairobi's shard and drew the second bar, after which the button hid itself; the interval it showed, `+0.24 to +0.39`, matches the case file's `+0.236 to +0.390`. Escape closed the dialog and returned focus to the top-bar button, toggling a star did not move the case panel's scroll, and the test stars were removed afterwards so the browser is left clean.
+
+- [x] G167: The comparison reads as one designed surface rather than a chart stacked on a table.
+  CHECK: node scripts/verify_stars_ui.mjs
+  EXPECT: stars ui verified
+  EVIDENCE: The dialog now opens with a context line (variable, window, count) and one sentence on how to read the chart, then a framed chart card with its own caption, units and legend, then a four column table, then the covariance note under a `NOTE` kicker, then the footer. `verify_stars_ui` asserts each part is present in the renderer and in the stylesheet, and the rendered dialog was reviewed at 760 px and at 420 px. Three layout defects found in that review were fixed rather than accepted: a seven column table that wanted 739 px inside a 589 px body and pushed its own row actions off the edge, verdict pills that shouted in solid orange, and a footer that stacked into two lines.
+
+- [x] G168: Chart type is set in CSS pixels, so no label grows with the dialog and no text inherits the document default.
+  CHECK: node scripts/verify_stars_ui.mjs
+  EXPECT: stars ui verified
+  EVIDENCE: The root cause was scoping, not size: every chart rule in the stylesheet lives under `.chart .axis-label`, so a plot inside `.compare-chart` inherited the 16 px SVG default in near black, which is why the first screenshot showed giant, unreadable ticks. The plot is now laid out in CSS pixels measured from its own box (`clientWidth` minus computed padding, clamped to 280 to 860), emits that measured width, and the stylesheet sets its type in its own scope: ticks 9 px, row labels 11 px, values 9.5 px mono. Measured after the change at 420 px and 760 px viewports: no horizontal overflow, labels and values all present.
+
+- [x] G169: A saved place can be opened or unstarred from the comparison itself.
+  CHECK: node scripts/verify_stars_ui.mjs
+  EXPECT: stars ui verified
+  EVIDENCE: Each row carries `Open` and `×`, both handled by one delegated listener on the dialog body. Driving the real dialog: `Open` closed it and opened Oyem's case file, whose star read `aria-pressed="false"` because Oyem had just been unstarred, which is the two views agreeing rather than disagreeing. `×` removed that row, rewrote storage to the remaining place, and moved the badge from 2 to 1. The static check asserts both actions, both handlers, and that they reuse the app's own openers instead of inventing a second navigation path.
+
+- [x] G170: The comparison stays readable at a narrow width and in both colour schemes.
+  CHECK: manual review of the rendered dialog at 760px and 420px, with measurements taken from the live DOM
+  EXPECT: labels, numbers and actions remain legible with nothing clipped
+  EVIDENCE: Below 560 px a row becomes a card: place and kind, then the rate over its supporting numbers, then the verdict, then its actions. Measured at 420 px: table 366 px inside a 366 px body with no overflow, the country line unclipped, verdict and actions on separate lines (`overlap: false` once read vertically), and the body scrolls only when the content exceeds it. Two bugs surfaced here and were fixed: the rate kept the desktop right alignment inside a full width block, and the first column kept its 31% desktop share, which clipped `STATION · SIERRA LEONE`. Rendering under `prefers-color-scheme: light` changes nothing, because the app paints its own dark surfaces.
+
+- [x] G171: Restyling the comparison regresses nothing the site already promised.
+  CHECK: node scripts/verify_prose.mjs && node scripts/verify_motion.mjs && node scripts/verify_security.mjs && node scripts/verify_stars.mjs && node scripts/verify_stars_ui.mjs && node scripts/verify_firstload.mjs && npm run build
+  EXPECT: prose verified, motion verified, security verified, stars verified, stars ui verified, and a successful build with the first case still under budget
+  EVIDENCE: All seven pass against this change, with the first case still at 299 kB gzip against the 1025 kB budget. `verify_bundle`, `verify_app` and `verify_export` also pass against the running dev server. `verify_prose` matters here because the new copy was written under its no em-dash rule.
+
+- [x] G172: A grid point or a searched place can be starred as a "point", so the third group exists and can be compared.
+  CHECK: node scripts/verify_stars.mjs
+  EXPECT: stars verified
+  EVIDENCE: `stars verified` (a point is a starrable kind; toggleStar saves one). Live: "Is Timbuktu warming?" opened a derived case whose star saved `point:Timbuktu`, which then drew its own Grid points section. Grid cells reach the same path through starTarget's grid branch.
+
+- [x] G173: Saved places are grouped by kind in a fixed order, and each section is a heading, then its chart, then the places in it.
+  CHECK: node scripts/verify_stars.mjs
+  EXPECT: stars verified
+  EVIDENCE: `stars verified` (grouped labels are [Cities, Countries, Grid points, Ocean regions] and empty kinds are skipped). Live with a city, a grid point, an ocean region and a sea-ice record starred: sections read Cities, Grid points, Ocean regions, Sea ice, and each section's children are exactly [compare-section-head, compare-figure, compare-table].
+
+- [x] G174: Every variable that any saved place carries can be switched to, and a place missing it is shown as missing rather than dropped.
+  CHECK: node scripts/verify_stars.mjs
+  EXPECT: stars verified
+  EVIDENCE: `stars verified` (variablesAcross counts carrying places, keeps app order, and appends a code it cannot describe; sectionsFor keeps a row and marks it missing). Live: the mixed set offered 7 variables with counts (Temperature 2 ... Extent 1). T2M drew both cities and marked the point and ocean "no temperature record"; SEAICE drew only the ice line and marked the other three missing.
+
+- [x] G175: Series are read against each dataset's own year axis, so a city, an ocean region and a sea-ice record are compared only where their records actually overlap.
+  CHECK: node scripts/verify_stars.mjs
+  EXPECT: stars verified
+  EVIDENCE: `stars verified`: each record is cut on its own years, a window outside the record yields no series, a missing annual value is skipped rather than drawn as zero, and a section with fewer than three annual values draws no line. Live: the sea-ice line spans its own 36-year record and is labelled 10⁶ km², not the station unit.
+
+- [x] G176: Hovering a place dims the others in both the chart and the rows, and leaving clears it.
+  CHECK: node scripts/verify_stars_ui.mjs
+  EXPECT: stars ui verified
+  EVIDENCE: `stars ui verified` (setCompareFocus owns the classes, pointerover/pointerleave are bound on the dialog body, rows and chart groups share data-key). Live: hovering one row set 4 elements to is-focus and 10 to is-dim across the chart and the tables; pointerleave cleared all 14.
+
+- [x] G177: The saved menu can add places as well as remove them.
+  CHECK: node scripts/verify_stars_ui.mjs
+  EXPECT: stars ui verified
+  EVIDENCE: `stars ui verified` (the add field, its candidates, addSavedPlace and the cap are all present). Live: the field loaded the country, ocean and sea-ice bundles on first keystroke; "sea ice" offered the three NSISDC records and adding "Arctic sea ice" drew a new section. Removing with × returned the list to the two cities it started with.
+
+- [x] G178: The regrouped comparison regresses nothing the site already promised.
+  CHECK: node scripts/verify_stars.mjs && node scripts/verify_stars_ui.mjs && node scripts/verify_prose.mjs && node scripts/verify_motion.mjs && node scripts/verify_security.mjs && node scripts/verify_stars_ui.mjs && node scripts/verify_firstload.mjs && npm run build
+  EXPECT: stars verified, stars ui verified, prose verified, motion verified, security verified, and a successful build
+  EVIDENCE: In the full suite run: stars verified, stars ui verified, PROSE CHECK PASS, MOTION CHECK PASS, security verified, firstload 301 kB gzip, bundle self-consistent, `built in`. The prose check caught one em-dash in a new fallback string and it was removed, not suppressed. The suite's exit 1 came from the separate live check of the deployed GitHub Pages URL (dist/index.html answered 503), which this change does not touch.
+
+- [x] G179: A mixed set of saved places reads correctly in the live dialog at desktop and phone widths.
+  CHECK: manual review with a city, a point, an ocean region and a sea-ice record starred
+  EXPECT: sections appear in order with their own chart above their own rows, and nothing clips
+  EVIDENCE: Reviewed live at 660 px and 420 px with Oyem, Freetown, Timbuktu (grid point), North Pacific and Arctic sea ice starred. At 660 each section showed its heading, its own chart, then its own table, with the swatch colour matching its line. At 420 the dialog measured 400 wide with a 368 px body, a 364 px chart, tables ending inside the body and no horizontal page overflow. A section whose places lack the chosen variable now prints one line instead of an empty framed chart. Two fixes came out of this review: the picker loaded only countries (oceans and sea ice never matched) and the sea-ice variable printed as "SEAICE".
+
+- [x] G180: A closed saved-places dialog is not rendered, so nothing of it is left lying over the globe.
+  CHECK: node scripts/verify_stars_ui.mjs
+  EXPECT: stars ui verified
+  EVIDENCE: The cause was `.method-dialog.compare-dialog { display: flex }` out-ranking the browser's `dialog:not([open]) { display: none }`, so a closed dialog sat on the globe at 837 px tall. Opening the selector to `[open]` and adding a `:not([open])` guard fixed it: a closed dialog now measures `display: none`, height 0, and the elements at the centre of the page after closing are the case panel and the globe canvas, not the dialog. Both the CSS rule and the absence of a lingering overlay are asserted in verify_stars_ui.
+
+- [x] G181: Export CSV in the dialog downloads the variable and window the dialog is showing.
+  CHECK: node scripts/verify_stars_ui.mjs
+  EXPECT: stars ui verified
+  EVIDENCE: Export was calling the deleted `starTrend` and would have thrown on click. It now reads `state.starSeries` for the dialog's variable and window. Live: with Rainfall / 2000-2025 active, clicking Export CSV raised no error and toasted "Exported 2 saved places as CSV". The file body itself was not inspected in the browser, so the contents are covered by the verifier assertion on the CSV arguments rather than observed.
+
+- [x] G182: The dialog's timeframe can be changed between the same windows the cases offer, without changing the case's own window.
+  CHECK: node scripts/verify_stars_ui.mjs
+  EXPECT: stars ui verified
+  EVIDENCE: The dialog carries the case's three windows as its own chips (`state.compareWindow`, reset to the case's window on open). Live: switching Temperature from 1990-2025 to 2010-2025 moved Oyem from +0.60 (n 36) to +1.67 (n 16) and re-cut the x axis to end at 2025, while the case behind kept 1990-2025. Reopening defaulted to the case's current window (2000-2025 after the case chip was changed).
+
+- [x] G183: Both chart axes are labelled and ticked readably: years on the x axis, the variable's units on the y axis.
+  CHECK: node scripts/verify_stars_ui.mjs
+  EXPECT: stars ui verified
+  EVIDENCE: Each chart now draws an axis rule on both sides, a "YEAR" title on the x axis and a rotated units title on the y axis ("°C" for temperature, "MM/DAY" for rainfall, "10⁶ KM²" for sea ice), with five y ticks. Verified live at 660 px (chart 572, svg 552) and 420 px (chart 340, svg 320), both titles present and unclipped.
+
+- [x] G184: Every control in the dialog does its job: close, Back to the case, Export CSV, variable switch, window switch, add a candidate, open a row, remove a row, backdrop click and Escape.
+  CHECK: node scripts/verify_stars_ui.mjs
+  EXPECT: stars ui verified
+  EVIDENCE: Driven one by one in the live page: the × and "Back to the case" both closed it; Escape and a click on the dialog element itself closed it; Export CSV toasted; the variable and window chips both re-rendered; the add field found and added North Pacific, which drew an Ocean regions section; a row's Open closed the dialog and opened that place's case; a row's × removed it and the count fell back to 2. The star in the case head still toggles and repaints only itself.
+
+- [x] G185: A full interaction pass over the saved-places feature leaves no console error and no unhandled rejection.
+  CHECK: manual review with the browser console open through open, switch, add, remove, export, close
+  EXPECT: no error and no unhandled rejection in the console
+  EVIDENCE: Console cleared, page reloaded, then open, variable switch, window switch, Export CSV, Back to the case, close the case, reopen, resize. The only entries were Vite's `connecting`/`connected` debug lines: no error, no exception, no failed request.
+
+- [x] G186: The rest of the app is untouched by the comparison: the case window chips, the star, the globe and the existing checks all still behave.
+  CHECK: node scripts/verify_stars.mjs && node scripts/verify_stars_ui.mjs && node scripts/verify_prose.mjs && node scripts/verify_motion.mjs && node scripts/verify_security.mjs && npm run build
+  EXPECT: stars verified, stars ui verified, prose verified, motion verified, security verified, and a successful build
+  EVIDENCE: `stars verified`, `stars ui verified`, PROSE CHECK PASS, MOTION CHECK PASS, `security verified`, `built in 15.02s`. Live: the case panel's own chips still switch windows (+0.60 °C/decade on 1990-2025 to +0.89 on 2000-2025), the case closes normally, and the globe canvas is exposed again after the dialog closes.
+
+- [x] G187: The dialog holds up at desktop and phone widths with the window chips and the labelled axes added.
+  CHECK: manual review at 660 px and 420 px with a mixed set of saved places
+  EXPECT: chips wrap without clipping, both axes stay legible, and no page overflow appears
+  EVIDENCE: At 660 px the window row is one 32 px line under the variable chips; the chart measures 572 px with a 552 px svg. At 420 px the dialog is 388 px, the chart 340 px with a 320 px svg, the chips and their counts end inside the body, the note wraps to four lines inside 342 px, and the page has no horizontal overflow. A resize while the dialog is open re-measured the charts from 320 to 552 px; before that fix the svg kept its old width and overflowed its box.
+
+MET: 185
 UNMET: 2
 ABANDONED: 0

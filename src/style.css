@@ -575,6 +575,380 @@ body.has-case .case-panel { display: block; }
 
 .case-close:hover { color: var(--text); }
 
+/* Saved places. The star sits beside Close in the case head, so the feature adds
+   one glyph to a row that already exists and cannot shift the panel. The auto
+   margin absorbs the head's free space, which keeps Close at the right edge. */
+.case-star {
+  margin-left: auto;
+  width: 26px;
+  height: 26px;
+  display: grid;
+  place-items: center;
+  border: 1px solid var(--line-strong);
+  border-radius: 4px;
+  background: transparent;
+  color: var(--dim);
+  font-size: 13px;
+  line-height: 1;
+  cursor: pointer;
+  transition: color 0.15s ease, border-color 0.15s ease, background 0.15s ease;
+}
+
+.case-star:hover { color: var(--text); border-color: var(--accent); }
+.case-star.on { color: var(--amber); border-color: var(--amber); background: rgba(201, 162, 39, 0.08); }
+.case-star:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.case-star + .case-close { margin-left: 10px; }
+
+/* Saved places: the comparison dialog. It is built from the same parts as the
+   rest of the app (hairline rules, mono numerals, a kicker in the accent) so it
+   reads as a case surface rather than a table dropped on top of one. The chart is
+   laid out in CSS pixels, which is why the type sizes below are the sizes that
+   actually render. */
+/* Two classes deep on purpose: `.method-dialog` is declared later in this file and
+   would otherwise win the width and height back. */
+/* [open] matters: without it this rule out-ranks the browser's own
+   dialog:not([open]) { display: none }, and the closed dialog stayed on screen as an
+   837 px panel lying over the globe. */
+.method-dialog.compare-dialog[open] {
+  width: min(880px, calc(100vw - 32px));
+  max-height: min(93vh, 940px);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  padding: 22px 22px 18px;
+}
+
+.method-dialog.compare-dialog:not([open]) { display: none; }
+
+.compare-dialog .dialog-head { margin-bottom: 14px; }
+
+/* The dialog's window chips reuse the case's chip styles; the wrapper only spaces
+   them away from the variable row above and the add field below. */
+.compare-window-row { margin: 0 0 12px; }
+.compare-window-row .chip-label { margin-right: 8px; }
+
+/* Axis rules and titles: without them the reader had tick numbers but no statement
+   of what either axis measured. */
+.axis-line { stroke: var(--line-strong); stroke-width: 1; }
+.axis-title {
+  fill: var(--dim);
+  font-family: var(--mono);
+  font-size: 9px;
+  letter-spacing: 0.12em;
+}
+
+.compare-body { flex: 1 1 auto; overflow-y: auto; min-height: 0; padding-right: 2px; }
+
+/* --- context line ------------------------------------------------------ */
+.compare-hero { margin: 0 0 12px; }
+
+.compare-meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 7px;
+  font-family: var(--mono);
+  font-size: 10px;
+  letter-spacing: 0.04em;
+  color: var(--muted);
+}
+
+.compare-meta b { color: var(--text); font-weight: 500; }
+
+.compare-lede {
+  margin: 6px 0 0;
+  max-width: 72ch;
+  font-size: 11.5px;
+  line-height: 1.55;
+  color: var(--muted);
+}
+
+/* --- chart card -------------------------------------------------------- */
+.compare-figure {
+  margin: 0 0 14px;
+  border: 1px solid var(--line);
+  border-radius: 4px;
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.022), rgba(255, 255, 255, 0.008));
+}
+
+.compare-figure-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 9px 14px 8px;
+  border-bottom: 1px solid var(--line);
+}
+
+.compare-figure-head h3 {
+  margin: 0;
+  font-size: 9px;
+  font-weight: 650;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  color: var(--accent);
+}
+
+.compare-figure-head span { font-family: var(--mono); font-size: 10px; color: var(--muted); }
+
+.compare-chart { padding: 12px 10px 2px; }
+.compare-chart svg { display: block; width: 100%; height: auto; overflow: visible; }
+
+.compare-chart .tick-label { font-size: 9px; fill: var(--dim); letter-spacing: 0.02em; }
+.compare-chart .slope-label { font-size: 11px; fill: #cfdae4; }
+.compare-chart .slope-value { font-family: var(--mono); font-size: 9.5px; fill: var(--muted); }
+.compare-chart .grid-line { stroke: rgba(255, 255, 255, 0.055); stroke-width: 0.7; }
+.compare-chart .zero-line { stroke: rgba(255, 255, 255, 0.22); stroke-width: 0.7; stroke-dasharray: 2 3; }
+.compare-chart .slope-bar { stroke-width: 3; stroke-linecap: round; opacity: 0.42; }
+.compare-chart .slope-dot { stroke: #05080c; stroke-width: 1.5; }
+
+.compare-legend {
+  display: flex;
+  align-items: center;
+  gap: 18px;
+  padding: 0 14px 11px;
+  font-size: 8.5px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--dim);
+}
+
+.legend-item { display: inline-flex; align-items: center; gap: 6px; }
+.legend-item.is-note { text-transform: none; letter-spacing: 0.03em; font-style: italic; }
+
+.legend-dot {
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: var(--accent);
+  box-shadow: 0 0 6px rgba(95, 211, 224, 0.5);
+}
+
+.legend-bar { width: 20px; height: 2px; border-radius: 1px; background: rgba(255, 255, 255, 0.32); }
+
+/* --- table ------------------------------------------------------------- */
+/* Fixed layout, so a long verdict word can never push the row actions off the
+   edge of the dialog: the columns keep their shares and the text wraps instead. */
+.compare-table { width: 100%; table-layout: fixed; border-collapse: collapse; font-size: 11px; }
+.compare-table th:first-child,
+.compare-table td:first-child { width: 30%; }
+.compare-table th.num,
+.compare-table td.num { width: 27%; }
+
+.compare-table thead th {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  padding: 0 10px 7px;
+  border-bottom: 1px solid var(--line-strong);
+  background: rgba(8, 13, 19, 0.98);
+  text-align: left;
+  font-size: 8.5px;
+  font-weight: 400;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--accent);
+  white-space: nowrap;
+}
+
+.compare-table tbody th,
+.compare-table tbody td {
+  padding: 10px 10px;
+  border-bottom: 1px solid var(--line);
+  text-align: left;
+  vertical-align: top;
+  font-weight: 400;
+}
+
+.compare-table tbody tr:hover { background: rgba(255, 255, 255, 0.02); }
+
+.compare-table .num {
+  text-align: right;
+  font-family: var(--mono);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.compare-table .actions { width: 76px; text-align: right; white-space: nowrap; }
+
+.compare-place { display: block; font-size: 13px; letter-spacing: -0.01em; color: var(--text); }
+
+.compare-kind {
+  display: block;
+  max-width: 172px;
+  margin-top: 2px;
+  overflow: hidden;
+  font-size: 8.5px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--dim);
+}
+
+.compare-slope { display: block; font-size: 14px; line-height: 1.2; color: var(--text); }
+
+/* The supporting numbers: interval, sample size, difference from the first saved
+   place. One line, so the rate above stays the thing the eye lands on. */
+.compare-sub {
+  display: block;
+  margin-top: 4px;
+  font-size: 9.5px;
+  letter-spacing: 0.01em;
+  color: var(--dim);
+}
+
+.compare-absent { font-size: 10.5px; line-height: 1.5; color: var(--dim); }
+
+.compare-verdict {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  font-size: 9px;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--text);
+}
+
+.compare-dot { flex: none; width: 5px; height: 5px; border-radius: 50%; }
+.compare-dot.warm { background: var(--warm); box-shadow: 0 0 6px rgba(255, 107, 74, 0.55); }
+.compare-dot.cool { background: var(--cool); box-shadow: 0 0 6px rgba(79, 147, 214, 0.55); }
+.compare-dot.flat { background: var(--flat); }
+.compare-dot.explore { background: var(--amber); box-shadow: 0 0 6px rgba(201, 162, 39, 0.5); }
+
+.compare-shared {
+  display: inline-block;
+  margin-left: 8px;
+  padding: 1px 5px;
+  border: 1px solid rgba(201, 162, 39, 0.4);
+  border-radius: 2px;
+  font-size: 8px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--amber);
+}
+
+.row-open,
+.row-remove {
+  border: 0;
+  border-radius: 3px;
+  background: transparent;
+  color: var(--dim);
+  cursor: pointer;
+  transition: color 0.15s ease, background 0.15s ease;
+}
+
+.row-open {
+  padding: 5px 7px;
+  font-size: 8.5px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  /* Visible without hovering: the row action is the point of the row. */
+  color: var(--muted);
+}
+
+.row-open:hover { color: var(--accent); background: rgba(95, 211, 224, 0.07); }
+
+.row-remove { width: 24px; height: 24px; margin-left: 2px; font-size: 15px; line-height: 1; }
+
+.row-remove:hover { color: var(--warm); background: rgba(255, 107, 74, 0.09); }
+
+.row-open:focus-visible,
+.row-remove:focus-visible { outline: 1px solid var(--accent); outline-offset: 1px; }
+
+/* --- notes ------------------------------------------------------------- */
+.compare-empty,
+.compare-hint,
+.compare-note,
+.compare-footnote {
+  margin: 12px 0 0;
+  font-size: 11px;
+  line-height: 1.6;
+  color: var(--muted);
+}
+
+.compare-note { padding-left: 11px; border-left: 2px solid var(--line-strong); }
+.compare-note.warn { border-left-color: var(--amber); color: var(--text); }
+
+.compare-footnote {
+  display: flex;
+  gap: 10px;
+  padding-top: 10px;
+  border-top: 1px solid var(--line);
+  font-size: 10px;
+  line-height: 1.55;
+}
+
+.compare-footnote-kicker {
+  flex: none;
+  padding-top: 2px;
+  font-size: 8.5px;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--dim);
+}
+
+/* --- empty state ------------------------------------------------------- */
+.compare-empty-state { padding: 30px 4px 12px; text-align: center; }
+
+.compare-empty-star {
+  display: block;
+  margin-bottom: 14px;
+  font-size: 34px;
+  line-height: 1;
+  color: rgba(201, 162, 39, 0.55);
+}
+
+.compare-empty { max-width: 46ch; margin: 0 auto; font-size: 13px; color: var(--text); }
+.compare-empty-state .compare-hint { max-width: 54ch; margin: 8px auto 0; }
+
+/* --- footer ------------------------------------------------------------ */
+.compare-actions { display: flex; align-items: center; gap: 8px; }
+
+#compare-note {
+  font-family: var(--mono);
+  font-size: 9.5px;
+  letter-spacing: 0.04em;
+  color: var(--dim);
+}
+
+@media (max-width: 640px) {
+  .method-dialog.compare-dialog { width: calc(100vw - 20px); padding: 16px; }
+  .compare-slope { font-size: 13px; }
+  .compare-legend { gap: 12px; }
+  .compare-footnote { display: block; }
+  .compare-footnote-kicker { display: block; margin-bottom: 4px; }
+}
+
+/* Below a phone width four columns cannot hold their words, so a row becomes a
+   small card: place, then its rate with the supporting numbers, then the verdict
+   and its actions. Nothing is hidden and nothing overlaps. */
+@media (max-width: 560px) {
+  .compare-table,
+  .compare-table tbody { display: block; width: 100%; }
+  .compare-table thead { display: none; }
+  .compare-table tbody tr { display: block; padding: 13px 0 11px; border-bottom: 1px solid var(--line); }
+  .compare-table tbody tr:hover { background: transparent; }
+  .compare-table tbody th,
+  .compare-table tbody td {
+    display: block;
+    width: auto;
+    padding: 0;
+    border: 0;
+  }
+  /* The desktop column shares are overridden here, not inherited: without this the
+     first cell keeps 31% of the row and clips a long country name. */
+  .compare-table tbody th:first-child,
+  .compare-table tbody td:first-child { width: auto; }
+  .compare-kind { max-width: none; }
+  .compare-table .compare-rate { margin-top: 6px; text-align: left; }
+  .compare-sub { margin-top: 5px; }
+  .compare-verdict-cell { margin-top: 9px; }
+  .compare-table .actions { width: auto; margin-top: 9px; text-align: left; }
+  .row-open { padding-left: 0; }
+  .row-remove { margin-left: 6px; }
+}
+
 .place-title {
   margin: 0;
   font-size: 30px;
@@ -1978,3 +2352,156 @@ html.landing body {
   text-decoration: underline;
   cursor: pointer;
 }
+/* ---------- grouped comparison: sections, switcher, picker, hover ---------- */
+
+.compare-section { margin: 0 0 22px; }
+
+.compare-section-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  margin: 0 0 8px;
+  padding-bottom: 6px;
+  border-bottom: 1px solid var(--line);
+}
+
+.compare-section-head h3 {
+  margin: 0;
+  font-size: 10px;
+  font-weight: 650;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  color: var(--accent);
+}
+
+.compare-section-head span { font-family: var(--mono); font-size: 9.5px; color: var(--dim); }
+
+.compare-section .compare-figure { margin-bottom: 10px; }
+
+/* A section whose places have no series for the chosen variable says so in one
+   line instead of drawing an empty frame. */
+.compare-nochart {
+  margin: 0 0 10px;
+  padding: 9px 11px;
+  border-left: 2px solid var(--line-strong);
+  background: rgba(255, 255, 255, 0.015);
+  font-size: 10.5px;
+}
+
+/* The variable switcher reads like the case chips, with the coverage count sitting
+   quietly beside each name. */
+.compare-vars { display: flex; flex-wrap: wrap; gap: 6px; margin: 0 0 12px; }
+
+.compare-var {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 6px 10px;
+  border: 1px solid var(--line-strong);
+  border-radius: 3px;
+  background: rgba(8, 14, 21, 0.5);
+  color: var(--muted);
+  font-size: 9.5px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  cursor: pointer;
+  transition: color 0.15s ease, border-color 0.15s ease, background 0.15s ease;
+}
+
+.compare-var span {
+  font-family: var(--mono);
+  font-size: 8.5px;
+  letter-spacing: 0;
+  color: var(--dim);
+}
+
+.compare-var:hover { color: var(--text); border-color: rgba(95, 211, 224, 0.5); }
+.compare-var.on { color: #0b0f13; border-color: var(--accent); background: var(--accent); }
+.compare-var.on span { color: rgba(11, 15, 19, 0.7); }
+.compare-var:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+/* Adding a place, right where the comparison lives. */
+.compare-add { position: relative; margin: 0 0 16px; }
+
+.compare-add input {
+  width: 100%;
+  padding: 9px 11px;
+  border: 1px solid var(--line-strong);
+  border-radius: 3px;
+  background: rgba(5, 10, 16, 0.6);
+  color: var(--text);
+  font: inherit;
+  font-size: 11.5px;
+}
+
+.compare-add input::placeholder { color: var(--dim); }
+.compare-add input:focus { outline: none; border-color: var(--accent); }
+
+.compare-add-results {
+  position: absolute;
+  z-index: 3;
+  left: 0;
+  right: 0;
+  margin-top: 4px;
+  border: 1px solid var(--line-strong);
+  border-radius: 3px;
+  background: rgba(9, 15, 22, 0.99);
+  box-shadow: 0 18px 44px rgba(0, 0, 0, 0.55);
+  overflow: hidden;
+}
+
+.compare-candidate {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  width: 100%;
+  padding: 8px 11px;
+  border: 0;
+  border-bottom: 1px solid var(--line);
+  background: transparent;
+  color: var(--text);
+  font-size: 11.5px;
+  text-align: left;
+  cursor: pointer;
+}
+
+.compare-candidate:last-child { border-bottom: 0; }
+.compare-candidate:hover,
+.compare-candidate:focus-visible { background: rgba(95, 211, 224, 0.08); outline: none; }
+
+.compare-candidate em {
+  flex: none;
+  font-family: var(--mono);
+  font-size: 9px;
+  font-style: normal;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--dim);
+}
+
+.compare-candidate-empty { margin: 0; padding: 9px 11px; font-size: 11px; color: var(--dim); }
+
+.compare-loading { margin: 12px 0; }
+
+/* The colour that ties a line to its row. */
+.compare-swatch {
+  display: inline-block;
+  width: 7px;
+  height: 7px;
+  margin-right: 7px;
+  border-radius: 50%;
+  vertical-align: baseline;
+}
+
+/* Hover: the focused place stays, the rest recede in both the chart and the rows. */
+.compare-body [data-key].is-dim { opacity: 0.22; }
+.compare-body tr[data-key].is-dim { background: transparent; }
+.compare-body [data-key] { transition: opacity 0.15s ease; }
+.compare-body tr.is-dim .compare-place,
+.compare-body tr.is-dim .compare-slope { color: var(--muted); }
+
+.trend-line { stroke-width: 1.7; stroke-linejoin: round; stroke-linecap: round; opacity: 0.92; }
+.trend-series.is-focus .trend-line { stroke-width: 2.6; opacity: 1; }
+.trend-dot { opacity: 0.9; }

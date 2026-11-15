@@ -16,6 +16,8 @@ node scripts/verify_prose.mjs
 node scripts/verify_hero.mjs
 uv run python scripts/verify_countries.py
 node scripts/verify_bundle.mjs
+node scripts/verify_stars.mjs
+node scripts/verify_stars_ui.mjs
 node scripts/verify_gazetteer.mjs
 node scripts/verify_search.mjs
 node scripts/verify_typos.mjs
