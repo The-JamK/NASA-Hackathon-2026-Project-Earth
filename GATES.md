@@ -704,11 +704,11 @@ Last verified: 2026-11-14
   EXPECT: all checks passed
   EVIDENCE: `all checks passed` with the three new steps inside it (`MOTION CHECK PASS`, `PROSE CHECK PASS`, `HERO CHECK PASS`) and every earlier check unchanged, including `app verified`, `hero: eight copy boxes, no leader lines`, `case layout: narrative paragraph above the verdict block` and `verdict: tone fills the box, no left bar`. `npm run build` succeeds and first-load stays inside its 1,025 kB budget.
 
-- [ ] G140: The result is committed to main and pushed.
+- [x] G140: The result is committed to main and pushed.
   CHECK: git status --porcelain --untracked-files=no
   EXPECT: (no output)
-  EVIDENCE: pending
+  EVIDENCE: `git status --porcelain --untracked-files=no` prints nothing and `cloud_git push` reported `4202031..d731e60  HEAD -> main`. `81df711` carries the two audience boxes and the prose sweep, `d731e60` merges `main` (which had added gates up to G135 and a security check), with this ledger's new gates renumbered G136-G140 and `main`'s side taken for the five conflicted files before the em-dash sweep and the landing edits were re-applied on top of it. The only untracked path is `artifacts/`, the screenshots that have never been in the repository.
 
-MET: 138
-UNMET: 2
+MET: 139
+UNMET: 1
 ABANDONED: 0
