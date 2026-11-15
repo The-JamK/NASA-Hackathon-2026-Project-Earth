@@ -2219,7 +2219,7 @@ function workBlock(kind) {
         ? "The global series is the published GISTEMP annual anomaly. The cell counts come from the same 4° subsample and HAC contract, corrected with Benjamini–Hochberg FDR at q = 0.05; neighbouring cells are correlated, so the correction is approximate. The global slope is not an area-weighted average of the cells."
         : kind === "ice"
           ? "The Sea Ice Index reports monthly extent and area per hemisphere. Extent is the area with at least 15% ice cover; concentration is 100 × area ÷ extent, the mean concentration of the ice-covered area. Each year is the mean of twelve monthly values, so the same trend code reads it as any other record, which hides the seasonal cycle. The family correction runs across the three records (two hemispheres and their sum), separately for each measure. No attribution is claimed."
-          : "Annual means only. OLS with Newey–West HAC standard errors; 95% interval with Student-t on n − 2 df; Sen's slope as a robust check. A verdict needs the HAC p < 0.05 and the Hamed–Rao corrected Mann–Kendall p < 0.05 with the same direction. The AI proposed the variable and wrote the narrative; it did not compute a number.";
+          : "Annual means only. OLS with Newey–West HAC standard errors; 95% interval with Student-t on n − 2 df; Sen's slope as a robust check. A verdict needs the HAC p < 0.05 and the Hamed–Rao corrected Mann–Kendall p < 0.05 with the same direction. The SI proposed the variable and wrote the narrative; it did not compute a number.";
   return `<details class="work"><summary>Show your work</summary><p>${escapeHtml(text)}</p></details>`;
 }
 

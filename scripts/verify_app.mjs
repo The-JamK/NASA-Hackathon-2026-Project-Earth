@@ -48,7 +48,7 @@ if (/^\s*Scroll\s*$/m.test(landing)) fail("the landing page still says Scroll");
 for (const copy of [
   "Dhruv G, James H and Henry Z.",
   "Ask about any place on Earth.",
-  "The AI explains, the code computes.",
+  "The SI explains, the code computes.",
   "Be an Earth Trend Detective!",
   "Gold Coast · Australia, attended remotely.",
   "NASA GISTEMP v4, POWER (MERRA-2), Blue Marble, Sentinel-2",
