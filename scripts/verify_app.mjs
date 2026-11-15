@@ -136,7 +136,7 @@ if (!heroSource.includes('CASE_URL = "./app.html"')) {
 for (const marker of [
   "const START_LAT = -25.3",
   "const START_LNG = 133.8",
-  "const SPIN_IDLE = (2 * Math.PI) / 70",
+  "const SPIN_IDLE = (2 * Math.PI) / 50",
   "rotation.y +=",
   "controls.autoRotate = false",
   "camera.up.set(0, 1, 0)",

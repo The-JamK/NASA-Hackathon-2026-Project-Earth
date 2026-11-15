@@ -434,6 +434,15 @@ Last verified: 2026-11-14
   MANUAL: Cloud browser, built site, 1440x900, temporary probe removed before committing.
   EVIDENCE: With a temporary `window.__heroProbe` (grep now finds 0 occurrences in `hero.js`), two samples 5.19 s apart gave `rotation.y` 0.40841 -> 0.87664 = 0.09024 rad/s against the 0.08976 target (0.5% high, timing noise), i.e. a full turn in about 70 s versus the previous 0.0628 rad/s. `camera.up` read `[0, 1, 0]` at both samples. The final probe-free build was screenshotted twice 4 s apart: the pole is vertical and the landmasses have moved between frames (`artifacts/hero-upright.png`, `artifacts/hero-upright-t1.png`). `scripts/verify_all.sh` passes on the final build.
 
-MET: 84
+- [x] G85: The hero Earth turns a little faster again: one revolution per 50 s instead of 70.
+  CHECK: node scripts/verify_app.mjs
+  EXPECT: app verified
+  EVIDENCE: `SPIN_IDLE` is `(2 * Math.PI) / 50` in `src/hero.js`, up from `/ 70`, so the idle rate is 0.12566 rad/s against 0.08976 before — 1.4x — and `SPIN_HOVER` keeps deriving from it as a fifth. The upright camera, the Australia start point and `controls.autoRotate = false` are untouched. `verify_app.mjs` expects the new constant, so a silent revert to 70 s fails the check.
+
+- [x] G86: The measured spin on the built page matches one turn in 50 s, with the probe gone from the shipped code.
+  MANUAL: Cloud browser, built site, 1440x900, temporary probe removed before committing.
+  EVIDENCE: Two samples 5.127 s apart read `rotation.y` 0.64713 -> 1.29217 = 0.12581 rad/s, i.e. one turn in 49.94 s, against the 0.12566 target (0.1% high, timing noise) and the 0.08976 measured at the 70 s setting. `camera.up` was `[0, 1, 0]` at both samples, so the Earth is still upright. The final build reports `typeof window.__heroProbe === "undefined"` and `grep -c __heroProbe src/hero.js` is 0. Screenshots 4 s apart: `artifacts/hero-upright-50s.png`, `artifacts/hero-upright-50s-t1.png`. `scripts/verify_all.sh` passes on this build.
+
+MET: 86
 UNMET: 1
 ABANDONED: 0
