@@ -747,10 +747,10 @@ Last verified: 2026-11-15
   EXPECT: all checks passed
   EVIDENCE: `all checks passed`, with `hero: nine copy boxes, no leader lines` and the geometry, data and export checks unchanged, and `npm run build` clean.
 
-- [ ] G149: The result is committed to main and pushed.
+- [x] G149: The result is committed to main and pushed.
   CHECK: git status --porcelain --untracked-files=no
   EXPECT: (no output)
-  EVIDENCE: pending
+  EVIDENCE: The saved-places work landed as a5c5436, then merged with the eight upstream commits in 2f81a74 after resolving six identical case-head conflicts (upstream dropped the case-id line, the star was kept). Pushed c66a5ad..2f81a74 to origin/main.
 
 - [x] G150: The suite fails when the published bundle stops reproducing itself, instead of only when the jeddah case or the copy regresses.
   CHECK: grep -c "refit_bundle.py --check" scripts/verify_all.sh
@@ -940,6 +940,6 @@ Last verified: 2026-11-15
   EXPECT: chips wrap without clipping, both axes stay legible, and no page overflow appears
   EVIDENCE: At 660 px the window row is one 32 px line under the variable chips; the chart measures 572 px with a 552 px svg. At 420 px the dialog is 388 px, the chart 340 px with a 320 px svg, the chips and their counts end inside the body, the note wraps to four lines inside 342 px, and the page has no horizontal overflow. A resize while the dialog is open re-measured the charts from 320 to 552 px; before that fix the svg kept its old width and overflowed its box.
 
-MET: 185
-UNMET: 2
+MET: 186
+UNMET: 1
 ABANDONED: 0
