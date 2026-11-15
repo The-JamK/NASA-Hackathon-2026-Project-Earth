@@ -159,7 +159,11 @@ chip **Snapshot**.
 
 To host the proxy, build with `npm run build`, deploy `worker/` with Wrangler
 (`worker/wrangler.toml` serves `dist/` as static assets), and store
-`METEOMATICS_USERNAME` and `METEOMATICS_PASSWORD` as Worker secrets.
+`METEOMATICS_USERNAME` and `METEOMATICS_PASSWORD` as Worker secrets. That
+deployment is live at
+<https://earth-trend-detective-case-files.gaussian-frontiers.workers.dev/app.html>
+— the same build as GitHub Pages, with `/api/live` and `/api/resolve` in front of
+it, so places outside the bundle resolve there and not on the Pages site.
 
 ## The ocean
 
@@ -296,6 +300,11 @@ overwrite each other — one deploy serves the built site, the next serves the V
 sources, which is exactly the failure that sent `/dist/index.html` links around.
 `scripts/verify_live.sh` now fails if the live `/app.html` is the source shell or
 if `/dist/index.html` answers again.
+
+Pages is a static host, so it has no `/api/resolve`: a question about a place the
+bundle does not hold ("Is Gold Coast getting hotter?") is refused honestly there
+with "the resolver is not running". The Worker deployment above serves the same
+build with that route attached.
 
 Vite uses relative asset paths (`base: "./"`) and the app resolves data,
 textures and point imagery through `import.meta.env.BASE_URL`, so the build works
