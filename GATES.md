@@ -608,50 +608,73 @@ Last verified: 2026-11-14
   EXPECT: ocean verified
   EVIDENCE: G117 stopped a repaired country from displacing an exact basin alias; this is the independent guard underneath it, so the repair cannot fire at all. `typoLimit(10) = 3` gave a ten-letter name a three-edit budget, and `southocean` is three edits from `southkorea`, which is how a correctly spelled Southern Ocean alias was read as South Korea. Country and basin repairs are now capped at two edits regardless of length — the lesson the station matcher already learned, where three edits turned Washington into Wellington. Measured: `south ocean` and `southern ocean` plan **Southern Ocean**, while `Austraila` → Australia, `Cannda` → Canada and `Indain Ocean` → Indian Ocean still repair; `verify_ocean`, `verify_resolve`, `verify_typos`, `verify_rag` and `verify_seaice` all pass.
 
-- [x] G120: A place name that comes back from a public geocoder cannot execute script in the derived case narrative.
+- [x] G120: The motion is small and can be switched off: every keyframe animates only opacity or transform, nothing runs longer than 1.2 s except the loader spinner, the case stagger tops out well under a tenth of a second, at least five controls give press feedback, and the reduced-motion block still zeroes both animation and transition durations.
+  CHECK: node scripts/verify_motion.mjs
+  EXPECT: MOTION CHECK PASS
+  EVIDENCE: `exit=0`, output `8 keyframe blocks parsed · every animation declaration stays within 1.2s (the spinner excepted) · case stagger: 7 steps, last delay 0.08s · 8 controls give press feedback · reduced motion zeroes animation and transition durations for every element · MOTION CHECK PASS`. Red before it was green: on the untouched stylesheet the same command printed `FAIL: no case-panel entrance stagger found`, `FAIL: the case panel's children are not given the settle animation` and `FAIL: only 0 rules give press feedback` and exited 1. Two rules were softened after the first visual check: the settle starts at opacity 0.45 and travels 3px over 0.22s (it began at opacity 0 and read as a flash over a glass panel), and the stagger's ceiling came down from 0.15s to 0.08s.
+
+- [x] G121: Every check that passed before still passes with the motion in place — no layout, wording, data or routing regression.
+  CHECK: SKIP_LIVE=1 bash scripts/verify_all.sh
+  EXPECT: all checks passed
+  EVIDENCE: `all checks passed` with the motion check as its third step (`MOTION CHECK PASS`) and every previous check unchanged: `data verified`, `bundle verified`, `ocean verified`, `sea ice verified`, `export verified`, `app verified`, `case layout: narrative paragraph above the verdict block`, `verdict: tone fills the box, no left bar · snapshot chip carries no dot`. First-load cost is unchanged at `critical path 294 kB gzip` against the 1,025 kB budget, so the 3 kB of stylesheet does not reach the first case.
+
+- [x] G122: With reduced motion requested the app animates nothing and still renders a full case file.
+  MANUAL: measured in the cloud browser with `prefers-reduced-motion: reduce`.
+  EVIDENCE: Signed-in cloud browser, `Emulation.setEmulatedMedia` with `prefers-reduced-motion: reduce`: `matchMedia("(prefers-reduced-motion: reduce)").matches` true, the first case block's `animation-duration` `1e-06s`, and every direct child of the case panel already at `opacity 1` the moment the case opened. The case rendered in full — verdict `OPEN AND SHUT +0.31°C / decade · Significant warming · 95% CI +0.24 to …` — so the motion switches off without hiding anything. Screenshot: `artifacts/motion-case-reduced.png`.
+
+- [x] G123: The motion reads as a panel settling, not a show: the case file mid-settle and at rest look like the same screen, and nothing is hidden once it lands.
+  MANUAL: screenshots of the opening case at two moments.
+  EVIDENCE: `artifacts/motion-case-mid.png` is the case frozen 80 ms into its settle: the panel itself is fully opaque (`opacity 1`, background `rgba(9, 15, 23, 0.9)`), the case id, title and chips are at 0.92–0.83, the narrative and the blocks under it at 0.78–0.63, and the layout is identical to rest — a cascade, not a fade-in. `artifacts/motion-case-rest.png` is the same screen 500 ms later. In an untouched flow after a variable switch all 15 children read `opacity 1` with no running animations, and after opening a different case all 14 do with the panel at `opacity 1`, so nothing stays dim. The first deliberate check caught a real defect: freezing every animation on the page also rewound the panel's own pre-existing 0.5s fade, and the frame looked washed out — which is why the settle now starts at 0.45 and no longer fades the panel body.
+
+- [x] G124: The result is committed to main and pushed.
+  CHECK: git status --porcelain --untracked-files=no
+  EXPECT: (no output)
+  EVIDENCE: `git status --porcelain --untracked-files=no` prints nothing and `cloud_git push` reported `989b76b..0eefae5  HEAD -> main`. Two commits plus a merge: `71f5315` (the quiet motion and its check), `0eefae5` (merge of `main`'s comparative-vocabulary change, with this ledger's gates renumbered G120–G124 around its new G118–G119). `main` moved once during the work, from `64e6dfb` to `989b76b`. The only untracked path is `artifacts/`, the screenshots and deck renders that have never been in the repository.
+
+- [x] G125: A place name that comes back from a public geocoder cannot execute script in the derived case narrative.
   CHECK: node scripts/verify_security.mjs
   EXPECT: security verified
   EVIDENCE: `derivedNarrative` drew `${place.name}` unescaped into two `innerHTML` sentences (`No complete annual series is available for the cell nearest …` and `read it as the region around …, not as the town itself`), and that name is third-party data: `worker/resolve.js` copies `place.name` from Open-Meteo or OpenStreetMap Nominatim (community-editable) into the answer, and `field.js` falls back to the raw question. All three draws are now `escapeHtml(place.name)`; the check counts 3 draws, requires each to start with `escapeHtml`, and first proves the hostile string `<img src=x onerror=alert(1)>` still reaches the page through the resolver, so the escape is the guard rather than luck.
 
-- [x] G121: The metered Meteomatics quota behind `/api/live` cannot be spent by a public caller.
+- [x] G126: The metered Meteomatics quota behind `/api/live` cannot be spent by a public caller.
   CHECK: node scripts/verify_security.mjs
   EXPECT: security verified
   EVIDENCE: Three gaps. `?ids=` was order-sensitive, so `?ids=b,a` and `?ids=a,b` were two cache entries and two upstream queries. The id list was unbounded, so one request could name 708 points = 29 upstream queries in one call. And nothing budgeted a miss at all, so a loop could burn the 1,000-query day in a minute. Now the list is deduplicated, sorted (one cache entry per set), capped at 60 ids with a 2,000-character query cap, and a cache miss is budgeted at 1,000 upstream coordinates a minute per isolate — 20 × 60-point requests allowed exactly 16 before 429, with 3 upstream queries each and every 17th refused; a warm case still answers from cache with 0 upstream queries. `rate_limited` carries `retry-after: 60`.
 
-- [x] G122: `/api/resolve` refuses an oversized body before it parses one.
+- [x] G127: `/api/resolve` refuses an oversized body before it parses one.
   CHECK: node scripts/verify_security.mjs
   EXPECT: security verified
   EVIDENCE: The handler called `request.json()` on whatever arrived, so a megabyte body became a string and a parse even though the question is capped at 240 characters. `content-length` is now checked first and the read body is checked again for a chunked request; both answer `413 body_too_large` with an 8 kB limit, and the stub geocoder counted 0 calls. Both JSON helpers now send `x-content-type-options: nosniff`.
 
-- [x] G123: Workers CI hands `CLOUDFLARE_API_TOKEN` only to the steps that use it.
+- [x] G128: Workers CI hands `CLOUDFLARE_API_TOKEN` only to the steps that use it.
   CHECK: node scripts/verify_security.mjs
   EXPECT: security verified
   EVIDENCE: The token sat in the job-level `env:`, so `npm ci` and `npm run build` ran with a live Cloudflare token in their environment — any dependency install script could have read and exfiltrated it, and `npx wrangler@4` was not the only consumer. It is now scoped to the creds-check step and the deploy step only (exactly 2 × 10-space `env:` entries, 0 at job level). The committed `CLOUDFLARE_ACCOUNT_ID` is an account identifier, not a credential, and is left as the default.
 
-- [x] G124: The live proxy still costs one upstream query per case and keeps its cache.
+- [x] G129: The live proxy still costs one upstream query per case and keeps its cache.
   CHECK: node scripts/verify_live_proxy.mjs
   EXPECT: live proxy verified
   EVIDENCE: `live proxy verified: 1 point = 1 upstream query, cache, chunking, 503/502/504/405/400` — unchanged after the budget, including the 60-point no-ids chunk test (3 queries) and the 400 for an unknown id.
 
-- [x] G125: The resolver contract is unchanged by the body cap.
+- [x] G130: The resolver contract is unchanged by the body cap.
   CHECK: node scripts/verify_resolve.mjs
   EXPECT: resolver verified
   EVIDENCE: `resolver verified: 10974 gazetteer places · Gold Coast → Australia · keyless fallbacks open-meteo → nominatim · place query, validation, caching and rate limit checked · no API key anywhere`.
 
-- [x] G126: The production build still succeeds with the escaped render site.
+- [x] G131: The production build still succeeds with the escaped render site.
   CHECK: npm run build
   EXPECT: built in
   EVIDENCE: `✓ built in 2.48s`; `dist/assets/app.js` 205.19 kB (70.71 kB gzip), `style.js` 1,819.20 kB (515.93 kB gzip). The escaper survives minification (`&quot;` present once in the bundle).
 
-- [x] G127: No credential material is tracked or shipped, and the local `.env` is not readable by other local accounts.
+- [x] G132: No credential material is tracked or shipped, and the local `.env` is not readable by other local accounts.
   MANUAL: `node scripts/verify_clean.mjs` plus a file-mode check.
   EVIDENCE: `env: local .env is ignored; no tracked secrets` · `clean verified`; `git ls-files | grep -iE 'env|secret|key|pem|credentials|token'` lists only `.env.example` and `scripts/envfile.py`; `git log --all -- .env` is empty; an AKIA/gh*_/sk-/PEM/xox/AIza/Bearer scan over every tracked file matched nothing; a `METEOMATICS|EARTHDATA|password|api_key` scan over `dist/` found only the public source names (`Meteomatics`, `Earthdata`) in copy and data, never a value. `chmod 600 .env` applied (mode 600).
 
-- [x] G128: Neither dependency tree carries a published advisory.
+- [x] G133: Neither dependency tree carries a published advisory.
   CHECK: npm audit
   EXPECT: found 0 vulnerabilities
   EVIDENCE: `found 0 vulnerabilities` with 88 packages installed (d3, globe.gl, three, topojson-client, world-atlas, vite 7). Python: `uv run --with pip-audit pip-audit` → `No known vulnerabilities found` against the resolved numpy/pandas/scipy/statsmodels/xarray/requests/earthaccess/pillow/rasterio set.
 
-MET: 127
+MET: 132
 UNMET: 1
 ABANDONED: 0
