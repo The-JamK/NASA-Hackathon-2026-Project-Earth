@@ -310,10 +310,14 @@ sources, which is exactly the failure that sent `/dist/index.html` links around.
 `scripts/verify_live.sh` now fails if the live `/app.html` is the source shell or
 if `/dist/index.html` answers again.
 
-Pages is a static host, so it has no `/api/resolve`: a question about a place the
-bundle does not hold ("Is Gold Coast getting hotter?") is refused honestly there
-with "the resolver is not running". The Worker deployment above serves the same
-build with that route attached.
+Pages is a static host, so it has no `/api/resolve`. A question about a place the
+bundle does not hold ("Is Gold Coast getting hotter?") is still answered there:
+`src/field.js` falls back to the same Natural Earth gazetteer the Worker resolves
+from, which `public/data/gazetteer.json` already ships in the bundle, so the
+6,421 places it carries open a derived case on either host. Only the names the
+gazetteer lacks — suburbs like Broadbeach, alternate spellings — need the Worker,
+because the keyless geocoders live there and not in the page. There the app says
+so plainly instead of guessing.
 
 Vite uses relative asset paths (`base: "./"`) and the app resolves data,
 textures and point imagery through `import.meta.env.BASE_URL`, so the build works
