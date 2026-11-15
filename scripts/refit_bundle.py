@@ -13,8 +13,18 @@ This pass re-derives every stored trend from the shipped series using the same
 number or a verdict actually moves. It is idempotent, so `--check` is a standing
 proof that the published bundle reproduces its own numbers.
 
-    uv run python scripts/refit_bundle.py            # repair in place
-    uv run python scripts/refit_bundle.py --check    # verify, write nothing
+"Reproduces" is read to the precision that matters, not to the last bit:
+re-fitting reassociates floats, and where a shipped series was rounded the fit
+moves by at most 1.9e-7 relative. Comparing for bit equality reported all
+11,169 records as differing on every run, which hid any real drift in the noise
+and made the repair rewrite the whole bundle each time. Numbers are therefore
+compared with a 1e-6 relative tolerance, so a record that only carries float
+noise is left exactly as it ships. `--strict` restores the bit-exact
+comparison.
+
+    uv run python scripts/refit_bundle.py                    # repair in place
+    uv run python scripts/refit_bundle.py --check            # verify, write nothing
+    uv run python scripts/refit_bundle.py --check --strict   # bit-exact, not recommended
 """
 
 from __future__ import annotations
@@ -72,18 +82,39 @@ def _fit(values: Any, window_start: int, window_end: int) -> dict[str, Any] | No
     return compute_trend([year for year, _ in pairs], [value for _, value in pairs])
 
 
-def _same(left: Any, right: Any) -> bool:
-    return json.dumps(left, sort_keys=True) == json.dumps(right, sort_keys=True)
+# A refit of the same series reassociates floats; where the shipped series was
+# rounded for publication the fit moves by up to 1.9e-7 relative. Anything inside
+# this tolerance is the same number, anything outside it is drift worth seeing.
+REL_TOL = 1e-6
 
 
-def _same_trend(old: Any, new: dict[str, Any]) -> bool:
+def _close(left: Any, right: Any, strict: bool) -> bool:
+    """Deep equality that tolerates float reassociation unless `strict`."""
+    if isinstance(left, dict) and isinstance(right, dict):
+        return set(left) == set(right) and all(_close(left[key], right[key], strict) for key in right)
+    if isinstance(left, list) and isinstance(right, list):
+        return len(left) == len(right) and all(_close(one, other, strict) for one, other in zip(left, right))
+    if isinstance(left, bool) or isinstance(right, bool):
+        return left is right
+    if isinstance(left, (int, float)) and isinstance(right, (int, float)):
+        if strict:
+            return left == right
+        return math.isclose(float(left), float(right), rel_tol=REL_TOL, abs_tol=0.0)
+    return left == right
+
+
+def _same(left: Any, right: Any, strict: bool = False) -> bool:
+    return _close(left, right, strict)
+
+
+def _same_trend(old: Any, new: dict[str, Any], strict: bool = False) -> bool:
     """True when `old` already holds every number `compute_trend` produces.
 
     Fitted records also carry fields the fit does not own (`q_value`,
-    `significant`, which the FDR step stamps on afterwards), so comparing the
-    whole dictionary would report a difference on every record for ever.
+    `significant`, which the FDR step stamps on afterwards), so only the keys the
+    fit produces are compared — otherwise every record would differ for ever.
     """
-    return isinstance(old, dict) and all(old.get(key) == value for key, value in new.items())
+    return isinstance(old, dict) and all(_close(old.get(key), value, strict) for key, value in new.items())
 
 
 def _merge(old: dict[str, Any] | None, new: dict[str, Any]) -> dict[str, Any]:
@@ -109,7 +140,7 @@ class Report:
         self.note(f"{where}: verdict {old} -> {new}")
 
 
-def refit_points(report: Report, check: bool) -> dict[str, Any]:
+def refit_points(report: Report, check: bool, strict: bool = False) -> dict[str, Any]:
     merged = points_bundle.load_bundle(PUBLIC)
     touched = 0
     for point in merged.get("points", []):
@@ -124,21 +155,23 @@ def refit_points(report: Report, check: bool) -> dict[str, Any]:
                 if old is None or new is None:
                     touched += 1
                     report.note(f"{point.get('id')} {code} {key}: trend appeared or vanished")
-                elif not _same(old, new):
+                elif not _same_trend(old, new, strict):
                     touched += 1
                     if old.get("verdict") != new.get("verdict"):
                         report.verdict_change(f"{point.get('id')} {code} {key}", old.get("verdict"), new.get("verdict"))
                     elif len(report.changes) < 400:
                         report.note(f"{point.get('id')} {code} {key}: numbers move")
-                if not check and not _same(old, new):
-                    trends.setdefault(code, {})[key] = new
+                if not check and not _same_trend(old, new, strict):
+                    # `_merge` keeps fields the fit does not own, so a repair can
+                    # never shear off a q_value or significance stamped earlier.
+                    trends.setdefault(code, {})[key] = _merge(old, new)
                     point["trends"] = trends
     if not check and touched:
         points_bundle.write_bundle(PUBLIC, merged)
     return {"dataset": "points", "touched": touched}
 
 
-def refit_grid(report: Report, check: bool) -> dict[str, Any]:
+def refit_grid(report: Report, check: bool, strict: bool = False) -> dict[str, Any]:
     path = PUBLIC / "grid.json"
     grid = _load(path)
     cells = grid.get("cells", [])
@@ -171,13 +204,15 @@ def refit_grid(report: Report, check: bool) -> dict[str, Any]:
                 "q": (old or {}).get("q"),
                 "significant": (old or {}).get("significant", False),
             }
-            if old is None or not _same({k: old.get(k) for k in record if k not in {"q", "significant"}},
-                                        {k: record[k] for k in record if k not in {"q", "significant"}}):
+            unchanged = old is not None and _same_trend(old, record, strict)
+            if not unchanged:
                 touched += 1
                 if len(report.changes) < 400:
                     report.note(f"cell {cell.get('lat')},{cell.get('lon')} {key}: numbers move")
             if not check:
-                trends[key] = record
+                # Keep the published record when the refit only reassociated
+                # floats: replacing it would churn 4,039 cells for no change.
+                trends[key] = old if unchanged else record
         cell["trends"] = trends
 
     # FDR across each window, then the per-cell defaults the globe reads.
@@ -211,7 +246,7 @@ def refit_grid(report: Report, check: bool) -> dict[str, Any]:
     meta = grid.get("meta") or {}
     old_counts = meta.get("counts_by_window") or {}
     for _, _, key in WINDOWS:
-        if not _same(old_counts.get(key), counts_by_window[key]):
+        if not _same(old_counts.get(key), counts_by_window[key], strict):
             report.note(f"grid counts {key}: {old_counts.get(key, {}).get('significant_increasing')}"
                         f" -> {counts_by_window[key]['significant_increasing']} significant increases")
 
@@ -221,11 +256,13 @@ def refit_grid(report: Report, check: bool) -> dict[str, Any]:
     global_series = global_block.get("series")
     global_trends: dict[str, Any] = {}
     for window_start, window_end, key in WINDOWS:
-        global_trends[key] = _fit(global_series, window_start, window_end)
+        fitted = _fit(global_series, window_start, window_end)
         old = (global_block.get("trends") or {}).get(key)
-        if old and global_trends[key] and not _same(old, global_trends[key]):
+        unchanged = old is not None and fitted is not None and _same_trend(old, fitted, strict)
+        if old and fitted and not unchanged:
             touched += 1
             report.note(f"global {key}: numbers move")
+        global_trends[key] = old if unchanged else fitted
 
     if not check:
         meta["counts"] = counts_by_window["1990-2025"]
@@ -243,7 +280,7 @@ def refit_grid(report: Report, check: bool) -> dict[str, Any]:
     return {"dataset": "grid", "touched": touched, "counts": counts_by_window}
 
 
-def refit_countries(report: Report, check: bool) -> dict[str, Any]:
+def refit_countries(report: Report, check: bool, strict: bool = False) -> dict[str, Any]:
     path = PUBLIC / "countries.json"
     payload = _load(path)
     countries = payload.get("countries", [])
@@ -259,7 +296,7 @@ def refit_countries(report: Report, check: bool) -> dict[str, Any]:
                 if new is None:
                     continue
                 record = _merge(old, new)
-                if not _same_trend(old, new):
+                if not _same_trend(old, new, strict):
                     touched += 1
                     if old and old.get("verdict") != new.get("verdict"):
                         report.verdict_change(f"{country.get('name')} {code} {key}", old.get("verdict"), new.get("verdict"))
@@ -284,9 +321,12 @@ def refit_countries(report: Report, check: bool) -> dict[str, Any]:
 
 
 def _refit_measure_block(report: Report, check: bool, entries: list[dict[str, Any]], label: str,
-                         q_digits: int) -> int:
+                         q_digits: int, strict: bool = False) -> int:
     """Ocean regions and sea-ice records: series[measure] -> trends[measure][window]."""
     touched = 0
+    # Which (record, measure) pairs actually moved, so q is only re-stamped
+    # where the p it derives from moved.
+    moved: set[tuple[str, str]] = set()
     for entry in entries:
         series_by_measure = entry.get("series") or {}
         trends = entry.get("trends") or {}
@@ -296,12 +336,14 @@ def _refit_measure_block(report: Report, check: bool, entries: list[dict[str, An
                 new = _fit(series, window_start, window_end)
                 if new is None:
                     continue
-                if not _same_trend(old, new):
+                unchanged = old is not None and _same_trend(old, new, strict)
+                if not unchanged:
                     touched += 1
+                    moved.add((str(entry.get("id")), measure))
                     if old and old.get("verdict") != new.get("verdict"):
                         report.verdict_change(f"{label} {entry.get('id')} {measure} {key}", old.get("verdict"), new.get("verdict"))
                 if not check:
-                    trends.setdefault(measure, {})[key] = _merge(old, new)
+                    trends.setdefault(measure, {})[key] = old if unchanged else _merge(old, new)
         entry["trends"] = trends
 
     for measure in {m for entry in entries for m in (entry.get("trends") or {})}:
@@ -320,6 +362,10 @@ def _refit_measure_block(report: Report, check: bool, entries: list[dict[str, An
                 for entry, q_value, flag in zip(family, q_values, flags):
                     wanted[str(entry.get("id"))] = (round(float(q_value), q_digits), bool(flag))
             for entry in refs:
+                # q follows p, so when the fit did not move the stored q is still
+                # the one this family produces: re-stamping it only churns.
+                if (str(entry.get("id")), measure) not in moved:
+                    continue
                 trend = entry["trends"][measure][key]
                 q_value, flag = wanted[str(entry.get("id"))]
                 if trend.get("q_value") != q_value or bool(trend.get("significant")) != flag:
@@ -330,19 +376,19 @@ def _refit_measure_block(report: Report, check: bool, entries: list[dict[str, An
     return touched
 
 
-def refit_ocean(report: Report, check: bool) -> dict[str, Any]:
+def refit_ocean(report: Report, check: bool, strict: bool = False) -> dict[str, Any]:
     path = PUBLIC / "ocean.json"
     payload = _load(path)
-    touched = _refit_measure_block(report, check, payload.get("regions", []), "ocean", 9)
+    touched = _refit_measure_block(report, check, payload.get("regions", []), "ocean", 9, strict)
     if not check and touched:
         _save(path, payload)
     return {"dataset": "ocean", "touched": touched}
 
 
-def refit_seaice(report: Report, check: bool) -> dict[str, Any]:
+def refit_seaice(report: Report, check: bool, strict: bool = False) -> dict[str, Any]:
     path = PUBLIC / "seaice.json"
     payload = _load(path)
-    touched = _refit_measure_block(report, check, payload.get("records", []), "sea ice", 12)
+    touched = _refit_measure_block(report, check, payload.get("records", []), "sea ice", 12, strict)
     if not check and touched:
         _save(path, payload)
     return {"dataset": "sea ice", "touched": touched}
@@ -352,16 +398,22 @@ def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--check", action="store_true", help="verify only; write nothing")
     parser.add_argument("--quiet", action="store_true", help="summary only")
+    parser.add_argument(
+        "--strict",
+        action="store_true",
+        help=("compare published numbers for bit equality instead of the 1e-6 tolerance; "
+              "float reassociation alone will report every record as differing"),
+    )
     args = parser.parse_args()
 
     report = Report(verbose=not args.quiet)
     print(("checking" if args.check else "refitting") + " the published bundle from its own series")
     results = [
-        refit_points(report, args.check),
-        refit_grid(report, args.check),
-        refit_countries(report, args.check),
-        refit_ocean(report, args.check),
-        refit_seaice(report, args.check),
+        refit_points(report, args.check, args.strict),
+        refit_grid(report, args.check, args.strict),
+        refit_countries(report, args.check, args.strict),
+        refit_ocean(report, args.check, args.strict),
+        refit_seaice(report, args.check, args.strict),
     ]
 
     total = sum(item["touched"] for item in results)
@@ -372,7 +424,8 @@ def main() -> int:
 
     if args.check:
         if total:
-            print(f"BUNDLE NOT SELF-CONSISTENT: {total} records differ from a refit from their own series")
+            mode = " (strict bit comparison)" if args.strict else ""
+            print(f"BUNDLE NOT SELF-CONSISTENT: {total} records differ from a refit from their own series{mode}")
             return 1
         print("BUNDLE SELF-CONSISTENT: every published trend reproduces from the published series")
         return 0

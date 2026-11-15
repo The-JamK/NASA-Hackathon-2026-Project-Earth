@@ -728,25 +728,30 @@ Last verified: 2026-11-14
   EXPECT: (no output)
   EVIDENCE: `git status --porcelain --untracked-files=no` prints nothing and `cloud_git push` reported `d0437a9..49ed0eb  HEAD -> main`. `49ed0eb` carries the statement box, the stage change that gives it room and the wider columns on very wide screens, with `verify_hero` and `verify_app` moved to nine boxes. Only `artifacts/`, the screenshots, stays untracked.
 
-- [x] G145: Clicking a box answers with a small note at the bottom of the screen that says "Click the Earth to open a case", it is nicely made, it leaves on its own, and clicking the Earth still opens the case.
+- [x] G145: The refit check can pass, and a repair rewrites only the records that actually moved.
+  CHECK: uv run python scripts/refit_bundle.py --check
+  EXPECT: BUNDLE SELF-CONSISTENT
+  EVIDENCE: `_same` compared floats for bit equality, and re-fitting reassociates them, so all 11,169 records reported as differing on every run (points 8,460 · countries 2,661 · grid 3 · ocean 27 · sea ice 18) with 0 verdicts changed — the largest real move anywhere being 1.9e-7 relative, at `trehuaco PRECTOTCORR 2000-2025 ci_high_per_decade`. Comparison is now `_close` with `rel_tol=1e-6` (a constant with that measurement written next to it), and the points and grid sections compare only the keys a fit produces via `_same_trend` instead of whole dicts. Measured after the change: `--check` → `BUNDLE SELF-CONSISTENT`, 0 records in every section; `--strict` still reports the same 11,169, so the bit-exact mode survives. A plain run now prints `refit complete: 0 records rewritten` and leaves the tree byte-identical, where before it rewrote all 11,169: the write paths keep the published record when the refit only reassociated floats (`trends[key] = old if unchanged else record`, same for the grid's global block), and the ocean/sea-ice FDR re-stamps q only for the `(record, measure)` pairs whose fit moved — q follows p, so an unmoved fit cannot produce a different q. The tolerance does not hide drift: perturbing one published slope by 1% (`nairobi T2M 1990-2025`, 0.31298738738738535 → 0.3161172612612592) made `--check` report `points 1 records differ` with every other section at 0, and a plain run repaired exactly `1 records rewritten`. `refit_points` also now writes `_merge(old, new)` rather than replacing the record, so a repair can no longer shear off a `q_value` or `significant` that a later step stamps on. `verify_refit.py` still prints `REFIT CHECKS PASS`, and the data files are unchanged by this commit.
+
+- [x] G146: Clicking a box answers with a small note at the bottom of the screen that says "Click the Earth to open a case", it is nicely made, it leaves on its own, and clicking the Earth still opens the case.
   MANUAL: a click on a box and a click on the globe, in the browser, photographed.
   EVIDENCE: In the browser at 1440x900 a click on the public box shows a pill 209x37 at x 615, y 837, centred on 720 with border radius 999px, an accent dot and a shadow, reading exactly `Click the Earth to open a case`; the page did not navigate, and `pointer-events: none` keeps the note itself out of the way. It is gone by 3.9s (`hidden: true`, `opacity: 0`), and a click on the belief box afterwards shows it again. On a 390x844 phone it is 199px wide at x 88, inside the viewport. Clicking the globe still lands on `app.html`, and `elementFromPoint(720, 520)` is still `#hero-globe`, so the boxes did not steal the way in. Screenshots: `artifacts/hero-toast-1440.png`, `artifacts/hero-toast-390.png`.
 
-- [x] G146: Nothing about the boxes invites a click in the first place: no pointer cursor, no hover state, nothing focusable that promises an action.
+- [x] G147: Nothing about the boxes invites a click in the first place: no pointer cursor, no hover state, nothing focusable that promises an action.
   CHECK: node scripts/verify_hero.mjs
   EXPECT: HERO CHECK PASS
   EVIDENCE: `HERO CHECK PASS` with `a click on a box is answered by a note pointing at the Earth`, `the note is wired to the boxes`, `the boxes keep the ordinary arrow, not a pointer` and `the boxes have no hover state to invite a press`. Measured in the browser: the box computes `cursor: default`, and hovering it changes neither the cursor nor its background (`rgba(4, 7, 12, 0.78)` before and after). The boxes carry no `tabindex`, so there is no keyboard stop that suggests pressing something.
 
-- [x] G147: Every earlier check still passes with the note added.
+- [x] G148: Every earlier check still passes with the note added.
   CHECK: SKIP_LIVE=1 bash scripts/verify_all.sh
   EXPECT: all checks passed
   EVIDENCE: `all checks passed`, with `hero: nine copy boxes, no leader lines` and the geometry, data and export checks unchanged, and `npm run build` clean.
 
-- [ ] G148: The result is committed to main and pushed.
+- [ ] G149: The result is committed to main and pushed.
   CHECK: git status --porcelain --untracked-files=no
   EXPECT: (no output)
   EVIDENCE: pending
 
-MET: 146
+MET: 147
 UNMET: 2
 ABANDONED: 0
