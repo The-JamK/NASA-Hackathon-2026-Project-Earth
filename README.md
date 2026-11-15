@@ -338,7 +338,12 @@ precipitation`. Countries and ocean basins are covered the same way — `Austrai
 answers the Australia average, `Pacfic` answers a Pacific basin, `Indain Ocean`
 answers the Indian Ocean rather than the global one — while a name that is
 already right is never swapped for a neighbour (`Australia` and `Austria` are one
-edit apart, and each answers itself). States and provinces come through the same
+edit apart, and each answers itself). `scripts/verify_typos.mjs` measures that
+across the whole table: one letter dropped from the middle of 300 sampled cities
+gets the right city first 95% of the time (99% appear in the popup), and 300
+sampled states and provinces land first 96% of the time (99% in the popup), with
+nothing unplaced. Every repair now raises the popup, including a climate word, a
+country, a basin and an ice record, not just a place name. States and provinces come through the same
 gazetteer matcher (`Illonois` → Illinois), and sea ice has its own repairs: a
 misspelt `Antartic sea ice` gets that hemisphere's record rather than the global
 one, and `Arctic see ice` is still recognised as an ice question instead of being

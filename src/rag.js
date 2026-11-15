@@ -712,6 +712,19 @@ export function planCase(question, { rag, points, variables, countries, ocean, s
         : useCountry
           ? Boolean(countryHit?.corrected)
           : Boolean(city.corrected),
+    // Every word the app changed, in one list, so the popup can offer each of
+    // them instead of only the place names. Only the place that actually answers
+    // is listed: a country the question merely brushed past is not a reading.
+    repairs: [
+      iceRecord
+        ? seaIceHit?.corrected && { kind: "ice record", typed: seaIceHit.typed, name: place.name }
+        : useOcean
+          ? oceanHit?.corrected && { kind: "ocean", typed: oceanHit.typed, name: place.name }
+          : useCountry
+            ? countryHit?.corrected && { kind: "country", typed: countryHit.typed, name: place.name }
+            : city.corrected && { kind: "station", typed: city.typed, name: place.name },
+      chosen.corrected && { kind: "climate word", typed: chosen.corrected.typed, name: chosen.corrected.word },
+    ].filter(Boolean),
     candidates: city.candidates || [],
     variableCorrection: chosen.corrected || null,
   };
