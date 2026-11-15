@@ -29,7 +29,12 @@ if [ "$nested" != "404" ]; then
 fi
 echo "  served from the site root, no /dist"
 
-for file in points.json rag_index.json countries.json; do
+# points.json ships the hour's live conditions and a build refreshes them when it
+# runs, so its bytes differ from the committed file by a timestamp alone. Compare
+# it field by field; the rest are compared byte for byte.
+node scripts/compare_points.mjs "$BASE"
+
+for file in rag_index.json countries.json; do
   local_hash=$(shasum -a 256 "dist/data/$file" | awk '{print $1}')
   live_hash=$(curl -fsS --max-time 30 "$BASE/data/$file" | shasum -a 256 | awk '{print $1}')
   if [ "$local_hash" != "$live_hash" ]; then

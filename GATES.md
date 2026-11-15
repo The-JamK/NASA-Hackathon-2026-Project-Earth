@@ -771,11 +771,16 @@ Last verified: 2026-11-14
   EXPECT: all checks passed
   EVIDENCE: `all checks passed`, with `hero: nine copy boxes, no leader lines` and the geometry, data and export checks unchanged, and `npm run build` clean.
 
-- [ ] G154: The result is committed to main and pushed.
+- [x] G154: The result is committed to main and pushed.
   CHECK: git status --porcelain --untracked-files=no
   EXPECT: (no output)
-  EVIDENCE: `git status --porcelain --untracked-files=no` prints nothing and `cloud_git push` reported `d5fb4c6..29ba0ea  HEAD -> main`. `b7651f4` carries the note and the pointer-events change, `29ba0ea` merges `main` (which had added its own G145 and touched the refit script) with these gates renumbered G146-G149, and `all checks passed` holds on the merged tree.
+  EVIDENCE: `git status --porcelain --untracked-files=no` prints nothing and `cloud_git push` reported `a48bc90..47ec4a0  HEAD -> main`. `b7651f4` carries the note and the pointer-events change, `29ba0ea` and `47ec4a0` merge `main` (which added its own gates and a refit check) with these renumbered G151-G154, and `all checks passed` holds on the merged tree, the new refit step included.
 
-MET: 151
-UNMET: 3
+- [x] G155: The live check still proves the deployed bundle is ours, without failing on the one thing a build is allowed to change: the current conditions it refreshes when it runs.
+  CHECK: bash scripts/verify_live.sh
+  EXPECT: live verified
+  EVIDENCE: The old byte hash for `points.json` failed after this hour's deploy with `points.json differs (local e9e9ab...d3f3, live 2c90d3...9dcd)`, and a field-by-field comparison shows why: `points.points[0].live.t_2m is 23.3 here and 24.8 live`, the hour's readings the build refreshed. `scripts/compare_points.mjs` now compares that file with the build field by field, setting aside only the `live` blocks and the bundle's own stamps, and still prints the first real difference and fails. `bash scripts/verify_live.sh` then exits 0 with `points.json matches dist apart from 1416 refreshed live blocks`, `rag_index.json matches dist`, `countries.json matches dist`, `every dist/data/*.json is served` and `live plan verified`, so a wrong build, a nested deploy or a missing data file still fails.
+
+MET: 153
+UNMET: 2
 ABANDONED: 0
