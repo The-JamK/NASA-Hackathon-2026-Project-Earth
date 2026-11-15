@@ -248,10 +248,10 @@ a.source-pill:focus-visible {
 .case-panel {
   right: 24px;
   width: 418px;
-  /* The panel now runs closer to both edges: it starts just under the top bar
-     and stops a short gap above the map's legend, so the bar has its own row. */
+  /* The panel starts just under the top bar. On screens too narrow to hold it
+     and the map's controls in one row it stops a short gap above the legend. */
   top: 72px;
-  bottom: 58px;
+  bottom: 50px;
   max-height: none;
 }
 
@@ -1308,6 +1308,27 @@ details.work p {
 .suggest-popover { animation: fade-up 0.16s ease-out both; }
 
 /* ---------- responsive ---------- */
+
+/* Close rides in the panel's corner instead of holding a row above the title,
+   so the case starts at the top of the panel rather than under a gap. */
+@media (min-width: 901px) {
+  .case-panel { padding-top: 18px; }
+  .case-panel .case-head {
+    position: absolute;
+    top: 14px;
+    right: 16px;
+    margin: 0;
+  }
+  .case-panel .place-title { padding-right: 68px; }
+}
+
+/* Wide enough for the panel and the map's controls side by side: the panel runs
+   to the bottom of the screen and the legend and layer switch keep to the
+   column left of it, so the two never share a pixel. */
+@media (min-width: 1320px) {
+  .case-panel { bottom: 16px; }
+  body.has-case .bottom-bar { right: calc(24px + 418px + 16px); }
+}
 
 @media (max-width: 1180px) {
   .ask-panel { width: 320px; left: 16px; }
