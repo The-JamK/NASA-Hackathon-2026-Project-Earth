@@ -13,9 +13,8 @@ const START_LAT = -25.3;
 const START_LNG = 133.8;
 // Lower altitude = larger globe on screen.
 const altitudeFor = (width) => (width < 700 ? 2.05 : width < 1080 ? 1.82 : 1.44);
-// Earth's axis leans this far, and it spins eastward once per 100 s.
-const AXIAL_TILT_DEG = 23.5;
-const SPIN_IDLE = (2 * Math.PI) / 100;
+// Earth stands upright here — no axial lean — and spins eastward once per 70 s.
+const SPIN_IDLE = (2 * Math.PI) / 70;
 const SPIN_HOVER = SPIN_IDLE / 5;
 const CASE_URL = "./app.html";
 
@@ -58,13 +57,12 @@ export function initHero() {
     globe.renderer().setPixelRatio?.(Math.min(window.devicePixelRatio || 1, 2));
   }
 
-  /* ------------------------------------------------------- tilt + rotation */
+  /* ----------------------------------------------------------- rotation */
 
-  // Rolling the camera's up vector shows the pole 23.5° off vertical while the
-  // surface spins about its own axis, which is how the tilt actually looks.
-  const tiltRadians = (AXIAL_TILT_DEG * Math.PI) / 180;
+  // The camera keeps the default upright up vector, so the pole is vertical on
+  // screen, and the surface spins about that axis.
   const camera = globe.camera();
-  camera.up.set(Math.sin(tiltRadians), Math.cos(tiltRadians), 0).normalize();
+  camera.up.set(0, 1, 0);
   camera.lookAt(0, 0, 0);
 
   // three-globe assembles its globe group only once the texture arrives, so the

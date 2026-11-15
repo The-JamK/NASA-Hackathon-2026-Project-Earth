@@ -425,6 +425,15 @@ Last verified: 2026-11-14
   MANUAL: Cloud browser, built site, 1440x900, case opened with "Is Sydney getting hotter?" then Run case.
   EVIDENCE: The live chip's text starts at the box edge — `SNAPSHOT · 26.7 °C NOW · 0.00 MM/H · 1.7 M/S · METEOMATICS · 14 NOV 00:00 UTC` — and `document.querySelectorAll('.live-chip i').length` is 0. The verdict reads `OPEN AND SHUT` / `+0.35 °C / decade` / `Significant warming · 95% CI +0.18 to +0.51 · n = 36` with computed `background: rgb(255, 107, 74)` and `border-left-width: 0px`. Contrast measured in the page for all four tones (background against the resolved colour of the stamp, rate, unit and sub-line) is warm 6.83, cool 5.93, none 4.76, explore 7.95 — all above the 4.5 AA floor, with the grey tone the tightest and therefore pinned to pure black ink at full opacity. Screenshots: `artifacts/verdict-filled.png`, `artifacts/chip-no-dot.png`.
 
-MET: 82
+- [x] G83: The hero Earth stands upright and spins faster than it did.
+  CHECK: node scripts/verify_app.mjs
+  EXPECT: app verified
+  EVIDENCE: `AXIAL_TILT_DEG` and the `sin`/`cos` camera roll are gone; `camera.up.set(0, 1, 0)` keeps the pole vertical on screen while the surface still turns about that axis, so `pointOfView` over Australia is unchanged. `SPIN_IDLE` moves from `(2 * Math.PI) / 100` to `(2 * Math.PI) / 70` — one revolution per 70 s, about 1.43x the old rate — and the hover rate stays a fifth of it. `verify_app.mjs` now requires the `camera.up.set(0, 1, 0)` line and the new `SPIN_IDLE`, and fails if `AXIAL_TILT` or `tiltRadians` returns to `hero.js`.
+
+- [x] G84: On the built page the camera is upright and the measured spin matches the new rate.
+  MANUAL: Cloud browser, built site, 1440x900, temporary probe removed before committing.
+  EVIDENCE: With a temporary `window.__heroProbe` (grep now finds 0 occurrences in `hero.js`), two samples 5.19 s apart gave `rotation.y` 0.40841 -> 0.87664 = 0.09024 rad/s against the 0.08976 target (0.5% high, timing noise), i.e. a full turn in about 70 s versus the previous 0.0628 rad/s. `camera.up` read `[0, 1, 0]` at both samples. The final probe-free build was screenshotted twice 4 s apart: the pole is vertical and the landmasses have moved between frames (`artifacts/hero-upright.png`, `artifacts/hero-upright-t1.png`). `scripts/verify_all.sh` passes on the final build.
+
+MET: 84
 UNMET: 1
 ABANDONED: 0
