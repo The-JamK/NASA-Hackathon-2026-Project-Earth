@@ -1,7 +1,8 @@
 // The landing screen is the whole first impression: one Earth, eight boxes that
-// ride around it, and no lines drawn from a box to anywhere. This checks the
-// structure and the copy that matters, not the pixels. The geometry is measured
-// in a browser, because only a browser knows where the sphere ends up.
+// ride around it and one statement centred above it, and no lines drawn from a
+// box to anywhere. This checks the structure and the copy that matters, not the
+// pixels. The geometry is measured in a browser, because only a browser knows
+// where the sphere ends up.
 //
 //   node scripts/verify_hero.mjs
 import { readFileSync } from "node:fs";
@@ -20,14 +21,22 @@ function check(label, condition) {
 
 const boxClasses = [...landing.matchAll(/class="hero-box hero-box--([\w-]+)"/g)].map((match) => match[1]);
 check(
-  "eight boxes, one per position around the sphere",
-  boxClasses.length === 8 && new Set(boxClasses).size === 8,
+  "nine boxes, one per position around the sphere and one above it",
+  boxClasses.length === 9 && new Set(boxClasses).size === 9,
   );
-if (boxClasses.length !== 8) console.log(`       found ${boxClasses.length}: ${boxClasses.join(", ")}`);
+if (boxClasses.length !== 9) console.log(`       found ${boxClasses.length}: ${boxClasses.join(", ")}`);
 
-for (const name of ["name", "public", "members", "about", "challenge", "analyst", "event", "data"]) {
+for (const name of ["belief", "name", "public", "members", "about", "challenge", "analyst", "event", "data"]) {
   check(`the ${name} box exists`, boxClasses.includes(name));
 }
+
+// The statement above the sphere, and the label that frames it.
+const beliefBox = landing.match(/hero-box--belief"[\s\S]*?<\/article>/)?.[0] ?? "";
+check(
+  "the belief box says access to Earth science and trends should not require a science degree",
+  /We believe access to Earth science and trends shouldn't require a science degree\./.test(beliefBox),
+);
+check("the belief box is labelled", /Why we built this/.test(beliefBox));
 
 // The two audience boxes, and the sentences they have to carry.
 const publicBox = landing.match(/hero-box--public"[\s\S]*?<\/article>/)?.[0] ?? "";
@@ -50,11 +59,11 @@ check(
 check("the analyst box says the data is organised and ready to download", /organised data/.test(analystBox) && /download/.test(analystBox));
 check("the download formats are named", /CSV/.test(analystBox) && /Excel/.test(analystBox) && /R\b/.test(analystBox));
 
-// Every box has copy, so none of the eight is a placeholder.
+// Every box has copy, so none of the nine is a placeholder.
 const boxes = [...landing.matchAll(/<article class="hero-box[\s\S]*?<\/article>/g)].map((match) => text(match[0]));
 check(
   "every box carries copy",
-  boxes.length === 8 && boxes.every((box) => box.length > 20),
+  boxes.length === 9 && boxes.every((box) => box.length > 20),
 );
 
 // The page still opens the case and still holds no leader lines or dots.

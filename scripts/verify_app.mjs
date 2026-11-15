@@ -42,8 +42,9 @@ for (const gone of [
 }
 if (/^\s*Scroll\s*$/m.test(landing)) fail("the landing page still says Scroll");
 
-// The hero copy lives in eight bordered boxes behind the globe; the leader lines
-// that used to tie each callout to a surface anchor are gone for good.
+// The hero copy lives in nine bordered boxes around the globe, one of them the
+// statement centred above the sphere; the leader lines that used to tie each
+// callout to a surface anchor are gone for good.
 for (const copy of [
   "Dhruv G, James H and Henry Z.",
   "Ask about any place on Earth.",
@@ -53,11 +54,12 @@ for (const copy of [
   "NASA GISTEMP v4, POWER (MERRA-2), Blue Marble, Sentinel-2",
   "Made for the general public through simple search and a clear answer",
   "Made for technical analysts with detailed numbers and calculations",
+  "We believe access to Earth science and trends shouldn't require a science degree.",
 ]) {
   if (!landing.includes(copy)) fail(`the landing hero is missing "${copy}"`);
 }
-if ((landing.match(/class="hero-box /g) || []).length !== 8) {
-  fail("expected eight hero boxes");
+if ((landing.match(/class="hero-box /g) || []).length !== 9) {
+  fail("expected nine hero boxes");
 }
 if (/hero-line|hero-lines|hero-dot/.test(landing)) {
   fail("the hero still ships leader lines or dots");
@@ -238,7 +240,7 @@ console.log(`points: ${points.points.length} · grid: ${grid.cells.length} · so
 console.log(`assets: 3 textures · ${points.points.filter((point) => point.imagery).length} context images`);
 console.log("recommendation: overlay element served and wired to the tap handler");
 console.log("chrome: tagline, brand dot, Intake label and case board wording removed");
-console.log("hero: eight copy boxes, no leader lines");
+console.log("hero: nine copy boxes, no leader lines");
 console.log("case layout: narrative paragraph above the verdict block");
 console.log("verdict: tone fills the box, no left bar · snapshot chip carries no dot");
 console.log(`country averages: ${countries.countries.length} · cities suggested: ${countries.countries.reduce((total, country) => total + country.cities.length, 0)}`);

@@ -709,6 +709,25 @@ Last verified: 2026-11-14
   EXPECT: (no output)
   EVIDENCE: `git status --porcelain --untracked-files=no` prints nothing and `cloud_git push` reported `4202031..d731e60  HEAD -> main`. `81df711` carries the two audience boxes and the prose sweep, `d731e60` merges `main` (which had added gates up to G135 and a security check), with this ledger's new gates renumbered G136-G140 and `main`'s side taken for the five conflicted files before the em-dash sweep and the landing edits were re-applied on top of it. The only untracked path is `artifacts/`, the screenshots that have never been in the repository.
 
-MET: 139
-UNMET: 1
+- [x] G141: The landing carries the belief statement in a box of its own, centred above the Earth, and it is readable there.
+  CHECK: node scripts/verify_hero.mjs
+  EXPECT: HERO CHECK PASS
+  EVIDENCE: `HERO CHECK PASS` with `nine boxes, one per position around the sphere and one above it`, `the belief box says access to Earth science and trends should not require a science degree`, and `the belief box is labelled`. In the browser the box is horizontally centred to the pixel at every wide size (1920: 643..1277 around a centre of 960; 1440: 439..1001 around 720; 1280: 390..890 around 640) and its bottom edge sits 7 to 40px above the top of the sphere. Measured contrast of the copy against the box, composited over the night sky, is 17.3:1, and the copy is set at 13.5px on a 1200px screen rising to 15px at 1920.
+
+- [x] G142: The landing still fits the whole screen at desktop sizes with the statement added, and the boxes are spaced without collisions or clipping.
+  MANUAL: box rectangles and screenshots at four desktop sizes.
+  EVIDENCE: `getBoundingClientRect` at 1202x700, 1280x800, 1440x900 and 1920x1080: nine boxes each time, `overlaps: []`, `clipped: []`, `scrolls: false`. The globe no longer crowds the copy: the stage stops 112px below the top on the wide layout, which leaves the statement clear sky and gives the two columns more air (1440: public box ends at x 279 with the sphere starting near 360). Above 1600px the boxes widen to 288px so the columns still carry the frame. The stacked layout below 1200px is unchanged apart from the statement taking its place third, after the globe, and still scrolls as it always did. Screenshots: `artifacts/hero-belief-1440.png`, `artifacts/hero-belief-1920.png`, `artifacts/hero-belief-1280.png`, `artifacts/hero-belief-390.png`.
+
+- [x] G143: Every earlier check still passes with the statement added.
+  CHECK: SKIP_LIVE=1 bash scripts/verify_all.sh
+  EXPECT: all checks passed
+  EVIDENCE: `all checks passed`, including `hero: nine copy boxes, no leader lines` and every data, routing and export check from before, with `npm run build` succeeding afterwards.
+
+- [ ] G144: The result is committed to main and pushed.
+  CHECK: git status --porcelain --untracked-files=no
+  EXPECT: (no output)
+  EVIDENCE: pending
+
+MET: 142
+UNMET: 2
 ABANDONED: 0
