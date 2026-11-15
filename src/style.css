@@ -2182,7 +2182,7 @@ html.landing body {
    tall and below the data list used to start before the local-event box had
    ended. They are anchored to the bottom edge instead, stacked with the same
    gaps at every height, and the data list tightens its leading a little. */
-@media (min-width: 1201px) and (max-height: 800px) and (min-height: 701px) {
+@media (min-width: 1201px) and (max-height: 800px) {
   .hero-box--analyst { top: auto; bottom: calc(3.5vh + 262px); }
   .hero-box--event { top: auto; bottom: calc(3.5vh + 172px); }
   .hero-box--data { bottom: 3.5vh; }
@@ -2293,13 +2293,9 @@ html.landing body {
   .topbar .brand { font-size: 9.5px; letter-spacing: 0.18em; }
 }
 
-/* ---------- phones, narrow and short viewports: globe between stacked captions ---------- */
+/* ---------- phones and narrow viewports: globe between stacked captions ---------- */
 
-/* The arc is a fixed vertical composition: eight text boxes of set height need
-   roughly 700px of window before their rows stop meeting, whatever the width.
-   A window shorter than that gets the stacked column instead, so a short wide
-   window reads as a scrolling page rather than a heap of overlapping boxes. */
-@media (max-width: 1200px), (max-height: 700px) {
+@media (max-width: 1200px) {
   .hero {
     min-height: auto;
     display: flex;
