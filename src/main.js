@@ -2446,11 +2446,6 @@ async function offerDerivedPlan(question, seq) {
   if (resolution.ambiguous || resolution.expanded || resolution.corrected) showSuggestions(resolution);
 }
 
-const compactNumber = new Intl.NumberFormat("en", {
-  notation: "compact",
-  maximumFractionDigits: 1,
-});
-
 function suggestionLabel(candidate) {
   const kind =
     candidate.kind === "region"
@@ -2460,11 +2455,7 @@ function suggestionLabel(candidate) {
         : candidate.kind === "place"
           ? "city"
           : "place";
-  const people =
-    candidate.kind === "region" || !(candidate.population > 0)
-      ? ""
-      : ` · ${compactNumber.format(candidate.population)}`;
-  return candidate.country ? `${kind} · ${candidate.country}${people}` : `${kind}${people}`;
+  return candidate.country ? `${kind} · ${candidate.country}` : kind;
 }
 
 function hideSuggestions() {
