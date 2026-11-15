@@ -75,6 +75,30 @@ const cases = [
     window: "1990-2025",
     token: "mcmurdo",
   },
+  // Comparatives name the variable. "hotter" used to reach temperature only
+  // because temperature is the first document in the index, and "sunnier" fell
+  // to temperature at all.
+  {
+    question: "Is Brisbane getting hotter?",
+    code: "T2M",
+    place: "brisbane",
+    window: "1990-2025",
+    token: "hotter",
+  },
+  {
+    question: "Is Brisbane getting cooler?",
+    code: "T2M",
+    place: "brisbane",
+    window: "1990-2025",
+    token: "cooler",
+  },
+  {
+    question: "Is Brisbane getting sunnier?",
+    code: "ALLSKY_SFC_SW_DWN",
+    place: "brisbane",
+    window: "1990-2025",
+    token: "sunnier",
+  },
 ];
 
 let failures = 0;

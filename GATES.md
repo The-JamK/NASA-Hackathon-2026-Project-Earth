@@ -598,6 +598,16 @@ Last verified: 2026-11-14
   EXPECT: ocean verified
   EVIDENCE: On merged `main` this failed: `FAIL: "south ocean" planned country at South Korea`. The country repair budget is three edits for a ten-letter name, and `southocean` is three edits from `southkorea` with a shared first letter, so `"south ocean"` was repaired into South Korea and the equal-length tie-break handed it the question. A repaired hit may now only displace a name that is itself repaired: `(!countryHit.corrected || !oceanHit || oceanHit.corrected)` in `useCountry`, and the ocean/country length comparison defers to an uncorrected ocean alias on a tie. Measured after the fix: `"Is south ocean warming?"` → `ocean southern-ocean` (358 cells, 75–55°S), while `"Is ocean warming?"` → global ocean, `"Is southern ocean warming?"` → Southern Ocean and `"Is south atlantic warming?"` → South Atlantic are unchanged, and `verify_ocean`, `verify_resolve` and `verify_search` all pass.
 
-MET: 116
+- [x] G118: A comparative word names the variable it asks about.
+  CHECK: node scripts/verify_rag.mjs
+  EXPECT: rag verified
+  EVIDENCE: `Is Brisbane getting hotter?` was answering temperature only because temperature is the first document in the vector index: `rankVariables("hotter")` scores 0.000 for every variable, the vocabulary had `hot` but not `hotter`, so the plan fell through to "the closest supported variable is temperature". `Is Brisbane getting sunnier?` fell through the same way and answered temperature — the wrong record for that question. The vocabulary now carries the comparatives (`hotter`, `hottest`, `warmer`, `warmest`, `cooler`, `coolest`, `colder`, `coldest`, `heating`, `warmth` for temperature; `sunny`, `sunnier`, `sunniest`, `cloudier`, `brighter` for solar; `wettest`, `driest` for rainfall), and `readVariable` returns the word that matched so the plan can say `matched "hotter" to temperature` instead of describing a guess. Measured in the browser: `Is Brisbane getting hotter?` opens **Temperature at 2 m, Brisbane** with that sentence, and `Is Brisbane getting sunnier?` opens **Surface solar irradiance**. `verify_rag.mjs` pins hotter, cooler and sunnier; `verify_typos.mjs`, `verify_resolve.mjs`, `verify_ocean.mjs` and `verify_seaice.mjs` still pass.
+
+- [x] G119: A near-miss country or basin name is repaired by at most two edits, whatever the name's length.
+  CHECK: node scripts/verify_ocean.mjs
+  EXPECT: ocean verified
+  EVIDENCE: G117 stopped a repaired country from displacing an exact basin alias; this is the independent guard underneath it, so the repair cannot fire at all. `typoLimit(10) = 3` gave a ten-letter name a three-edit budget, and `southocean` is three edits from `southkorea`, which is how a correctly spelled Southern Ocean alias was read as South Korea. Country and basin repairs are now capped at two edits regardless of length — the lesson the station matcher already learned, where three edits turned Washington into Wellington. Measured: `south ocean` and `southern ocean` plan **Southern Ocean**, while `Austraila` → Australia, `Cannda` → Canada and `Indain Ocean` → Indian Ocean still repair; `verify_ocean`, `verify_resolve`, `verify_typos`, `verify_rag` and `verify_seaice` all pass.
+
+MET: 118
 UNMET: 1
 ABANDONED: 0
