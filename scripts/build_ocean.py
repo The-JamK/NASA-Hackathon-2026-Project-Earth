@@ -8,7 +8,7 @@ Outputs:
 
 Why regions rather than points: the trend field already draws every GISTEMP cell
 over water as well as land. An ocean "station" would duplicate that field as
-clutter, so the ocean is presented the way countries are — as a place you ask
+clutter, so the ocean is presented the way countries are, as a place you ask
 about, averaged from the cells inside it.
 
 The means are weighted by cos(lat): each 4° cell covers less ground toward the
@@ -41,14 +41,14 @@ BH_Q = 0.05
 
 # Disjoint basins partition the ocean, so the family correction covers each cell
 # once. `global` is an aggregate over all of them and is therefore not part of the
-# family — its q is left null rather than borrowed from the basins.
+# family, its q is left null rather than borrowed from the basins.
 BASINS: list[dict[str, Any]] = [
     {
         "id": "north-pacific",
         "name": "North Pacific",
         "aliases": ["north pacific", "northern pacific"],
         "lat": (20, 66),
-        "lon": (120, 140),  # 120°E eastward 140° to 100°W: the basin crosses the dateline
+        "lon": (120, 140), # 120°E eastward 140° to 100°W: the basin crosses the dateline
         "extent": "20–66°N, 120°E–100°W",
     },
     {
@@ -56,7 +56,7 @@ BASINS: list[dict[str, Any]] = [
         "name": "Tropical Pacific",
         "aliases": ["tropical pacific", "central pacific", "east pacific", "pacific", "nino", "niño", "el nino", "el niño"],
         "lat": (-20, 20),
-        "lon": (150, 130),  # 150°E eastward 130° to 80°W
+        "lon": (150, 130), # 150°E eastward 130° to 80°W
         "extent": "20°S–20°N, 150°E–80°W",
     },
     {
@@ -64,7 +64,7 @@ BASINS: list[dict[str, Any]] = [
         "name": "South Pacific",
         "aliases": ["south pacific", "southern pacific"],
         "lat": (-55, -20),
-        "lon": (150, 140),  # 150°E eastward 140° to 70°W
+        "lon": (150, 140), # 150°E eastward 140° to 70°W
         "extent": "55–20°S, 150°E–70°W",
     },
     {
@@ -74,7 +74,7 @@ BASINS: list[dict[str, Any]] = [
         # Atlantic" is the North Atlantic (178 cells) rather than a coin flip.
         "aliases": ["north atlantic", "northern atlantic", "atlantic"],
         "lat": (20, 66),
-        "lon": (-80, 80),  # 80°W eastward to 0°
+        "lon": (-80, 80), # 80°W eastward to 0°
         "extent": "20–66°N, 80°W–0°",
     },
     {
@@ -82,7 +82,7 @@ BASINS: list[dict[str, Any]] = [
         "name": "South Atlantic",
         "aliases": ["south atlantic", "southern atlantic"],
         "lat": (-55, -20),
-        "lon": (-60, 80),  # 60°W eastward to 20°E
+        "lon": (-60, 80), # 60°W eastward to 20°E
         "extent": "55–20°S, 60°W–20°E",
     },
     {
@@ -90,7 +90,7 @@ BASINS: list[dict[str, Any]] = [
         "name": "Indian Ocean",
         "aliases": ["indian ocean", "indian"],
         "lat": (-55, 25),
-        "lon": (20, 100),  # 20°E eastward to 120°E
+        "lon": (20, 100), # 20°E eastward to 120°E
         "extent": "55°S–25°N, 20–120°E",
     },
     {

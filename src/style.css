@@ -1268,7 +1268,7 @@ details.work p {
    milliseconds after the one above it, so the eye lands on the place name first
    and the verdict last. It starts near full strength and travels three pixels,
    because a glass panel that fades from nothing reads as a flash rather than a
-   settle — and switching variable re-runs it, so it has to stay quiet. */
+   settle, and switching variable re-runs it, so it has to stay quiet. */
 .case-panel > * { animation: settle 0.22s cubic-bezier(0.2, 0.7, 0.2, 1) both; }
 .case-panel > :nth-child(2) { animation-delay: 0.02s; }
 .case-panel > :nth-child(3) { animation-delay: 0.03s; }
@@ -1600,6 +1600,13 @@ html.landing body {
   z-index: 2;
 }
 
+/* On the wide layout the stage stops short of the top, so the one statement has
+   clear sky to sit in and the sphere sits a little lower and a little smaller,
+   which also leaves the two columns more air between them. */
+@media (min-width: 1201px) {
+  .hero-stage { top: 112px; }
+}
+
 .hero-scene {
   position: absolute;
   inset: 0;
@@ -1652,8 +1659,8 @@ html.landing body {
 
 .hero-box {
   position: absolute;
-  width: clamp(248px, 20vw, 300px);
-  padding: 13px 15px 14px;
+  width: clamp(214px, 16.6vw, 258px);
+  padding: 11px 13px 12px;
   border: 1px solid rgba(255, 255, 255, 0.14);
   border-radius: 2px;
   background: rgba(4, 7, 12, 0.78);
@@ -1664,23 +1671,65 @@ html.landing body {
   animation: hero-box-in 0.7s ease forwards;
 }
 .hero.is-ready .hero-box--name { animation-delay: 0.18s; }
-.hero.is-ready .hero-box--members { animation-delay: 0.33s; }
-.hero.is-ready .hero-box--about { animation-delay: 0.48s; }
-.hero.is-ready .hero-box--challenge { animation-delay: 0.63s; }
-.hero.is-ready .hero-box--event { animation-delay: 0.78s; }
-.hero.is-ready .hero-box--data { animation-delay: 0.93s; }
+.hero.is-ready .hero-box--public { animation-delay: 0.3s; }
+.hero.is-ready .hero-box--members { animation-delay: 0.42s; }
+.hero.is-ready .hero-box--about { animation-delay: 0.54s; }
+.hero.is-ready .hero-box--challenge { animation-delay: 0.24s; }
+.hero.is-ready .hero-box--analyst { animation-delay: 0.36s; }
+.hero.is-ready .hero-box--event { animation-delay: 0.48s; }
+.hero.is-ready .hero-box--belief { animation-delay: 0.12s; }
+.hero.is-ready .hero-box--data { animation-delay: 0.6s; }
 
 @keyframes hero-box-in {
   to { opacity: 1; }
 }
 
-/* The sphere passes in front of these, so only their inner edge is covered. */
-.hero-box--name { left: calc(var(--box-left) + var(--box-bend)); top: 9vh; width: clamp(248px, 21vw, 312px); }
-.hero-box--members { left: var(--box-left); top: 47vh; }
-.hero-box--about { left: calc(var(--box-left) + var(--box-bend)); bottom: 9vh; }
-.hero-box--challenge { right: calc(var(--box-left) + var(--box-bend)); top: 12vh; }
-.hero-box--event { right: var(--box-left); top: 45vh; }
-.hero-box--data { right: calc(var(--box-left) + var(--box-bend)); bottom: 11vh; }
+/* The one statement, centred in the sky above the sphere, in front of the canvas
+   so the planet's northern arc passes behind it. */
+.hero-box--belief {
+  left: 50%;
+  top: 2.4vh;
+  width: clamp(390px, 39vw, 620px);
+  padding: 12px 20px 13px;
+  transform: translateX(-50%);
+  border-color: rgba(255, 255, 255, 0.2);
+  background: rgba(4, 7, 12, 0.86);
+  text-align: center;
+}
+
+.hero-box--belief .hero-label {
+  margin-bottom: 6px;
+  color: #c9bda9;
+}
+
+.hero-box--belief .hero-box-text {
+  max-width: none;
+  margin: 0;
+  font-size: clamp(13.5px, 1vw, 15px);
+  line-height: 1.6;
+  color: var(--paper);
+}
+
+/* Eight boxes ride around the sphere in two arcs of four. The sphere passes in
+   front of them, so only their inner edge is covered, and the arc follows it:
+   the rows nearest the equator stand furthest out, while the top and bottom rows
+   step inwards with the circle. The statement sits above all of them. */
+.hero-box--name { left: calc(var(--box-left) + var(--box-bend)); top: 3vh; width: clamp(238px, 19vw, 290px); }
+.hero-box--public { left: var(--box-left); top: 27vh; }
+.hero-box--members { left: var(--box-left); top: 51vh; }
+.hero-box--about { left: calc(var(--box-left) + var(--box-bend)); bottom: 4vh; }
+.hero-box--challenge { right: calc(var(--box-left) + var(--box-bend)); top: 6vh; }
+.hero-box--analyst { right: var(--box-left); top: 30vh; }
+.hero-box--event { right: var(--box-left); top: 54vh; }
+.hero-box--data { right: calc(var(--box-left) + var(--box-bend)); bottom: 6vh; }
+
+/* A very wide screen would leave the two columns looking thin against a globe
+   this size, so the boxes grow with the frame once there is room for it. */
+@media (min-width: 1600px) {
+  .hero-box { width: clamp(258px, 15vw, 296px); }
+  .hero-box--name { width: clamp(290px, 17vw, 330px); }
+  .hero-box--belief { width: clamp(430px, 33vw, 660px); }
+}
 
 .hero-name {
   margin: 0 0 8px;
@@ -1777,11 +1826,14 @@ html.landing body {
   .hero-boxes { display: contents; }
   .hero-box { position: static; width: min(100%, 640px); padding: 14px 16px; }
   .hero-box--name { order: 1; }
-  .hero-box--about { order: 3; }
-  .hero-box--members { order: 4; }
-  .hero-box--data { order: 5; }
-  .hero-box--challenge { order: 6; }
-  .hero-box--event { order: 7; }
+  .hero-box--belief { order: 3; width: min(100%, 640px); transform: none; text-align: left; }
+  .hero-box--about { order: 4; }
+  .hero-box--public { order: 5; }
+  .hero-box--members { order: 6; }
+  .hero-box--analyst { order: 7; }
+  .hero-box--challenge { order: 8; }
+  .hero-box--event { order: 9; }
+  .hero-box--data { order: 10; }
   .hero-name { font-size: clamp(34px, 9.4vw, 46px); }
   .hero-box-text { max-width: 42ch; }
   .hero-cursor { display: none; }

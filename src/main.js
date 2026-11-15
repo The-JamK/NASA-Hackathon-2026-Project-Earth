@@ -261,7 +261,7 @@ function ensureSeaIce() {
 // The station index carries identity and a verdict summary; the full trend
 // records and annual series are fetched with the station's shard, once, when a
 // case is opened. A shard is merged in place, so every reader of a point keeps
-// working unchanged — and is dropped again when the cache turns over.
+// working unchanged, and is dropped again when the cache turns over.
 const DETAIL_CACHE_LIMIT = 3;
 
 function touchDetailShard(path) {
@@ -389,7 +389,7 @@ function buildGlobe() {
 /* Picking the globe is the app's hottest pointer path: every move asks
    three-globe for the coordinates under the cursor, and the mesh it hits is a
    7,920-triangle sphere sitting behind a 32,040-triangle starfield and a
-   7,920-triangle atmosphere, all of which get tested too — about 21 ms per move,
+   7,920-triangle atmosphere, all of which get tested too, about 21 ms per move,
    which is what made the globe stutter under the cursor on a machine that
    otherwise drew it at 60 fps. The starfield, the atmosphere and the graticules
    cannot be picked at all, and the sphere answers analytically instead of a
@@ -470,8 +470,8 @@ function pointColor(point) {
 
    Drawn as one mesh per station, the 708 halos and the 286 country outlines were
    ~3,000 of the frame's 3,552 draw calls, and the globe sat at 15 fps for it.
-   Both are now a single object each — the halos an InstancedMesh, the borders one
-   LineSegments — which is the same picture for four calls. three-globe keeps each
+   Both are now a single object each, the halos an InstancedMesh, the borders one
+   LineSegments, which is the same picture for four calls. three-globe keeps each
    point's mesh on its datum as __threeObjPoint, so one mesh is scaled instead of
    re-digesting the whole layer (4,039 points in the trend field). */
 const HOVER_GROWTH = 1.85;
@@ -592,7 +592,7 @@ function haloRing(opacity, scale) {
 }
 
 // Country borders as one LineSegments: the cap and side meshes three-globe built
-// per country were fully transparent — they existed only to carry the stroke.
+// per country were fully transparent, they existed only to carry the stroke.
 function borderOutline() {
   const lines = topojsonMesh(world, world.objects.countries);
   const positions = [];
@@ -796,7 +796,7 @@ async function finishGlobeTap(event) {
     await ensureOcean();
     const cell = nearestOceanCell(coords.lat, coords.lng, 3);
     if (!cell) {
-      showToast("Land — the Ocean layer only shows water. Switch to Cities to ask about a station.");
+      showToast("Land, the Ocean layer only shows water. Switch to Cities to ask about a station.");
       return;
     }
     // 339 of the 2,672 ocean cells (the tropical Atlantic, for one) fall outside
@@ -946,7 +946,7 @@ async function selectGlobal(windowKey = state.windowKey) {
 /* ------------------------------------------------------ derived field case */
 
 // A place the bundle does not hold still has a coordinate. The resolver turns
-// the name into one, and the case is the nearest GISTEMP cell to it — the same
+// the name into one, and the case is the nearest GISTEMP cell to it, the same
 // field, the same stored statistics, the same verdict contract. Nothing is
 // invented: the case says which cell it borrowed and how far away it is.
 const DERIVED_STATION_CHIP_KM = 400;
@@ -1099,13 +1099,13 @@ function renderRecommendationCard() {
     <div class="rec-row">
       <span class="rec-kind">Nearest station</span>
       <b>${escapeHtml(station?.point?.name || "none")}</b>
-      <span class="rec-distance">${station ? `${distanceText(station.km)}${offset}` : "—"}</span>
+      <span class="rec-distance">${station ? `${distanceText(station.km)}${offset}` : ", "}</span>
       ${station ? `<button type="button" data-action="open-station">Open</button>` : ""}
     </div>
     <div class="rec-row">
       <span class="rec-kind">GISTEMP cell</span>
       <b>${escapeHtml(cell?.cell?.name || "none")}</b>
-      <span class="rec-distance">${cell ? distanceText(cell.km) : "—"}</span>
+      <span class="rec-distance">${cell ? distanceText(cell.km) : ", "}</span>
       ${cell ? `<button type="button" data-action="open-cell">Open</button>` : ""}
     </div>
   `;
@@ -1245,7 +1245,7 @@ function countryNarrative(country, variable, trend, windowKey) {
     "–"
   )} (95% CI ${signed(trend.ci_low_per_decade)} to ${signed(
     trend.ci_high_per_decade
-  )}; n = ${trend.n}; HAC p ${pText(trend.p_value)}).${correction} A country mean describes the stations, not every square kilometre: they cluster where people live, so desert and mountain interiors are represented only as far as the network reaches. This is a trend detection, not an attribution — and significance is not size.`;
+  )}; n = ${trend.n}; HAC p ${pText(trend.p_value)}).${correction} A country mean describes the stations, not every square kilometre: they cluster where people live, so desert and mountain interiors are represented only as far as the network reaches. This is a trend detection, not an attribution, and significance is not size.`;
 }
 
 function renderCountryCase() {
@@ -1377,7 +1377,7 @@ function oceanNarrative(region, trend, windowKey) {
   )} °C per decade</strong> over ${windowKey.replace(
     "-",
     "–"
-  )} (95% CI ${signed(trend.ci_low_per_decade)} to ${signed(trend.ci_high_per_decade)}; n = ${trend.n}). ${agreement}${family} Each 4° cell counts in proportion to its area, because a cell near a pole covers less ground than one at the equator. These cells carry ERSST-based sea surface temperature, with land influence inside roughly 1,200 km of a coast. This is a trend detection, not an attribution — and significance is not size.`;
+  )} (95% CI ${signed(trend.ci_low_per_decade)} to ${signed(trend.ci_high_per_decade)}; n = ${trend.n}). ${agreement}${family} Each 4° cell counts in proportion to its area, because a cell near a pole covers less ground than one at the equator. These cells carry ERSST-based sea surface temperature, with land influence inside roughly 1,200 km of a coast. This is a trend detection, not an attribution, and significance is not size.`;
 }
 
 function oceanFacts(region, trend, window) {
@@ -1531,11 +1531,11 @@ function seaIceNarrative(record, trend, windowKey, variable) {
     trend.p_value
   )}). ${tests} ${trend.significant
     ? `It survives the Benjamini–Hochberg correction across the three sea-ice records at q ${pText(trend.q_value)}.`
-    : `Corrected across the three sea-ice records it keeps q ${pText(trend.q_value)}, above the 0.05 threshold.`} Each year is the mean of twelve monthly values, so the seasonal cycle — the September minimum and the March maximum — is averaged rather than shown. ${
+    : `Corrected across the three sea-ice records it keeps q ${pText(trend.q_value)}, above the 0.05 threshold.`} Each year is the mean of twelve monthly values, so the seasonal cycle, the September minimum and the March maximum, is averaged rather than shown. ${
     variable.code === "SEAICECONC"
       ? "Concentration is ice area ÷ extent: how much of the ice-covered area is actually ice, not how far the ice reaches, so it can rise while the extent falls."
       : "Extent counts every cell with at least 15% ice cover; it is not concentration, and it is not thickness."
-  } This is a trend detection, not an attribution — and significance is not size.`;
+  } This is a trend detection, not an attribution, and significance is not size.`;
 }
 
 function seaIceFacts(record, trend, window, variable) {
@@ -1846,16 +1846,16 @@ function renderDerivedCase() {
         region
           ? `The bundle has no station for ${escapeHtml(place.name)}, a ${escapeHtml(
               regionLabel
-            )}, so this case is the GISTEMP 4° cell nearest its centre — ${distanceText(
+            )}, so this case is the GISTEMP 4° cell nearest its centre, ${distanceText(
               item.distanceKm
-            )} away at ${cellAt} — and its numbers describe that cell, roughly a 440 km box, not the whole ${escapeHtml(
+            )} away at ${cellAt}, and its numbers describe that cell, roughly a 440 km box, not the whole ${escapeHtml(
               regionLabel
             )}.`
           : `The bundle holds no station at ${escapeHtml(
               place.name
-            )}, so this case is the nearest GISTEMP 4° cell — ${distanceText(
+            )}, so this case is the nearest GISTEMP 4° cell, ${distanceText(
               item.distanceKm
-            )} away at ${cellAt} — and its numbers describe that cell, roughly a 440 km box, not the city boundary.`
+            )} away at ${cellAt}, and its numbers describe that cell, roughly a 440 km box, not the city boundary.`
       } ${how}
     </div>
     ${variableChips(variable, true)}
@@ -1927,7 +1927,7 @@ function derivedNarrative(place, item, trend, variable, windowKey) {
     item.distanceKm
   )} from the requested coordinate and covers roughly 440 km across, so read it as the region around ${escapeHtml(
     place.name
-  )}, not as the town itself. This is a trend detection, not an attribution — and significance is not size.`;
+  )}, not as the town itself. This is a trend detection, not an attribution, and significance is not size.`;
 }
 
 function renderGlobalCase() {
@@ -2017,7 +2017,7 @@ function verdictBlock(trend, variable, info) {
   if (!trend) {
     return `<div class="verdict none">
       <div class="verdict-stamp">No evidence</div>
-      <div class="verdict-rate">—<span class="unit">${escapeHtml(variable.units)} / decade</span></div>
+      <div class="verdict-rate">, <span class="unit">${escapeHtml(variable.units)} / decade</span></div>
       <div class="verdict-sub">No complete annual series for this window.</div>
     </div>`;
   }
@@ -2065,7 +2065,7 @@ function caveatBlock(trend, variable, isGrid) {
     )}).</div>`;
   }
   if (trend.verdict === "no significant trend") {
-    return `<div class="caveat">A non-significant result is not proof of no trend — only that this record cannot separate one from noise.</div>`;
+    return `<div class="caveat">A non-significant result is not proof of no trend, only that this record cannot separate one from noise.</div>`;
   }
   return "";
 }
@@ -2112,7 +2112,7 @@ function facts(trend, variable, isGrid, counts = null) {
   }
   const fit = [
     ["Sample size", `${trend.n} annual means`],
-    ["HAC lag", trend.maxlag ?? "—"],
+    ["HAC lag", trend.maxlag ?? ", "],
     ["HAC p-value", formatP(trend.p_value), true],
   ];
   if (Number.isFinite(trend.ci_low_per_decade) && Number.isFinite(trend.ci_high_per_decade)) {
@@ -2204,7 +2204,7 @@ function caseSources(point, variable) {
   if (point?.imagery) {
     const meta = point.imagery_meta || {};
     const label = meta.label || "NASA Blue Marble context crop";
-    const attribution = meta.attribution ? ` — ${escapeHtml(meta.attribution)}` : "";
+    const attribution = meta.attribution ? `, ${escapeHtml(meta.attribution)}` : "";
     bits.push(`<b>Imagery:</b> ${escapeHtml(label)}${attribution}`);
   }
   if (variable.kind === "grid") bits.push("<b>Grid:</b> GISTEMP v4, 4° subsample, BH FDR q = 0.05");
@@ -2218,7 +2218,7 @@ function workBlock(kind) {
       : kind === "global"
         ? "The global series is the published GISTEMP annual anomaly. The cell counts come from the same 4° subsample and HAC contract, corrected with Benjamini–Hochberg FDR at q = 0.05; neighbouring cells are correlated, so the correction is approximate. The global slope is not an area-weighted average of the cells."
         : kind === "ice"
-          ? "The Sea Ice Index reports monthly extent and area per hemisphere. Extent is the area with at least 15% ice cover; concentration is 100 × area ÷ extent, the mean concentration of the ice-covered area. Each year is the mean of twelve monthly values, so the same trend code reads it as any other record — which hides the seasonal cycle. The family correction runs across the three records (two hemispheres and their sum), separately for each measure. No attribution is claimed."
+          ? "The Sea Ice Index reports monthly extent and area per hemisphere. Extent is the area with at least 15% ice cover; concentration is 100 × area ÷ extent, the mean concentration of the ice-covered area. Each year is the mean of twelve monthly values, so the same trend code reads it as any other record, which hides the seasonal cycle. The family correction runs across the three records (two hemispheres and their sum), separately for each measure. No attribution is claimed."
           : "Annual means only. OLS with Newey–West HAC standard errors; 95% interval with Student-t on n − 2 df; Sen's slope as a robust check. A verdict needs the HAC p < 0.05 and the Hamed–Rao corrected Mann–Kendall p < 0.05 with the same direction. The AI proposed the variable and wrote the narrative; it did not compute a number.";
   return `<details class="work"><summary>Show your work</summary><p>${escapeHtml(text)}</p></details>`;
 }
@@ -2260,7 +2260,7 @@ function cityNarrative(point, variable, trend, windowKey) {
     trend.sen_slope_per_decade
   )} ${escapeHtml(
     variable.units
-  )}/decade. The Mann–Kendall p-value uses the Hamed–Rao variance correction for autocorrelation, computed on the Sen-detrended series. This is a trend detection, not an attribution — and significance is not size.`;
+  )}/decade. The Mann–Kendall p-value uses the Hamed–Rao variance correction for autocorrelation, computed on the Sen-detrended series. This is a trend detection, not an attribution, and significance is not size.`;
 }
 
 function gridNarrative(cell, trend, variable, windowKey) {
@@ -2290,7 +2290,7 @@ function gridNarrative(cell, trend, variable, windowKey) {
           trend.q_value
         )}).`
       : ` It does not survive the HAC test at the 5% level (q = ${formatP(trend.q_value)}).`;
-  return `${local}${correction} This is a trend detection, not an attribution — and significance is not size.`;
+  return `${local}${correction} This is a trend detection, not an attribution, and significance is not size.`;
 }
 
 function globalNarrative(trend, variable, windowKey, counts) {
@@ -2305,7 +2305,7 @@ function globalNarrative(trend, variable, windowKey, counts) {
     "–"
   )} (95% CI ${signed(trend.ci_low_per_decade)} to ${signed(
     trend.ci_high_per_decade
-  )}; n = ${trend.n}; HAC p ${pText(trend.p_value)}). Across the 4° grid, ${counts.significant_increasing.toLocaleString()} cells survive Benjamini–Hochberg FDR correction at q = 0.05 as increases, ${counts.significant_decreasing.toLocaleString()} as decreases, and ${counts.not_significant.toLocaleString()} are not significant. Neighbouring cells are correlated, so that correction is approximate. This is a trend detection, not an attribution — and significance is not size.`;
+  )}; n = ${trend.n}; HAC p ${pText(trend.p_value)}). Across the 4° grid, ${counts.significant_increasing.toLocaleString()} cells survive Benjamini–Hochberg FDR correction at q = 0.05 as increases, ${counts.significant_decreasing.toLocaleString()} as decreases, and ${counts.not_significant.toLocaleString()} are not significant. Neighbouring cells are correlated, so that correction is approximate. This is a trend detection, not an attribution, and significance is not size.`;
 }
 
 /* --------------------------------------------------------------- intake UI */
@@ -2795,13 +2795,13 @@ function changeWord(variable, increasing) {
 }
 
 function signed(value, digits = 3) {
-  if (!Number.isFinite(Number(value))) return "—";
+  if (!Number.isFinite(Number(value))) return ", ";
   const number = Number(value);
   return `${number >= 0 ? "+" : "−"}${Math.abs(number).toFixed(digits)}`;
 }
 
 function formatP(value) {
-  if (value == null || !Number.isFinite(Number(value))) return "—";
+  if (value == null || !Number.isFinite(Number(value))) return ", ";
   const number = Number(value);
   if (number < 0.001) return "< 0.001";
   return number.toFixed(3);

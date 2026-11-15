@@ -20,7 +20,7 @@ let failures = 0;
 function check(label, condition, detail = "") {
   if (condition) return;
   failures += 1;
-  console.error(`FAIL: ${label}${detail ? ` — ${detail}` : ""}`);
+  console.error(`FAIL: ${label}${detail ? `, ${detail}` : ""}`);
 }
 
 const bundle = JSON.parse(readFileSync(resolve(ROOT, "public/data/points.json"), "utf8"));

@@ -15,7 +15,7 @@ let failures = 0;
 function check(label, condition, detail = "") {
   if (condition) return;
   failures += 1;
-  console.error(`FAIL: ${label}${detail ? ` — ${detail}` : ""}`);
+  console.error(`FAIL: ${label}${detail ? `, ${detail}` : ""}`);
 }
 
 const payload = JSON.parse(readFileSync(resolve(ROOT, "public/data/gazetteer.json"), "utf8"));

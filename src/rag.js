@@ -106,7 +106,7 @@ export function resolvePlace(question, rag, points) {
  * The bundle's 708 station records are better than any derived cell, so a
  * one-edit misspelling should reach the station itself rather than fall through
  * to the gazetteer and answer from a coarser 4° cell. Only the station's own name
- * is compared — a country alias ("Kenya") is not a station — and only when the
+ * is compared, a country alias ("Kenya") is not a station, and only when the
  * exact pass found nothing, so a correctly spelled name never becomes a typo.
  *
  * Returns the best few, because "Did you mean" is a question the reader answers.
@@ -227,7 +227,7 @@ export function resolveCountry(question, countries) {
   // A near miss may only replace an exact match when that match is a generic
   // word inside the repaired name: "the Indain Ocean" matched "ocean", and the
   // global ocean is a worse answer than repairing one letter. It may never
-  // replace a name that was spelled correctly — "Australia" is one edit from
+  // replace a name that was spelled correctly, "Australia" is one edit from
   // "Austria", and an exact name is not a typo of a different one.
   // Two edits at most, however long the name: three let "south ocean" become
   // "south korea", the same over-generous budget that turned Washington into
@@ -278,7 +278,7 @@ export function resolveSeaIce(question, seaIce) {
       if (!best || alias.length > best.alias.length) best = { record, alias };
     }
   }
-  // "Antartic sea ice" matched only the word "sea ice" — the global record — so
+  // "Antartic sea ice" matched only the word "sea ice", the global record, so
   // the repair has to replace a generic exact alias, exactly as oceans do.
   const fuzzy = fuzzyRecord(question, seaIce, { maxEdits: 1 });
   if (fuzzy && (!best || covers(fuzzy.alias, best.alias))) {

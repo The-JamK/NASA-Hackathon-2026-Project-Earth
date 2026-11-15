@@ -1,7 +1,7 @@
 // The resolver is what makes "Is Gold Coast getting hotter?" answerable: a place
 // the bundle does not hold still gets a coordinate, and the GISTEMP field
 // supplies the numbers. This check pins the whole contract without depending on
-// a live geocoder — both providers are stubs, so a passing run proves the
+// a live geocoder, both providers are stubs, so a passing run proves the
 // matching, the place-name extraction, the validation, the fallbacks, the
 // caching and the rate limit. It also proves the feature needs no API key: no
 // test here passes one, and there is no option to pass one.
@@ -187,7 +187,7 @@ const NOMINATIM_BROADBEACH = [
   check(fetchImpl.calls.length === 1, "the cached question still called the geocoder");
 }
 
-// 4. When the first provider has nothing, the second is asked — with its policy
+// 4. When the first provider has nothing, the second is asked, with its policy
 //    header, because Nominatim blocks stock library User-Agents.
 {
   const fetchImpl = geocoderStub({
@@ -351,7 +351,7 @@ const NOMINATIM_BROADBEACH = [
 }
 
 // 12. A name that is not one place, and a name that is misspelt, come back as a
-//     list of candidates with the reason — never as one silent guess.
+//     list of candidates with the reason, never as one silent guess.
 {
   const fetchImpl = geocoderStub({});
 
@@ -540,7 +540,7 @@ const NOMINATIM_BROADBEACH = [
   );
 
   const seeIce = planCase("Is the Arctic see ice shrinking?", context);
-  check(seeIce?.kind === "seaice", `"see ice" became a ${seeIce?.kind} case — the ice question was missed`);
+  check(seeIce?.kind === "seaice", `"see ice" became a ${seeIce?.kind} case, the ice question was missed`);
   check(seeIce?.place?.name === "Arctic sea ice", `"see ice" resolved to ${seeIce?.place?.name}`);
   check(seeIce?.corrected === true, "the misspelt sea ice was not flagged");
 
@@ -570,7 +570,7 @@ const NOMINATIM_BROADBEACH = [
 
   // Washington is not one of the bundle's 708 stations, so the plan must leave it
   // for the gazetteer, which knows Washington, D.C. A loose station repair used
-  // to answer Wellington here — three edits away — and never ask the gazetteer.
+  // to answer Wellington here, three edits away, and never ask the gazetteer.
   for (const washington of [
     "Is Washington getting hotter?",
     "Is Washington DC getting hotter?",

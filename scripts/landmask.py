@@ -1,6 +1,6 @@
 """Land/ocean raster for the 4° grid, from the cached Natural Earth polygons.
 
-The GISTEMP file ships anomalies only — no land mask — so an ocean region needs
+The GISTEMP file ships anomalies only, no land mask, so an ocean region needs
 its own coastline test. Natural Earth's 10m countries shapefile is already
 cached beside the populated-places table, and countries are land: a cell whose
 centre falls outside every polygon is water.

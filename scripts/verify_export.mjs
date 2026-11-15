@@ -292,11 +292,11 @@ checkCase("global", {
 });
 
 // Escaping: a title with a comma and a quote must survive the round trip, because
-// "Washington, D.C. — the "dry" side" is a real kind of case name.
+// "Washington, D.C., the "dry" side" is a real kind of case name.
 const escaped = parseCsv(
-  toCsv([["field", "value"], ["case", 'Washington, D.C. — the "dry" side']])
+  toCsv([["field", "value"], ["case", 'Washington, D.C., the "dry" side']])
 );
-if (escaped[1][1] !== 'Washington, D.C. — the "dry" side') {
+if (escaped[1][1] !== 'Washington, D.C., the "dry" side') {
   fail(`CSV escaping broke: got ${JSON.stringify(escaped[1][1])}`);
 }
 const slug = caseSlug({ title: "Arctic sea ice", variable: T2M, windowKey });

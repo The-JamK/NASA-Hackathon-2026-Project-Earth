@@ -155,7 +155,7 @@ def test_shipped_values_reproduce_the_published_trend() -> None:
 
     The build rounds a series before serialising it. If the fit used the
     unrounded values, a reader recomputing from the bundle gets a different Sen
-    slope, Kendall tau and Hamed-Rao p — which is how jeddah / GWETROOT /
+    slope, Kendall tau and Hamed-Rao p, which is how jeddah / GWETROOT /
     1990-2025 shipped as significant on a p-value its own series does not
     reproduce.
     """

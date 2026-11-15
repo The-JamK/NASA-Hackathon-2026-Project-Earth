@@ -1,7 +1,7 @@
 // A verdict is only worth as much as the numbers behind it, so every case can
 // hand those over: the annual means the fit was computed from, and the statistics
-// with their method and source. Both files are plain CSV — openable in Excel,
-// R, pandas — prefixed with a UTF-8 BOM and written with CRLF so Excel reads
+// with their method and source. Both files are plain CSV, openable in Excel,
+// R, pandas, prefixed with a UTF-8 BOM and written with CRLF so Excel reads
 // "°C", "−0.54" and "Benjamini–Hochberg" instead of mojibake.
 
 const BOM = "\uFEFF";

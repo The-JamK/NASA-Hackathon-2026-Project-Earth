@@ -685,11 +685,54 @@ Last verified: 2026-11-14
   EXPECT: --refresh-live
   EVIDENCE: `--refresh-live` appears in the usage and groups with `--skip-grid` and `--skip-imagery`. The flag reaches `fetch_meteomatics(..., refresh=True)`, which skips the cache-first shortcut that made credentials alone useless for a refresh. Proved with a sentinel rather than a timestamp: writing `{"valid_time":"SENTINEL-FROM-CACHE"}` into `data/cache/meteomatics/nairobi.json` and calling the helper twice returned `SENTINEL-FROM-CACHE` with `refresh=False` and `2026-11-15T09:00:00Z · 24.4 °C` with `refresh=True`, and the cache file was rewritten — so the bypass is real, not a coincidence of both paths reading the same hour. A full `--refresh-live --skip-grid --skip-imagery` run also completed (`BUILD EXIT=0`, 708 points, 4,039 cells, 16 shards), but its data was **not** committed: a rebuild moves every stored statistic in the 14th–15th digit (708 of 708 summaries differ, e.g. `0.31298738738738535` → `…574`, with 0 verdict changes), which is float churn rather than a refresh. Reverted with `git checkout -- public/data`. Unrelated pre-existing note measured while checking this: `refit_bundle.py --check` reports `11,169 records differ` identically at `e69c166` and at HEAD, while the suite's own `verify_refit.py` passes — so the `--check` comparison is unstable on this bundle for a reason that predates this commit.
 
-- [x] G136: The refit check can pass, and a repair rewrites only the records that actually moved.
+- [x] G136: The landing screen carries eight copy boxes, and the two new ones state who the site is for: the general public, with simple search and a clear answer; technical analysts, with the numbers, the calculations and data ready to download.
+  CHECK: node scripts/verify_hero.mjs
+  EXPECT: HERO CHECK PASS
+  EVIDENCE: `HERO CHECK PASS`, exit 0: eight boxes, one per position, each with copy; `the public box says it is made for the general public, through simple search and a clear answer`; `the analyst box says it is made for technical analysts, with detailed numbers and calculations fully explained`; `the analyst box says the data is organised and ready to download`; the formats named as CSV, Excel and R; `no leader lines or anchor dots`. `verify_app.mjs` now asserts the same two sentences and the count of eight, so the landing cannot quietly lose a box.
+
+- [x] G137: No em-dash remains anywhere a reader can meet one: the two pages, the app's source strings, the stylesheet's prose, the README, the demo notes, and the shipped data's labels.
+  CHECK: node scripts/verify_prose.mjs
+  EXPECT: PROSE CHECK PASS
+  EVIDENCE: `PROSE CHECK PASS`, exit 0, `scanned 25 files, 139 en-dashes kept in ranges` (the en-dashes in 1990–2025 stay). The first run failed with `121 em-dashes left (U+2014)`, and the sweep was done twice: the first attempt collapsed comma-plus-punctuation sequences and thereby ate JavaScript spread operators and Python variadic tuples in ten files (`{ points...creds }`, `tuple[str, Any]...`), which `node --check` and `py_compile` caught. The redo touches only the em-dash character and was gated on a before/after count of 17 spread operators, unchanged, with every JS and Python file compiling and all nine data files parsing afterwards.
+
+- [x] G138: All eight boxes hug the Earth and none of them collide, clip the viewport or spill across the sphere's centre, measured at several screen sizes.
+  MANUAL: box rectangles against the stage and the globe, photographed.
+  EVIDENCE: `getBoundingClientRect` in the browser at five sizes. Arc layout, the sphere between two columns of four: 1202x700, 1202x800, 1280x800, 1440x900 and 1920x1080, all `overlaps: []`, `clipped: []`, no page scroll. At 1440x900 the inner edges sit 360px (name), 441px (public and members) and 395px (about) from the centre line with the sphere between them, and the right column mirrors those numbers. Below 1200px the page keeps its existing stacked layout, name above the globe and the rest below: 1024x768 and 390x844 stack, scroll, and overlap nothing. Screenshots: `artifacts/hero-1440.png`, `artifacts/hero-1280.png`, `artifacts/hero-1024.png`, `artifacts/hero-390.png`, `artifacts/hero-390-full.png`.
+
+- [x] G139: Every check that passed before still passes with the new landing and the rewritten prose.
+  CHECK: SKIP_LIVE=1 bash scripts/verify_all.sh
+  EXPECT: all checks passed
+  EVIDENCE: `all checks passed` with the three new steps inside it (`MOTION CHECK PASS`, `PROSE CHECK PASS`, `HERO CHECK PASS`) and every earlier check unchanged, including `app verified`, `hero: eight copy boxes, no leader lines`, `case layout: narrative paragraph above the verdict block` and `verdict: tone fills the box, no left bar`. `npm run build` succeeds and first-load stays inside its 1,025 kB budget.
+
+- [x] G140: The result is committed to main and pushed.
+  CHECK: git status --porcelain --untracked-files=no
+  EXPECT: (no output)
+  EVIDENCE: `git status --porcelain --untracked-files=no` prints nothing and `cloud_git push` reported `4202031..d731e60  HEAD -> main`. `81df711` carries the two audience boxes and the prose sweep, `d731e60` merges `main` (which had added gates up to G135 and a security check), with this ledger's new gates renumbered G136-G140 and `main`'s side taken for the five conflicted files before the em-dash sweep and the landing edits were re-applied on top of it. The only untracked path is `artifacts/`, the screenshots that have never been in the repository.
+
+- [x] G141: The landing carries the belief statement in a box of its own, centred above the Earth, and it is readable there.
+  CHECK: node scripts/verify_hero.mjs
+  EXPECT: HERO CHECK PASS
+  EVIDENCE: `HERO CHECK PASS` with `nine boxes, one per position around the sphere and one above it`, `the belief box says access to Earth science and trends should not require a science degree`, and `the belief box is labelled`. In the browser the box is horizontally centred to the pixel at every wide size (1920: 643..1277 around a centre of 960; 1440: 439..1001 around 720; 1280: 390..890 around 640) and its bottom edge sits 7 to 40px above the top of the sphere. Measured contrast of the copy against the box, composited over the night sky, is 17.3:1, and the copy is set at 13.5px on a 1200px screen rising to 15px at 1920.
+
+- [x] G142: The landing still fits the whole screen at desktop sizes with the statement added, and the boxes are spaced without collisions or clipping.
+  MANUAL: box rectangles and screenshots at four desktop sizes.
+  EVIDENCE: `getBoundingClientRect` at 1202x700, 1280x800, 1440x900 and 1920x1080: nine boxes each time, `overlaps: []`, `clipped: []`, `scrolls: false`. The globe no longer crowds the copy: the stage stops 112px below the top on the wide layout, which leaves the statement clear sky and gives the two columns more air (1440: public box ends at x 279 with the sphere starting near 360). Above 1600px the boxes widen to 288px so the columns still carry the frame. The stacked layout below 1200px is unchanged apart from the statement taking its place third, after the globe, and still scrolls as it always did. Screenshots: `artifacts/hero-belief-1440.png`, `artifacts/hero-belief-1920.png`, `artifacts/hero-belief-1280.png`, `artifacts/hero-belief-390.png`.
+
+- [x] G143: Every earlier check still passes with the statement added.
+  CHECK: SKIP_LIVE=1 bash scripts/verify_all.sh
+  EXPECT: all checks passed
+  EVIDENCE: `all checks passed`, including `hero: nine copy boxes, no leader lines` and every data, routing and export check from before, with `npm run build` succeeding afterwards.
+
+- [x] G144: The result is committed to main and pushed.
+  CHECK: git status --porcelain --untracked-files=no
+  EXPECT: (no output)
+  EVIDENCE: `git status --porcelain --untracked-files=no` prints nothing and `cloud_git push` reported `d0437a9..49ed0eb  HEAD -> main`. `49ed0eb` carries the statement box, the stage change that gives it room and the wider columns on very wide screens, with `verify_hero` and `verify_app` moved to nine boxes. Only `artifacts/`, the screenshots, stays untracked.
+
+- [x] G145: The refit check can pass, and a repair rewrites only the records that actually moved.
   CHECK: uv run python scripts/refit_bundle.py --check
   EXPECT: BUNDLE SELF-CONSISTENT
   EVIDENCE: `_same` compared floats for bit equality, and re-fitting reassociates them, so all 11,169 records reported as differing on every run (points 8,460 · countries 2,661 · grid 3 · ocean 27 · sea ice 18) with 0 verdicts changed — the largest real move anywhere being 1.9e-7 relative, at `trehuaco PRECTOTCORR 2000-2025 ci_high_per_decade`. Comparison is now `_close` with `rel_tol=1e-6` (a constant with that measurement written next to it), and the points and grid sections compare only the keys a fit produces via `_same_trend` instead of whole dicts. Measured after the change: `--check` → `BUNDLE SELF-CONSISTENT`, 0 records in every section; `--strict` still reports the same 11,169, so the bit-exact mode survives. A plain run now prints `refit complete: 0 records rewritten` and leaves the tree byte-identical, where before it rewrote all 11,169: the write paths keep the published record when the refit only reassociated floats (`trends[key] = old if unchanged else record`, same for the grid's global block), and the ocean/sea-ice FDR re-stamps q only for the `(record, measure)` pairs whose fit moved — q follows p, so an unmoved fit cannot produce a different q. The tolerance does not hide drift: perturbing one published slope by 1% (`nairobi T2M 1990-2025`, 0.31298738738738535 → 0.3161172612612592) made `--check` report `points 1 records differ` with every other section at 0, and a plain run repaired exactly `1 records rewritten`. `refit_points` also now writes `_merge(old, new)` rather than replacing the record, so a repair can no longer shear off a `q_value` or `significant` that a later step stamps on. `verify_refit.py` still prints `REFIT CHECKS PASS`, and the data files are unchanged by this commit.
 
-MET: 135
+MET: 144
 UNMET: 1
 ABANDONED: 0

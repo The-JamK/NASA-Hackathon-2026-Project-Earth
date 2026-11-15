@@ -10,9 +10,9 @@
     />
     <meta
       name="description"
-      content="Gaussian Frontiers — Signal &amp; Noise. Ask the planet a question and get a defensible case file. NASA Space Apps 2026."
+      content="Gaussian Frontiers, Signal &amp; Noise. Ask the planet a question and get a defensible case file. NASA Space Apps 2026."
     />
-    <title>Gaussian Frontiers! — Signal &amp; Noise</title>
+    <title>Gaussian Frontiers · Signal &amp; Noise</title>
   </head>
   <body>
     <div id="globe" aria-label="Interactive 3D Earth"></div>
@@ -116,14 +116,14 @@
         <section>
           <h3>Data</h3>
           <ul id="method-sources">
-            <li>NASA GISTEMP v4 — global gridded temperature anomalies, baseline 1951–1980.</li>
+            <li>NASA GISTEMP v4: global gridded temperature anomalies, baseline 1951–1980.</li>
             <li>Ocean cells carry ERSST-based sea surface temperature; land cells carry surface air temperature. Ocean regions average their cells by area (cos lat) and correct across the eight basins, not the mixed field. The “global ocean” row is the area-weighted mean of those eight basins, so its cells are already counted inside them.</li>
-            <li>NASA POWER — point temperature, rainfall, root-zone wetness and solar irradiance, MERRA-2 derived. POWER answers per 0.5° × 0.625° cell, so neighbouring stations can share one series: 141 station variables are identical to another station's, and a country average can count a cell twice. Twelve stations on the Antarctic and Greenland ice sheets have no root-zone soil moisture at all — that variable is absent there, not zero.</li>
-            <li>Meteomatics — current conditions for every point, proxied server-side so the app itself holds no weather credentials. The build snapshot is labelled and used when the proxy is unavailable.</li>
-            <li>NASA Earthdata — MERRA-2 catalogue access check.</li>
-            <li>NSIDC/NOAA Sea Ice Index (G02135) — monthly ice extent per hemisphere, averaged to annual means and served as a timeseries by NOAA PSL.</li>
-            <li>Sentinel-2 L2A — Copernicus multispectral imagery, mosaicked for featured points by Microsoft Planetary Computer.</li>
-            <li>NASA Blue Marble — globe texture and fallback context when a Sentinel-2 mosaic is unavailable; the card label always names the source actually shown.</li>
+            <li>NASA POWER: point temperature, rainfall, root-zone wetness and solar irradiance, MERRA-2 derived. POWER answers per 0.5° × 0.625° cell, so neighbouring stations can share one series: 141 station variables are identical to another station's, and a country average can count a cell twice. Twelve stations on the Antarctic and Greenland ice sheets have no root-zone soil moisture at all, that variable is absent there, not zero.</li>
+            <li>Meteomatics: current conditions for every point, proxied server-side so the app itself holds no weather credentials. The build snapshot is labelled and used when the proxy is unavailable.</li>
+            <li>NASA Earthdata: MERRA-2 catalogue access check.</li>
+            <li>NSIDC/NOAA Sea Ice Index (G02135): monthly ice extent per hemisphere, averaged to annual means and served as a timeseries by NOAA PSL.</li>
+            <li>Sentinel-2 L2A: Copernicus multispectral imagery, mosaicked for featured points by Microsoft Planetary Computer.</li>
+            <li>NASA Blue Marble: globe texture and fallback context when a Sentinel-2 mosaic is unavailable; the card label always names the source actually shown.</li>
           </ul>
           <p class="method-note">
             Featured-point imagery is a low-cloud Sentinel-2 L2A mosaic. The visual

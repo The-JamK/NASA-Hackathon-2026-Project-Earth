@@ -4,7 +4,7 @@ The bundle ships series rounded to 4 dp (stations, countries, ocean, sea ice) an
 3 dp (grid cells), but the build fitted the unrounded values. That made a bundle
 that could not reproduce itself: Sen's slope, Kendall's tau, the Hamed-Rao
 corrected Mann-Kendall p and the FDR q values all moved when a reader recomputed
-them from the published series, and one borderline verdict moved with them —
+them from the published series, and one borderline verdict moved with them,
 jeddah / GWETROOT / 1990-2025 shipped as "significant increasing" on HAC
 p = 0.0499968 and recomputes to p = 0.0508, which is not significant.
 

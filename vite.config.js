@@ -106,7 +106,7 @@ function apiPlugin(env) {
 
 // GitHub Pages serves every asset with `max-age=600`, and the bundle names are
 // stable by design, so a browser could keep running the previous deploy's
-// JavaScript for ten minutes after a release — which is exactly what "it still
+// JavaScript for ten minutes after a release, which is exactly what "it still
 // says Wellington" looked like from the outside. Adding a content hash to the
 // URL in the HTML gives every build its own cache entry without committing a new
 // copy of the file to the repository.

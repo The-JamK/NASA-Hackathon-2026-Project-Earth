@@ -177,8 +177,8 @@ def _record(place: dict[str, str], continents: dict[str, str], rank: int) -> dic
     country = (place.get("ADM0NAME") or "").strip()
     if lat is None or lon is None or not name or not country:
         return None
-    # Some Natural Earth records carry a corrupted NAME_EN — Hail, in Saudi
-    # Arabia, is labelled "Saudi Arabia" there — which would put a station named
+    # Some Natural Earth records carry a corrupted NAME_EN, Hail, in Saudi
+    # Arabia, is labelled "Saudi Arabia" there, which would put a station named
     # after the country on the map. Prefer the plain NAME in that case.
     fallback = (place.get("NAME") or "").strip()
     if fallback and _normalise(name) == _normalise(country) != _normalise(fallback):

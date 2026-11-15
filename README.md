@@ -1,4 +1,4 @@
-# NASA Hackathon 2026 - Project Earth 
+# NASA Hackathon 2026 - Project Earth
 
 
 
@@ -7,13 +7,13 @@
 
 **Summary:**
 
-Signal & Noise is a web tool that lets anyone test whether a climate trend is real or just noise. Users ask a question such as “Is Dallas getting hotter from 2000 to 2025?” and an intake assistant suggests the variable, place and time period. A statistics engine then analyzes NASA data (GISTEMP v4, POWER/MERRA-2, Blue Marble, Sentinel-2) and returns a rate per decade, a 95% confidence interval, a sample size and a verdict backed with statistical analysis to state if it is significant or “not proven”. 
+Signal & Noise is a web tool that lets anyone test whether a climate trend is real or just noise. Users ask a question such as “Is Dallas getting hotter from 2000 to 2025?” and an intake assistant suggests the variable, place and time period. A statistics engine then analyzes NASA data (GISTEMP v4, POWER/MERRA-2, Blue Marble, Sentinel-2) and returns a rate per decade, a 95% confidence interval, a sample size and a verdict backed with statistical analysis to state if it is significant or “not proven”.
 
-It addresses the Earth System Trend Detective challenge by turning raw NASA records into transparent, defensible trend detection. It uses autocorrelation-aware tests, a second-opinion check and multiple-comparison correction across the map from mathematical analysis. 
+It addresses the Earth System Trend Detective challenge by turning raw NASA records into transparent, defensible trend detection. It uses autocorrelation-aware tests, a second-opinion check and multiple-comparison correction across the map from mathematical analysis.
 
 It matters because climate claims are often cherry-picked or over-read. By labeling weak evidence honestly, it helps users separate signal from noise.
 
- 
+
 
 **Project Details:**
 

@@ -4,8 +4,8 @@
  * MISSION.md asks for a red-herring case that is steep but not proven. Picking
  * it by name would rot: a data rebuild could make McMurdo significant and the
  * story would break on stage. So the case is chosen from the shipped bundle by
- * the property the demo needs — a featured record with a real slope that both
- * tests refuse to call at the 5% level — and the steepest such record wins.
+ * the property the demo needs, a featured record with a real slope that both
+ * tests refuse to call at the 5% level, and the steepest such record wins.
  */
 
 import { trendOf } from "./bundle.js";

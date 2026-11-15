@@ -42,20 +42,24 @@ for (const gone of [
 }
 if (/^\s*Scroll\s*$/m.test(landing)) fail("the landing page still says Scroll");
 
-// The hero copy lives in six bordered boxes behind the globe; the leader lines
-// that used to tie each callout to a surface anchor are gone for good.
+// The hero copy lives in nine bordered boxes around the globe, one of them the
+// statement centred above the sphere; the leader lines that used to tie each
+// callout to a surface anchor are gone for good.
 for (const copy of [
-  "Members: Dhruv G, James H and Henry Z.",
-  "Ask a question about a place.",
+  "Dhruv G, James H and Henry Z.",
+  "Ask about any place on Earth.",
   "The AI explains, the code computes.",
   "Be an Earth Trend Detective!",
-  "Local event: Gold Coast - Australia (participated remotely).",
+  "Gold Coast · Australia, attended remotely.",
   "NASA GISTEMP v4, POWER (MERRA-2), Blue Marble, Sentinel-2",
+  "Made for the general public through simple search and a clear answer",
+  "Made for technical analysts with detailed numbers and calculations",
+  "We believe access to Earth science and trends shouldn't require a science degree.",
 ]) {
   if (!landing.includes(copy)) fail(`the landing hero is missing "${copy}"`);
 }
-if ((landing.match(/class="hero-box /g) || []).length !== 6) {
-  fail("expected six hero boxes");
+if ((landing.match(/class="hero-box /g) || []).length !== 9) {
+  fail("expected nine hero boxes");
 }
 if (/hero-line|hero-lines|hero-dot/.test(landing)) {
   fail("the hero still ships leader lines or dots");
@@ -148,7 +152,7 @@ if (/hero-dialog/.test(landing)) fail("the hero still ships a confirmation dialo
 
 const main = await (await get("/src/main.js", "javascript")).text();
 if (!main.includes("new Globe")) fail("main.js does not mount the globe");
-// The ask strip keeps four chips — two question examples, the ocean basin and the
+// The ask strip keeps four chips, two question examples, the ocean basin and the
 // derived place. The sea-ice and steep-but-unproven chips were removed on request.
 for (const gone of ["chip-ice", "chip-herring", "Arctic sea ice shrinking", "Steep, but not proven"]) {
   if (main.includes(gone)) fail(`the ask strip still ships ${gone}`);
@@ -180,7 +184,7 @@ if (/case files/i.test(html) || /case files/i.test(landing)) {
   fail("the old product name is still on a page");
 }
 // The case page must lead with the product name too, not the tagline.
-if (!/<title>Gaussian Frontiers — Signal &amp; Noise<\/title>/.test(html)) {
+if (!/<title>Gaussian Frontiers \u00b7 Signal &amp; Noise<\/title>/.test(html)) {
   fail("the case page titles the tagline instead of the product name");
 }
 if (/Back to the Signal &amp; Noise/.test(html)) {
@@ -210,7 +214,7 @@ if (narrativeAt === -1 || verdictAt === -1 || narrativeAt > verdictAt) {
   fail("the narrative paragraph is not rendered above the verdict block");
 }
 
-// The snapshot chip is text only — the status dot above the word went with it —
+// The snapshot chip is text only, the status dot above the word went with it,
 // and the verdict fills its whole box with the tone colour instead of drawing a
 // bar down the left edge. The ink for every tone is asserted against 4.5:1 in
 // the ledger's browser gate; here the wiring is what is pinned.
@@ -236,7 +240,7 @@ console.log(`points: ${points.points.length} · grid: ${grid.cells.length} · so
 console.log(`assets: 3 textures · ${points.points.filter((point) => point.imagery).length} context images`);
 console.log("recommendation: overlay element served and wired to the tap handler");
 console.log("chrome: tagline, brand dot, Intake label and case board wording removed");
-console.log("hero: six copy boxes, no leader lines");
+console.log("hero: nine copy boxes, no leader lines");
 console.log("case layout: narrative paragraph above the verdict block");
 console.log("verdict: tone fills the box, no left bar · snapshot chip carries no dot");
 console.log(`country averages: ${countries.countries.length} · cities suggested: ${countries.countries.reduce((total, country) => total + country.cities.length, 0)}`);

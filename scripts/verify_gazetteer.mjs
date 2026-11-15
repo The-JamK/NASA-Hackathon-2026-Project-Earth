@@ -14,7 +14,7 @@ let failures = 0;
 function check(label, condition, detail = "") {
   if (condition) return;
   failures += 1;
-  console.error(`FAIL: ${label}${detail ? ` — ${detail}` : ""}`);
+  console.error(`FAIL: ${label}${detail ? `, ${detail}` : ""}`);
 }
 
 const payload = JSON.parse(readFileSync(FILE, "utf8"));
@@ -39,7 +39,7 @@ for (const row of places) {
     badPlace = row;
     break;
   }
-  const [, , lat, lon, population] = row;
+  const [,, lat, lon, population] = row;
   if (typeof row[0] !== "string" || !row[0]) {
     badPlace = row;
     break;
@@ -61,7 +61,7 @@ for (const row of regions) {
     badRegion = row;
     break;
   }
-  const [, , lat, lon] = row;
+  const [,, lat, lon] = row;
   if (typeof row[0] !== "string" || !row[0] || typeof row[1] !== "string" || !row[1]) {
     badRegion = row;
     break;

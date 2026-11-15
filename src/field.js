@@ -4,12 +4,12 @@
 // nine ocean basins and three sea-ice records. When a question names none of
 // them ("Is Gold Coast getting hotter?") it falls back to the global field and
 // says so. This module asks the resolver for a coordinate instead, and the app
-// then answers from the GISTEMP field at that coordinate — a derived case.
+// then answers from the GISTEMP field at that coordinate, a derived case.
 //
 // What comes back is a place and two numbers. No trend, no verdict: those are
 // computed from the cached field by the same code as every other case. The
 // resolver is a gazetteer first and a keyless public geocoder second, so there is
-// nothing to configure — no key ever reaches this module.
+// nothing to configure, no key ever reaches this module.
 
 import {
   AMBIGUITY_MARGIN,
@@ -32,7 +32,7 @@ function endpoint(path) {
  *
  * A static host has no `/api/resolve`, but it does have the same 6,421-place
  * Natural Earth table the resolver reads, sitting unused in `public/data`. Loading
- * it here — once, lazily, and only after the server path has failed — lets "Is
+ * it here, once, lazily, and only after the server path has failed, lets "Is
  * Gold Coast getting hotter?" open a derived case on GitHub Pages exactly as it
  * does on the Worker. Suburbs and spelling variants still need the Worker: the
  * keyless geocoders live there, not in the page.
@@ -223,7 +223,7 @@ export function describeFailure(result) {
       return "The resolver timed out. The app still works with the cached bundle.";
     case "resolver_unreachable":
     case "resolver_unreadable":
-      return "No resolver server is reachable here, and the bundled gazetteer does not carry that name. Try a larger nearby city — suburbs and spelling variants need the Worker deployment.";
+      return "No resolver server is reachable here, and the bundled gazetteer does not carry that name. Try a larger nearby city, suburbs and spelling variants need the Worker deployment.";
     default:
       return result?.detail || "The place could not be resolved.";
   }
