@@ -8,6 +8,8 @@
 import { readFileSync } from "node:fs";
 
 const landing = readFileSync(new URL("../index.html", import.meta.url), "utf8");
+const styles = readFileSync(new URL("../src/style.css", import.meta.url), "utf8");
+const heroSource = readFileSync(new URL("../src/hero.js", import.meta.url), "utf8");
 const failures = [];
 
 function check(label, condition) {
@@ -65,6 +67,21 @@ check(
   "every box carries copy",
   boxes.length === 9 && boxes.every((box) => box.length > 20),
 );
+
+// A box is not a door. Nothing on it asks to be clicked, and if one is clicked
+// anyway the page answers with a note pointing at the Earth.
+check(
+  "a click on a box is answered by a note pointing at the Earth",
+  /id="hero-toast"[^>]*role="status"[^>]*aria-live="polite"/.test(landing) &&
+    /Click the Earth to open a case/.test(landing),
+);
+check(
+  "the note is wired to the boxes",
+  /querySelectorAll\("\.hero-box"\)/.test(heroSource) && /addEventListener\("click", answerBoxClick\)/.test(heroSource),
+);
+const boxRule = styles.match(/\n\.hero-box \{[\s\S]*?\n\}/)?.[0] ?? "";
+check("the boxes keep the ordinary arrow, not a pointer", /cursor:\s*default/.test(boxRule) && !/cursor:\s*pointer/.test(boxRule));
+check("the boxes have no hover state to invite a press", !/\.hero-box[^{,]*:hover/.test(styles));
 
 // The page still opens the case and still holds no leader lines or dots.
 check("the globe is still the way in", /id="hero-globe"/.test(landing));

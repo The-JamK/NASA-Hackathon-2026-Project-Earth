@@ -171,6 +171,40 @@ export function initHero() {
   // A click, Enter or Space on the globe goes straight to the case analysis.
   hit.addEventListener("click", () => window.location.assign(CASE_URL));
 
+  /* ------------------------------------------------------ boxes are reading */
+
+  // The boxes sit beside the sphere, so one can be taken for the way in. The
+  // page does not invite that: no pointer cursor, no hover state, nothing that
+  // says press me. If a box is clicked anyway, it answers plainly and points at
+  // the globe, then the note leaves on its own.
+  const toast = document.getElementById("hero-toast");
+  const NOTE = "Click the Earth to open a case";
+  let toastTimer = 0;
+  let toastHide = 0;
+
+  function answerBoxClick() {
+    if (!toast) return;
+    clearTimeout(toastTimer);
+    clearTimeout(toastHide);
+    toast.hidden = false;
+    // Setting the same sentence again is a fresh mutation, so a live region
+    // announces the answer to a second click as well as the first.
+    toast.textContent = NOTE;
+    toast.classList.remove("is-shown");
+    void toast.offsetWidth;
+    toast.classList.add("is-shown");
+    toastTimer = window.setTimeout(() => {
+      toast.classList.remove("is-shown");
+      toastHide = window.setTimeout(() => {
+        toast.hidden = true;
+      }, 260);
+    }, 3200);
+  }
+
+  for (const box of hero.querySelectorAll(".hero-box")) {
+    box.addEventListener("click", answerBoxClick);
+  }
+
   /* ------------------------------------------------------- motion + browser */
 
   function applyMotion() {
@@ -208,6 +242,8 @@ export function initHero() {
 
   return function destroy() {
     clearTimeout(readyFallback);
+    clearTimeout(toastTimer);
+    clearTimeout(toastHide);
     stopSpin();
     resizeObserver.disconnect();
     document.removeEventListener("visibilitychange", onVisibility);
