@@ -488,6 +488,6 @@ Last verified: 2026-11-14
   EXPECT: resolver verified
   EVIDENCE: All four pass after the change (`resolver verified: 10973 gazetteer places`, `bundle verified`, `offline verified`, `✓ built`). `verify_firstload.mjs` still passes at 293 kB gzip on the critical path (was 289 kB, +4 kB for the matcher), and `verify_all.sh` now runs the two new checks before the resolver. The worker's gazetteer loader and the Vite middleware both index places and regions, so the server paths see the same 10,973 entries the page does.
 
-MET: 95
+MET: 94
 UNMET: 1
 ABANDONED: 0
