@@ -4,6 +4,12 @@ on:
   push:
     branches: [main]
   workflow_dispatch:
+  # The deploy refreshes the fallback snapshot itself, so the site never needs a
+  # push to stay current: the job rebuilds the data on the runner with the live
+  # API and deploys that build. Daily keeps it within a day at six API calls a
+  # run, against a 1,000-a-day allowance.
+  schedule:
+    - cron: "17 5 * * *"
 
 permissions:
   contents: read
@@ -24,6 +30,15 @@ jobs:
           node-version: 22
           cache: npm
       - run: npm ci
+      # Only on a schedule or a manual run: a push should not spend minutes of
+      # runner time refetching six points, and the committed snapshot is fine
+      # there.
+      - name: Refresh the live snapshot
+        if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
+        uses: ./.github/actions/refresh-live
+        with:
+          username: ${{ secrets.METEOMATICS_USERNAME }}
+          password: ${{ secrets.METEOMATICS_PASSWORD }}
       - run: npm run build
       - uses: actions/configure-pages@v5
       - uses: actions/upload-pages-artifact@v3
