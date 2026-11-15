@@ -395,6 +395,15 @@ Last verified: 2026-11-14
   MANUAL: browser measurements on the built site at 1440x900, plus PIL frame differencing.
   EVIDENCE: Measured with a temporary probe (removed before committing, `grep` finds no `__heroProbe`/`__heroDebug`): `pointOfView` = lat -25.3, lng 133.8 with Australia at the disc centre in the frame; `camera.up` = (0.3987, 0.9171, 0) = 23.5 degrees off vertical; `rotation.y` advanced 0.3246 rad in 5.11 s = 0.0635 rad/s against the 0.0628 target (1% high, timing noise), so one revolution per 100 s; hovered it advanced 0.0656 rad in 5.22 s = 0.01256 rad/s, exactly a fifth. The sign is positive: PIL puts the warm Australia mask centroid at (806, 501) then (962, 585) in frames 4 s apart — 156 px right, 85 px down, 28.5 degrees below horizontal against the 23.5-degree tilt — eastward motion in the tilted frame, terrain entering left and leaving right. Under `prefers-reduced-motion` `rotation.y` stayed at 0 across 2 s with the tilt still applied. Two defects this caught and the change fixes: `three-globe` builds its globe group only after the texture loads, so capturing the handle at init made the spin a no-op (two frames were pixel-identical); and the frame-delta clamp of 0.25 s dropped wall-clock time in a throttled tab, so it is now 2 s.
 
-MET: 75
+- [x] G76: The landing page is the globe scene and nothing else: no top-bar call to action, no section under the hero, no scroll hint, and no scrollbar.
+  CHECK: node scripts/verify_app.mjs
+  EXPECT: app verified
+  EVIDENCE: `index.html` drops the `Open the case` button from the top bar, the `<div class="landing-main">` block (the intake steps, the sample case, the contract, the data notes and the footer), and the `Scroll` link; the page is 76 lines and an HTML parse reports no unbalanced or unclosed tag. `src/landing.js` is now three statements — import the stylesheet, import `initHero`, call it — so nothing fetches `points.json`, `variables.json` or a detail shard for a section that no longer exists. The matching CSS went with it: `.cta-ghost`, `.landing-main`, the `.hero-scroll` rules and the sections, sample, contract, data and footer blocks, with the two landing breakpoints trimmed to the `.hero` and `.topbar` rules they still need. `verify_app.mjs` now asserts the globe button is present and fails if `class="landing-main"`, `class="ghost-btn cta-ghost"`, `class="hero-scroll"`, `href="#how"`, `id="sample-case"`, `<footer` or `class="section"` reappears, or if a line reading exactly `Scroll` is back.
+
+- [x] G77: In the browser the trimmed landing fills the viewport without scrolling and the globe still opens the case.
+  MANUAL: Cloud browser, built site, 1440x900.
+  EVIDENCE: `document.documentElement.scrollHeight` is 900 against `window.innerHeight` 900, so there is no scrollbar; `innerText` contains no occurrence of the word scroll; the top bar's text is exactly `GAUSSIAN FRONTIERS` with zero links or buttons in it; six `.hero-box` articles remain, `.landing-main`, `footer` and `section.section` all return null and there are 0 such sections; `main` measures 834 px tall, filling the height under the 66 px bar. Clicking `#hero-globe` navigated to `/app.html` (title `Gaussian Frontiers — Signal & Noise`), which is now the only route into the app. Screenshot: `artifacts/hero-only.png`.
+
+MET: 77
 UNMET: 1
 ABANDONED: 0

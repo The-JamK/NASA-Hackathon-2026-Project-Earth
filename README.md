@@ -323,8 +323,8 @@ the case.
 
 Two pages are built from `vite.config.js` (`build.rollupOptions.input`):
 
-- `index.html` — the landing page at the site root: what the app does, a sample
-  verdict read live from `public/data`, and the statistical contract.
+- `index.html` — the landing page at the site root: one full-screen Earth carrying
+  the project's six cards. Clicking the globe is the only way in.
 - `app.html` — the app itself: globe, question box, map link and the case file, which appears only while a case is open.
 
 On GitHub Pages they are served at `/NASA-Hackathon-2026-Project-Earth/` and

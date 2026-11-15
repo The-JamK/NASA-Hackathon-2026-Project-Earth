@@ -25,9 +25,22 @@ async function json(path) {
 }
 
 const landing = await (await get("/", "text/html")).text();
-for (const marker of ['id="sample-case"', 'href="./app.html"']) {
-  if (!landing.includes(marker)) fail(`the landing page is missing ${marker}`);
+if (!landing.includes('id="hero-globe"')) fail("the landing page is missing the globe button");
+
+// The landing is the scene and nothing else: no top-bar call to action, no
+// scroll hint, and no sections under the globe.
+for (const gone of [
+  'class="landing-main"',
+  'class="ghost-btn cta-ghost"',
+  'class="hero-scroll"',
+  "href=\"#how\"",
+  'id="sample-case"',
+  "<footer",
+  'class="section"',
+]) {
+  if (landing.includes(gone)) fail(`the landing page still carries ${gone}`);
 }
+if (/^\s*Scroll\s*$/m.test(landing)) fail("the landing page still says Scroll");
 
 // The hero copy lives in six bordered boxes behind the globe; the leader lines
 // that used to tie each callout to a surface anchor are gone for good.
