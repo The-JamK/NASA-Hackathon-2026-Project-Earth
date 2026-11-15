@@ -1108,18 +1108,6 @@ details.work p {
 .layer-switch button + button { border-left: 1px solid var(--line-strong); }
 .layer-switch button.on { color: var(--accent); background: rgba(95, 211, 224, 0.08); }
 
-.hint {
-  font-size: 9px;
-  letter-spacing: 0.12em;
-  text-transform: uppercase;
-  color: var(--dim);
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
-.hint.live { color: var(--accent); }
-
 /* ---------- loading + toast ---------- */
 
 .loading {
@@ -1381,7 +1369,6 @@ details.work p {
   }
   .layer-switch { flex: 0 0 auto; }
   .layer-switch button { padding: 8px 10px; min-height: 32px; white-space: nowrap; }
-  .hint { display: none; }
 
   .case-close { padding: 10px 8px; margin: -10px -8px 0 4px; min-height: 40px; font-size: 10.5px; }
   .var-chip { padding: 8px 9px; min-height: 32px; }
@@ -1489,7 +1476,6 @@ details.work p {
   .bottom-bar { bottom: calc(6px + env(safe-area-inset-bottom, 0px)); }
   .panel-lede,
   .panel-foot { display: none; }
-  .hint { display: none; }
 }
 
 /* ---------- landing page ---------- */

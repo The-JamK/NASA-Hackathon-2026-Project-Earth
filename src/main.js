@@ -96,7 +96,6 @@ const els = {
   casePanel: document.getElementById("case-panel"),
   loading: document.getElementById("loading"),
   toast: document.getElementById("toast"),
-  hint: document.getElementById("hint"),
   methodDialog: document.getElementById("method-dialog"),
   methodBtn: document.getElementById("method-btn"),
   globalBtn: document.getElementById("global-btn"),
@@ -921,9 +920,6 @@ async function selectPoint(point, options = {}) {
     globe.controls().autoRotate = false;
     clearTimeout(autoRotateTimer);
   }
-  els.hint.textContent = point.isGrid
-    ? "GISTEMP cell · click another cell"
-    : `${point.name} · ${state.byCode.get(state.variable)?.short || "trend"}`;
 }
 
 async function selectGlobal(windowKey = state.windowKey) {
@@ -940,7 +936,6 @@ async function selectGlobal(windowKey = state.windowKey) {
   refreshLayer();
   globe.pointOfView({ lat: 12, lng: 8, altitude: 3.0 }, 900);
   globe.controls().autoRotate = true;
-  els.hint.textContent = "Global field · click a cell or a city";
 }
 
 /* ------------------------------------------------------ derived field case */
@@ -981,7 +976,6 @@ async function selectDerived(place, resolution = null) {
   globe.pointOfView({ lat: place.lat, lng: place.lon, altitude: 1.55 }, 900);
   globe.controls().autoRotate = false;
   clearTimeout(autoRotateTimer);
-  els.hint.textContent = `${place.name} · derived from the nearest GISTEMP cell`;
 }
 
 function clearCase() {
@@ -992,7 +986,6 @@ function clearCase() {
   renderEmptyCase();
   refreshLayer();
   globe.controls().autoRotate = true;
-  els.hint.textContent = "Drag to rotate · scroll to zoom · tap anywhere to find the nearest record";
 }
 
 /* ----------------------------------------------------- tap recommendation */
@@ -1018,7 +1011,6 @@ async function recommendAt(lat, lng) {
   clearTimeout(autoRotateTimer);
   syncCustomLayer();
   renderRecommendationOverlay();
-  els.hint.textContent = "Nearest station and cell to the tapped point";
 }
 
 function clearRecommendation() {
@@ -1219,7 +1211,6 @@ function selectCountry(country) {
   globe.pointOfView({ lat: country.lat, lng: country.lon, altitude: 2.15 }, 900);
   globe.controls().autoRotate = false;
   clearTimeout(autoRotateTimer);
-  els.hint.textContent = `${country.name} · mean of ${country.stations} stations`;
 }
 
 function countryNarrative(country, variable, trend, windowKey) {
@@ -1343,7 +1334,6 @@ async function selectOcean(region) {
   globe.pointOfView({ lat: region.lat, lng: region.lon, altitude: 2.4 }, 900);
   globe.controls().autoRotate = false;
   clearTimeout(autoRotateTimer);
-  els.hint.textContent = `${region.name} · ${region.cells} ocean cells · sea surface temperature`;
 }
 
 function oceanNarrative(region, trend, windowKey) {
@@ -1501,9 +1491,6 @@ async function selectSeaIce(record, code = "SEAICE") {
   globe.pointOfView({ lat: record.lat, lng: record.lon, altitude: 1.9 }, 900);
   globe.controls().autoRotate = false;
   clearTimeout(autoRotateTimer);
-  els.hint.textContent = `${record.name} · ${seaIceVariable(
-    state.iceCode
-  ).label.toLowerCase()} · annual mean of 12 monthly values`;
 }
 
 function seaIceNarrative(record, trend, windowKey, variable) {
