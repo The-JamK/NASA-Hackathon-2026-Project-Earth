@@ -588,16 +588,16 @@ Last verified: 2026-11-14
   EXPECT: all checks passed
   EVIDENCE: `all checks passed` with 19 `verified` lines including `data verified`, `bundle verified`, `ocean verified: 2,672 ocean cells · 9 regions`, `sea ice verified`, `export verified`, `app verified`. One regression was caught and fixed on the way: the ocean refit first recomputed q across the aggregate too, and `verify_ocean.mjs` failed with "Global ocean 1990-2025 borrows a basin q value"; the refit now excludes `family: aggregate` and leaves its q null, as the build does.
 
-- [ ] G116: The result is committed to main and pushed.
-  CHECK: git status --porcelain
-  EXPECT: (clean)
-  EVIDENCE: pending
+- [x] G116: The result is committed to main and pushed.
+  CHECK: git status --porcelain --untracked-files=no
+  EXPECT: (no output)
+  EVIDENCE: `git status --porcelain --untracked-files=no` prints nothing, and `cloud_git push` reported `460cb7b..7bd27d4  HEAD -> main`. Three commits: `d908ccc` (the ship-then-fit rule, the offline refit of `public/data`, the grid meta rename, the method copy), `dce77a6` (merge of `main`'s typo-repair work, ledger gates renumbered G110–G116 around its G98–G109), `7bd27d4` (the exact-basin-beats-repaired-country fix). `main` was three commits ahead at merge time and moved no further. The only untracked path is `artifacts/` — deck renders from earlier work that have never been in the repository (`git log --all -- artifacts/` is empty), so it is left out of this commit too.
 
 - [x] G117: An exact basin name is never taken over by a repaired country name: `"south ocean"` — the Southern Ocean's own alias — answers the Southern Ocean, not South Korea.
   CHECK: node scripts/verify_ocean.mjs
   EXPECT: ocean verified
   EVIDENCE: On merged `main` this failed: `FAIL: "south ocean" planned country at South Korea`. The country repair budget is three edits for a ten-letter name, and `southocean` is three edits from `southkorea` with a shared first letter, so `"south ocean"` was repaired into South Korea and the equal-length tie-break handed it the question. A repaired hit may now only displace a name that is itself repaired: `(!countryHit.corrected || !oceanHit || oceanHit.corrected)` in `useCountry`, and the ocean/country length comparison defers to an uncorrected ocean alias on a tie. Measured after the fix: `"Is south ocean warming?"` → `ocean southern-ocean` (358 cells, 75–55°S), while `"Is ocean warming?"` → global ocean, `"Is southern ocean warming?"` → Southern Ocean and `"Is south atlantic warming?"` → South Atlantic are unchanged, and `verify_ocean`, `verify_resolve` and `verify_search` all pass.
 
-MET: 115
-UNMET: 2
+MET: 116
+UNMET: 1
 ABANDONED: 0
