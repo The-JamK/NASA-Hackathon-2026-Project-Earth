@@ -2177,6 +2177,18 @@ html.landing body {
   .hero-box--belief { width: clamp(430px, 33vw, 660px); }
 }
 
+/* A short window has less room than the arc asks for: the bottom three boxes in
+   the right-hand column are built from fixed-height text, so at around 800px
+   tall and below the data list used to start before the local-event box had
+   ended. They are anchored to the bottom edge instead, stacked with the same
+   gaps at every height, and the data list tightens its leading a little. */
+@media (min-width: 1201px) and (max-height: 800px) {
+  .hero-box--analyst { top: auto; bottom: calc(3.5vh + 262px); }
+  .hero-box--event { top: auto; bottom: calc(3.5vh + 172px); }
+  .hero-box--data { bottom: 3.5vh; }
+  .hero-box--data .hero-box-text { line-height: 1.5; }
+}
+
 .hero-name {
   margin: 0 0 8px;
   font-family: Fraunces, "Iowan Old Style", "Palatino Linotype", Georgia, serif;
