@@ -6,6 +6,11 @@ cd "$(dirname "$0")/.."
 
 uv run python scripts/verify_data.py
 uv run python scripts/verify_refit.py
+# `verify_refit` guards the repair's outcomes; this one re-derives every stored
+# trend from the series that ships, so it is the check that notices drift. It
+# exits non-zero on the first record that does not reproduce, which `set -e`
+# turns into a suite failure.
+uv run python scripts/refit_bundle.py --check --quiet
 node scripts/verify_motion.mjs
 node scripts/verify_prose.mjs
 node scripts/verify_hero.mjs
