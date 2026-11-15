@@ -8,12 +8,15 @@ import Globe from "globe.gl";
 
 const BASE_URL = import.meta.env.BASE_URL || "/";
 
-const START_LAT = 8;
-const START_LNG = 16;
+// Open over Australia, then let the planet turn under a fixed camera.
+const START_LAT = -25.3;
+const START_LNG = 133.8;
 // Lower altitude = larger globe on screen.
 const altitudeFor = (width) => (width < 700 ? 2.05 : width < 1080 ? 1.82 : 1.44);
-const SPEED_IDLE = 0.6; // ≈100 s per revolution
-const SPEED_HOVER = 0.12;
+// Earth's axis leans this far, and it spins eastward once per 100 s.
+const AXIAL_TILT_DEG = 23.5;
+const SPIN_IDLE = (2 * Math.PI) / 100;
+const SPIN_HOVER = SPIN_IDLE / 5;
 const CASE_URL = "./app.html";
 
 function assetUrl(path) {
@@ -46,12 +49,60 @@ export function initHero() {
   controls.enablePan = false;
   controls.enableRotate = false;
   controls.enableDamping = false;
-  controls.autoRotate = !prefersReduced.matches;
-  controls.autoRotateSpeed = SPEED_IDLE;
+  // OrbitControls orbits the camera about world up, which cannot carry the
+  // axial tilt, so the surface itself does the turning.
+  controls.autoRotate = false;
 
   // Keep the fragment budget sane on high-density phones.
   if (globe.renderer) {
     globe.renderer().setPixelRatio?.(Math.min(window.devicePixelRatio || 1, 2));
+  }
+
+  /* ------------------------------------------------------- tilt + rotation */
+
+  // Rolling the camera's up vector shows the pole 23.5° off vertical while the
+  // surface spins about its own axis, which is how the tilt actually looks.
+  const tiltRadians = (AXIAL_TILT_DEG * Math.PI) / 180;
+  const camera = globe.camera();
+  camera.up.set(Math.sin(tiltRadians), Math.cos(tiltRadians), 0).normalize();
+  camera.lookAt(0, 0, 0);
+
+  // three-globe assembles its globe group only once the texture arrives, so the
+  // handle is resolved on first use rather than at init.
+  let globeSurface = null;
+  function surface() {
+    if (!globeSurface) {
+      globeSurface = globe.scene()?.getObjectByProperty?.("__globeObjType", "globe") || null;
+    }
+    return globeSurface;
+  }
+
+  let spinSpeed = SPIN_IDLE;
+  let spinHandle = 0;
+  let lastFrame = 0;
+
+  function spinFrame(now) {
+    spinHandle = requestAnimationFrame(spinFrame);
+    if (!lastFrame) lastFrame = now;
+    // Wall-clock delta, so a throttled tab still turns at one revolution per
+    // SPIN seconds rather than slowing down with the frame rate.
+    const delta = Math.min((now - lastFrame) / 1000, 2);
+    lastFrame = now;
+    // +Y turns the near face eastward, the direction Earth turns.
+    const ball = surface();
+    if (ball) ball.rotation.y += spinSpeed * delta;
+  }
+
+  function startSpin() {
+    if (spinHandle || prefersReduced.matches || document.hidden) return;
+    lastFrame = 0;
+    spinHandle = requestAnimationFrame(spinFrame);
+  }
+
+  function stopSpin() {
+    if (spinHandle) cancelAnimationFrame(spinHandle);
+    spinHandle = 0;
+    lastFrame = 0;
   }
 
   /* --------------------------------------------------------------- sizing */
@@ -88,9 +139,7 @@ export function initHero() {
     if (hovering === on) return;
     hovering = on;
     hero.classList.toggle("is-hovering", on);
-    if (!prefersReduced.matches) {
-      controls.autoRotateSpeed = on ? SPEED_HOVER : SPEED_IDLE;
-    }
+    spinSpeed = on ? SPIN_HOVER : SPIN_IDLE;
     globe.atmosphereAltitude(on ? 0.17 : 0.1);
     if (!on && cursor) cursor.hidden = true;
   }
@@ -126,8 +175,9 @@ export function initHero() {
   /* ------------------------------------------------------- motion + browser */
 
   function applyMotion() {
-    controls.autoRotate = !prefersReduced.matches;
-    controls.autoRotateSpeed = prefersReduced.matches ? 0 : hovering ? SPEED_HOVER : SPEED_IDLE;
+    spinSpeed = hovering ? SPIN_HOVER : SPIN_IDLE;
+    if (prefersReduced.matches) stopSpin();
+    else startSpin();
   }
 
   const onMotionChange = () => applyMotion();
@@ -135,8 +185,13 @@ export function initHero() {
   else prefersReduced.addListener(onMotionChange);
 
   function onVisibility() {
-    if (document.hidden) globe.pauseAnimation?.();
-    else globe.resumeAnimation?.();
+    if (document.hidden) {
+      globe.pauseAnimation?.();
+      stopSpin();
+    } else {
+      globe.resumeAnimation?.();
+      startSpin();
+    }
   }
 
   document.addEventListener("visibilitychange", onVisibility);
@@ -148,10 +203,13 @@ export function initHero() {
   // If the texture never arrives, the copy must still be readable.
   const readyFallback = setTimeout(() => hero.classList.add("is-ready"), 2400);
 
+  startSpin();
+
   /* ---------------------------------------------------------------- teardown */
 
   return function destroy() {
     clearTimeout(readyFallback);
+    stopSpin();
     resizeObserver.disconnect();
     document.removeEventListener("visibilitychange", onVisibility);
     if (prefersReduced.removeEventListener) {

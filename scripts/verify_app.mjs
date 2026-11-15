@@ -119,6 +119,16 @@ const heroSource = await (await get("/src/hero.js", "javascript")).text();
 if (!heroSource.includes('CASE_URL = "./app.html"')) {
   fail("the hero globe does not navigate to the case page");
 }
+// The hero opens over Australia and turns the way Earth turns, on its tilt.
+for (const marker of [
+  "const START_LAT = -25.3",
+  "const START_LNG = 133.8",
+  "const AXIAL_TILT_DEG = 23.5",
+  "rotation.y +=",
+  "controls.autoRotate = false",
+]) {
+  if (!heroSource.includes(marker)) fail(`hero.js no longer contains ${marker}`);
+}
 if (/hero-dialog/.test(landing)) fail("the hero still ships a confirmation dialog");
 
 const main = await (await get("/src/main.js", "javascript")).text();
