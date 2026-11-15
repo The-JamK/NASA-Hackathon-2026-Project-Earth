@@ -1325,7 +1325,7 @@ details.work p {
 /* Wide enough for the panel and the map's controls side by side: the panel runs
    to the bottom of the screen and the legend and layer switch keep to the
    column left of it, so the two never share a pixel. */
-@media (min-width: 1320px) {
+@media (min-width: 1181px) {
   .case-panel { bottom: 16px; }
   body.has-case .bottom-bar { right: calc(24px + 418px + 16px); }
 }
