@@ -747,11 +747,35 @@ Last verified: 2026-11-14
   EXPECT: all checks passed
   EVIDENCE: `all checks passed`, with `hero: nine copy boxes, no leader lines` and the geometry, data and export checks unchanged, and `npm run build` clean.
 
-- [x] G149: The result is committed to main and pushed.
+- [ ] G149: The result is committed to main and pushed.
+  CHECK: git status --porcelain --untracked-files=no
+  EXPECT: (no output)
+  EVIDENCE: pending
+
+- [x] G150: The suite fails when the published bundle stops reproducing itself, instead of only when the jeddah case or the copy regresses.
+  CHECK: grep -c "refit_bundle.py --check" scripts/verify_all.sh
+  EXPECT: 1
+  EVIDENCE: `verify_all.sh` ran `verify_refit.py`, which never re-fits anything, so the 11,169-record drift reported in G145 had no gate that could see it. `uv run python scripts/refit_bundle.py --check --quiet` now runs directly after it, with a comment saying why both are needed. `bash -n scripts/verify_all.sh` is clean. On this tree the step prints 0 records in every section and `BUNDLE SELF-CONSISTENT`, exit 0. With one published slope raised 1% (`nairobi T2M 1990-2025`) it prints `points 1 records differ` / `BUNDLE NOT SELF-CONSISTENT: 1 records differ` and exits 1, and a `set -e` chain running the same two lines stopped before its final echo, so the suite aborts instead of continuing past a bundle that no longer reproduces itself — which is the failure that was silent before. The data was restored after the test (`git checkout -- public/data`), so this commit changes only `scripts/verify_all.sh` and this ledger. The step adds roughly 90 seconds to a full suite run.
+
+- [x] G151: Clicking a box answers with a small note at the bottom of the screen that says "Click the Earth to open a case", it is nicely made, it leaves on its own, and clicking the Earth still opens the case.
+  MANUAL: a click on a box and a click on the globe, in the browser, photographed.
+  EVIDENCE: In the browser at 1440x900 a click on the public box shows a pill 209x37 at x 615, y 837, centred on 720 with border radius 999px, an accent dot and a shadow, reading exactly `Click the Earth to open a case`; the page did not navigate, and `pointer-events: none` keeps the note itself out of the way. It is gone by 3.9s (`hidden: true`, `opacity: 0`), and a click on the belief box afterwards shows it again. On a 390x844 phone it is 199px wide at x 88, inside the viewport. Clicking the globe still lands on `app.html`, and `elementFromPoint(720, 520)` is still `#hero-globe`, so the boxes did not steal the way in. Screenshots: `artifacts/hero-toast-1440.png`, `artifacts/hero-toast-390.png`.
+
+- [x] G152: Nothing about the boxes invites a click in the first place: no pointer cursor, no hover state, nothing focusable that promises an action.
+  CHECK: node scripts/verify_hero.mjs
+  EXPECT: HERO CHECK PASS
+  EVIDENCE: `HERO CHECK PASS` with `a click on a box is answered by a note pointing at the Earth`, `the note is wired to the boxes`, `the boxes keep the ordinary arrow, not a pointer` and `the boxes have no hover state to invite a press`. Measured in the browser: the box computes `cursor: default`, and hovering it changes neither the cursor nor its background (`rgba(4, 7, 12, 0.78)` before and after). The boxes carry no `tabindex`, so there is no keyboard stop that suggests pressing something.
+
+- [x] G153: Every earlier check still passes with the note added.
+  CHECK: SKIP_LIVE=1 bash scripts/verify_all.sh
+  EXPECT: all checks passed
+  EVIDENCE: `all checks passed`, with `hero: nine copy boxes, no leader lines` and the geometry, data and export checks unchanged, and `npm run build` clean.
+
+- [ ] G154: The result is committed to main and pushed.
   CHECK: git status --porcelain --untracked-files=no
   EXPECT: (no output)
   EVIDENCE: `git status --porcelain --untracked-files=no` prints nothing and `cloud_git push` reported `d5fb4c6..29ba0ea  HEAD -> main`. `b7651f4` carries the note and the pointer-events change, `29ba0ea` merges `main` (which had added its own G145 and touched the refit script) with these gates renumbered G146-G149, and `all checks passed` holds on the merged tree.
 
-MET: 148
-UNMET: 1
+MET: 151
+UNMET: 3
 ABANDONED: 0
