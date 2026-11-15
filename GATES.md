@@ -552,6 +552,12 @@ Last verified: 2026-11-14
   EXPECT: resolver verified
   EVIDENCE: Two faults, reported from the running site. First, the station repair had a three-edit budget, and "Washington" is three edits from "Wellington" — so the plan answered Wellington as a station typo and the gazetteer, which knows Washington, D.C., was never asked. The station repair is now one edit at the same length, which still covers `Nairobii` → Nairobi and `Melborne` → Melbourne; `verify_resolve.mjs` asserts that `"Is Washington getting hotter?"`, `"Washington DC"` and `"Washington, D.C."` all leave the plan unresolved (the derived path owns them), that the resolver returns `Washington,  D.C.` for the first two, and that the station examples still resolve. Second, "Washington state" answered the District of Columbia, because the district carries Washington as an alias and won on population; asking for a state, province or territory now prefers a region, and among regions prefers the one whose own name appears in the question. In the browser `"Is Washington state getting hotter?"` opens the derived case at 47.49°N 120.36°W and `"Washington"` opens 38.90°N 77.01°W, with the popup offering D.C., the district and the state.
 
-MET: 107
+- [x] G109: A deploy cannot leave a browser running the previous build's JavaScript.
+  CHECK: npm run build && grep -o 'assets/[^"]*' dist/app.html
+  EXPECT: assets/app.js?v=
+  EVIDENCE: GitHub Pages serves every file with `cache-control: max-age=600`, and the bundle names are deliberately stable (`assets/app.js`) so the build does not add a new file to the repository each release — which meant a tab could keep the old planner for ten minutes after a fix. That is what "it still says Wellington" was: the deployed `assets/app.js` on both hosts was already byte-identical to the local build (md5 `d393265b…`), and `/api/resolve` on the Worker returned `Washington,  D.C.` with the D.C./district/state candidates, but the browser was running the cached script. A small Vite plugin now appends a content hash to each asset URL in `dist/app.html` and `dist/index.html` at build time (`assets/app.js?v=dad450fcd5`, `style.css?v=b4ea886b7b`), so a new build is a new cache entry. File names stay stable, so no churn in Git. Measured: the built page loads `./assets/app.js?v=dad450fcd5`, the versioned URL returns 200 from a plain static server, and `Is Washington getting hotter?` opens Washington, D.C. there. First-load and offline checks still pass (295 kB gzip critical path).
+  NOTE: The HTML itself is still served with `max-age=600`, so a tab opened before the deploy needs one hard reload (Cmd+Shift+R) to pick up the new versioned URL; after that, every deploy is picked up immediately.
+
+MET: 108
 UNMET: 1
 ABANDONED: 0

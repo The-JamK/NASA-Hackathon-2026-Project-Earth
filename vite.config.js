@@ -1,4 +1,5 @@
-import { readFileSync, statSync } from "node:fs";
+import { createHash } from "node:crypto";
+import { existsSync, readFileSync, statSync, writeFileSync } from "node:fs";
 import { defineConfig, loadEnv } from "vite";
 import { fileURLToPath } from "node:url";
 import { handleLive } from "./worker/live.js";
@@ -103,6 +104,34 @@ function apiPlugin(env) {
   };
 }
 
+// GitHub Pages serves every asset with `max-age=600`, and the bundle names are
+// stable by design, so a browser could keep running the previous deploy's
+// JavaScript for ten minutes after a release — which is exactly what "it still
+// says Wellington" looked like from the outside. Adding a content hash to the
+// URL in the HTML gives every build its own cache entry without committing a new
+// copy of the file to the repository.
+function versionedAssets() {
+  return {
+    name: "versioned-assets",
+    apply: "build",
+    closeBundle() {
+      for (const page of ["dist/index.html", "dist/app.html"]) {
+        if (!existsSync(page)) continue;
+        const html = readFileSync(page, "utf8").replace(
+          /(\.\/assets\/[A-Za-z0-9._-]+\.(?:js|css))"/g,
+          (match, url) => {
+            const file = url.replace("./", "dist/");
+            if (!existsSync(file)) return match;
+            const version = createHash("sha256").update(readFileSync(file)).digest("hex").slice(0, 10);
+            return `${url}?v=${version}"`;
+          }
+        );
+        writeFileSync(page, html);
+      }
+    },
+  };
+}
+
 // Two entries: the landing page at the site root and the app at /app.html.
 // Relative asset URLs keep both working at the domain root and under
 // /<repository>/ on GitHub Pages.
@@ -111,6 +140,7 @@ export default defineConfig(({ mode }) => {
   return {
     base: "./",
     plugins: [
+      versionedAssets(),
       apiPlugin({
         METEOMATICS_USERNAME: env.METEOMATICS_USERNAME || process.env.METEOMATICS_USERNAME,
         METEOMATICS_PASSWORD: env.METEOMATICS_PASSWORD || process.env.METEOMATICS_PASSWORD,
