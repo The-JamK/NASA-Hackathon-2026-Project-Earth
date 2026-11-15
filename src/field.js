@@ -11,11 +11,65 @@
 // resolver is a gazetteer first and a keyless public geocoder second, so there is
 // nothing to configure — no key ever reaches this module.
 
+import { indexGazetteer, matchGazetteer, readIntent } from "../worker/resolve.js";
+
 const RESOLVE_TIMEOUT_MS = 15_000;
+const GAZETTEER_TIMEOUT_MS = 10_000;
 
 function endpoint(path) {
   const base = import.meta.env.BASE_URL || "/";
   return `${base}${String(path).replace(/^\/+/, "")}`;
+}
+
+/**
+ * The place, matched in this page from the gazetteer the bundle already ships.
+ *
+ * A static host has no `/api/resolve`, but it does have the same 6,421-place
+ * Natural Earth table the resolver reads, sitting unused in `public/data`. Loading
+ * it here — once, lazily, and only after the server path has failed — lets "Is
+ * Gold Coast getting hotter?" open a derived case on GitHub Pages exactly as it
+ * does on the Worker. Suburbs and spelling variants still need the Worker: the
+ * keyless geocoders live there, not in the page.
+ *
+ * Returns the same shape as `resolveQuestion`, or null when nothing matches.
+ */
+let gazetteerEntries = null;
+
+async function localPlace(question, fetchImpl) {
+  if (!gazetteerEntries) {
+    try {
+      const response = await fetchImpl(endpoint("/data/gazetteer.json"), {
+        signal: AbortSignal.timeout(GAZETTEER_TIMEOUT_MS),
+      });
+      if (!response.ok) return null;
+      const payload = await response.json();
+      const rows = Array.isArray(payload) ? payload : payload?.places || [];
+      gazetteerEntries = indexGazetteer(rows);
+    } catch {
+      return null;
+    }
+  }
+
+  const match = matchGazetteer(question, gazetteerEntries);
+  if (!match?.place) return null;
+  const intent = readIntent(question);
+  return {
+    ok: true,
+    place: {
+      name: match.place.name,
+      country: match.place.country,
+      detail: "",
+      lat: match.place.lat,
+      lon: match.place.lon,
+    },
+    source: "gazetteer",
+    provider: null,
+    providerLabel: "the bundled Natural Earth gazetteer",
+    attribution: "Natural Earth populated places, public domain",
+    note: "This page placed the name from its bundled gazetteer; the GISTEMP field supplies the numbers.",
+    variable: intent.variable,
+    windowKey: intent.windowKey,
+  };
 }
 
 export function isResolvablePlan(plan) {
@@ -44,6 +98,10 @@ export async function resolveQuestion(question, { fetchImpl = fetch } = {}) {
     });
   } catch (error) {
     const timeout = error?.name === "TimeoutError" || error?.name === "AbortError";
+    if (!timeout) {
+      const local = await localPlace(clean, fetchImpl);
+      if (local) return local;
+    }
     return { ok: false, error: timeout ? "resolver_timeout" : "resolver_unreachable" };
   }
 
@@ -51,10 +109,18 @@ export async function resolveQuestion(question, { fetchImpl = fetch } = {}) {
   try {
     payload = await response.json();
   } catch {
+    const local = await localPlace(clean, fetchImpl);
+    if (local) return local;
     return { ok: false, error: "resolver_unreadable", status: response.status };
   }
 
   if (!response.ok || !payload?.ok) {
+    // 404/405 is a static host refusing the route, not the resolver's own
+    // answer (that is a 4xx JSON error, which localPlace cannot improve on).
+    if (response.status === 404 || response.status === 405) {
+      const local = await localPlace(clean, fetchImpl);
+      if (local) return local;
+    }
     return {
       ok: false,
       error: payload?.error || `resolver_${response.status}`,
@@ -125,7 +191,7 @@ export function describeFailure(result) {
       return "The resolver timed out. The app still works with the cached bundle.";
     case "resolver_unreachable":
     case "resolver_unreadable":
-      return "The resolver is not running (the static GitHub Pages build has no server). Ask about a bundled place instead.";
+      return "No resolver server is reachable here, and the bundled gazetteer does not carry that name. Try a larger nearby city — suburbs and spelling variants need the Worker deployment.";
     default:
       return result?.detail || "The place could not be resolved.";
   }
