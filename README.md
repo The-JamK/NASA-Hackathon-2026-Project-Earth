@@ -334,8 +334,13 @@ The same tolerance covers the rest of the question. A station name one letter of
 "Did you mean" popup — choosing it opens that station's record instead of a
 derived cell. A misspelt climate word (`precipitiation`, `temperture`, `drougt`)
 still asks the right variable, and the plan says so: `read "precipitiation" as
-precipitation`. Only words of six letters or more are repaired, and only when no
-ordinary climate word matched, so a correct question never gets "corrected".
+precipitation`. Countries and ocean basins are covered the same way — `Austraila`
+answers the Australia average, `Pacfic` answers a Pacific basin, `Indain Ocean`
+answers the Indian Ocean rather than the global one — while a name that is
+already right is never swapped for a neighbour (`Australia` and `Austria` are one
+edit apart, and each answers itself). Only words of five or six letters or more
+are repaired, and only when nothing matched exactly, so a correct question never
+gets "corrected".
 
 Vite uses relative asset paths (`base: "./"`) and the app resolves data,
 textures and point imagery through `import.meta.env.BASE_URL`, so the build works

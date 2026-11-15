@@ -443,6 +443,52 @@ const NOMINATIM_BROADBEACH = [
   check(resolved.variable === "PRECTOTCORR", `the resolver read ${resolved.variable}`);
 }
 
+// 14. A country or ocean basin one letter off is repaired, and a name that is
+//     already right is never "repaired" into a different one.
+{
+  const context = {
+    rag: read("public/data/rag_index.json"),
+    points: points.points,
+    variables,
+    countries: read("public/data/countries.json").countries,
+    ocean: read("public/data/ocean.json").regions,
+    seaIce: [],
+  };
+
+  const aus = planCase("Is Austraila warming?", context);
+  check(aus?.kind === "country", `Austraila became a ${aus?.kind} case`);
+  check(aus?.place?.name === "Australia", `Austraila resolved to ${aus?.place?.name}`);
+  check(aus?.corrected === true, "the country typo was not flagged");
+  check(/was read as australia/i.test(aus?.explanation || ""), `the plan does not say what it read: ${aus?.explanation}`);
+
+  const exact = planCase("Is Australia warming?", context);
+  check(exact?.place?.name === "Australia", `Australia resolved to ${exact?.place?.name}`);
+  check(exact?.corrected === false, "a correctly spelled country was flagged as a typo");
+
+  // One edit apart and both real: the exact name has to win.
+  const austria = planCase("Is Austria warming?", context);
+  check(austria?.place?.name === "Austria", `Austria resolved to ${austria?.place?.name}`);
+  check(austria?.corrected === false, "Austria was flagged as a typo");
+
+  const canada = planCase("Is Cannda getting hotter?", context);
+  check(canada?.place?.name === "Canada" && canada?.corrected === true, `Cannda resolved to ${canada?.place?.name}`);
+
+  const pacific = planCase("Is the Pacfic warming?", context);
+  check(pacific?.kind === "ocean", `Pacfic became a ${pacific?.kind} case`);
+  check(/pacific/i.test(pacific?.place?.name || ""), `Pacfic resolved to ${pacific?.place?.name}`);
+  check(pacific?.corrected === true, "the ocean typo was not flagged");
+
+  // The generic word "ocean" matches the global aggregate exactly; the repaired
+  // name has to win over it, or a misspelt Indian Ocean answers as the world.
+  const indian = planCase("Is the Indain Ocean warming?", context);
+  check(indian?.place?.name === "Indian Ocean", `Indain Ocean resolved to ${indian?.place?.name}`);
+  check(indian?.corrected === true, "the misspelt Indian Ocean was not flagged");
+
+  const control = planCase("Is the Indian Ocean warming?", context);
+  check(control?.place?.name === "Indian Ocean", `the control resolved to ${control?.place?.name}`);
+  check(control?.corrected === false, "a correctly spelled ocean was flagged as a typo");
+}
+
 if (failures) {
   console.error(`\n${failures} resolver check(s) failed`);
   process.exit(1);

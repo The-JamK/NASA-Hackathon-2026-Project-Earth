@@ -111,11 +111,9 @@ export function resolvePlace(question, rag, points) {
  *
  * Returns the best few, because "Did you mean" is a question the reader answers.
  */
-function stationCandidates(question, points) {
-  if (!Array.isArray(points) || !points.length) return [];
+/** Every one-, two- and three-word run of the question, as typed and unspaced. */
+function typoWindows(question) {
   const tokens = tokenize(question);
-  if (!tokens.length) return [];
-
   const windows = [];
   for (let size = 1; size <= 3; size += 1) {
     for (let start = 0; start + size <= tokens.length; start += 1) {
@@ -123,6 +121,57 @@ function stationCandidates(question, points) {
       windows.push({ text: words.join(" "), compact: words.join("") });
     }
   }
+  return windows;
+}
+
+/** Whether every word of `inner` is a word of `outer` (“ocean” → “indian ocean”). */
+function covers(outer, inner) {
+  const words = fold(outer).split(" ");
+  return fold(inner)
+    .split(" ")
+    .filter(Boolean)
+    .every((word) => words.includes(word));
+}
+
+/**
+ * The record whose alias a question nearly spells, best first.
+ *
+ * Used for countries and ocean basins, where the alias is the whole name and a
+ * near miss is almost always that name: "Austraila", "Cannda", "Indain Ocean".
+ * Short aliases ("us", "uk") are exact-only, because a one-letter difference
+ * there is a different word.
+ */
+function fuzzyRecord(question, records) {
+  if (!Array.isArray(records) || !records.length) return null;
+  const windows = typoWindows(question);
+  if (!windows.length) return null;
+
+  let best = null;
+  for (const record of records) {
+    for (const alias of record.aliases || []) {
+      const key = fold(alias).replace(/ /g, "");
+      const limit = typoLimit(key.length);
+      if (key.length < 5 || !limit) continue;
+      for (const window of windows) {
+        if (Math.abs(window.compact.length - key.length) > limit) continue;
+        if (key.length / Math.max(window.compact.length, 1) < 0.6) continue;
+        const distance = editDistance(window.compact, key, limit);
+        if (!distance || distance > limit) continue;
+        // Longer names are more specific: "Indian Ocean" over "ocean".
+        const score = 1 - distance / Math.max(window.compact.length, key.length) + key.length * 0.01;
+        if (!best || score > best.score) {
+          best = { record, alias, typed: window.text, score };
+        }
+      }
+    }
+  }
+  return best;
+}
+
+function stationCandidates(question, points) {
+  if (!Array.isArray(points) || !points.length) return [];
+  const windows = typoWindows(question);
+  if (!windows.length) return [];
 
   const found = new Map();
   for (const point of points) {
@@ -162,6 +211,15 @@ export function resolveCountry(question, countries) {
       if (!best || alias.length > best.alias.length) best = { country, alias };
     }
   }
+  // A near miss may only replace an exact match when that match is a generic
+  // word inside the repaired name: "the Indain Ocean" matched "ocean", and the
+  // global ocean is a worse answer than repairing one letter. It may never
+  // replace a name that was spelled correctly — "Australia" is one edit from
+  // "Austria", and an exact name is not a typo of a different one.
+  const fuzzy = fuzzyRecord(question, countries);
+  if (fuzzy && (!best || covers(fuzzy.alias, best.alias))) {
+    return { country: fuzzy.record, alias: fuzzy.alias, corrected: true, typed: fuzzy.typed };
+  }
   return best;
 }
 
@@ -180,6 +238,10 @@ export function resolveOcean(question, ocean) {
       if (!aliasRegex(alias).test(text)) continue;
       if (!best || alias.length > best.alias.length) best = { region, alias };
     }
+  }
+  const fuzzy = fuzzyRecord(question, ocean);
+  if (fuzzy && (!best || covers(fuzzy.alias, best.alias))) {
+    return { region: fuzzy.record, alias: fuzzy.alias, corrected: true, typed: fuzzy.typed };
   }
   return best;
 }
@@ -494,13 +556,18 @@ export function planCase(question, { rag, points, variables, countries, ocean, s
   // A country name should answer the country question, not silently pick its
   // biggest city. A city name still wins when it is the more specific match.
   const useCountry =
-    Boolean(countryHit) && (!city.resolved || countryHit.alias.length >= (city.alias || "").length);
+    Boolean(countryHit) &&
+    // A station the question really names beats a country it merely almost
+    // spells; only an unresolved question may be repaired into a country.
+    (!countryHit.corrected || !city.resolved) &&
+    (!city.resolved || countryHit.alias.length >= (city.alias || "").length);
   // Likewise a basin beats a country word ("Indian Ocean" is not India), and a
   // sea-ice question is answered by the sea-ice record itself.
   const oceanAlias = iceRegion ? oceanHit?.alias || "sea ice" : oceanHit?.alias;
   const useOcean =
     iceRegion !== null ||
     (Boolean(oceanHit) &&
+      (!oceanHit.corrected || !city.resolved) &&
       (!useCountry || oceanHit.alias.length > countryHit.alias.length) &&
       (!city.resolved || oceanHit.alias.length >= (city.alias || "").length));
 
@@ -538,13 +605,19 @@ export function planCase(question, { rag, points, variables, countries, ocean, s
   const placePhrase = iceRecord
     ? `"${alias}" is a hemisphere-scale sea ice record, so this is the annual mean of its twelve monthly extents`
     : useOcean
-    ? `"${alias}" is an ocean basin, so this averages its ${place.cells} GISTEMP ocean cells by area (${place.extent})`
+    ? oceanHit?.corrected
+      ? `"${oceanHit.typed}" was read as ${place.name}, so this averages its ${place.cells} GISTEMP ocean cells by area (${place.extent})`
+      : `"${alias}" is an ocean basin, so this averages its ${place.cells} GISTEMP ocean cells by area (${place.extent})`
     : place.global
       ? "no city was named, so the plan uses the global field"
       : useCountry
-        ? `"${alias}" is a country, so this is the mean of its ${place.stations} station${
-            place.stations === 1 ? "" : "s"
-          }`
+        ? countryHit.corrected
+          ? `"${countryHit.typed}" was read as ${place.name}, so this is the mean of its ${place.stations} station${
+              place.stations === 1 ? "" : "s"
+            }`
+          : `"${alias}" is a country, so this is the mean of its ${place.stations} station${
+              place.stations === 1 ? "" : "s"
+            }`
         : city.corrected
           ? `"${city.typed}" was read as ${place.name}${
               place.country ? `, ${place.country}` : ""
@@ -602,7 +675,11 @@ export function planCase(question, { rag, points, variables, countries, ocean, s
     // A station the question only nearly spelled: the caller offers the station
     // rather than quietly answering from it, and keeps the typed word for the
     // explanation.
-    corrected: Boolean(city.corrected),
+    corrected: useOcean
+      ? Boolean(oceanHit?.corrected)
+      : useCountry
+        ? Boolean(countryHit?.corrected)
+        : Boolean(city.corrected),
     candidates: city.candidates || [],
     variableCorrection: chosen.corrected || null,
   };

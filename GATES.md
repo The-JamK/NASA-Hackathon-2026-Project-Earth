@@ -512,6 +512,21 @@ Last verified: 2026-11-14
   EXPECT: search verified
   EVIDENCE: Exact questions are untouched: Nairobi, Paris, Sydney, Chicago and Gold Coast all come back with `corrected: false` and `variableCorrection: null`, and the typo budget is zero below five letters so short words are never mangled. A misspelt climate word is dropped from the place query in `worker/resolve.js` (`climateTypo` in the `placeQuery` filter) — without that, `"precipitiation"` stayed in the name, dragged coverage under the 0.6 floor and hid the city beside it; `"Is precipitiation in London changing?"` now places London and asks PRECTOTCORR, which `verify_resolve.mjs` asserts through `handleResolve`. `verify_search.mjs` and `verify_resolve.mjs` both pass, the build succeeds, and first-load is 294 kB gzip (+1 kB).
 
-MET: 99
+- [x] G101: A misspelt country name answers that country's average and says which name it read.
+  CHECK: node scripts/verify_resolve.mjs
+  EXPECT: resolver verified
+  EVIDENCE: `resolveCountry()` keeps its exact pass and adds one repaired pass over country aliases of five letters or more, using the same window-and-budget matcher as stations. `verify_resolve.mjs` asserts `"Is Austraila warming?"` → country Australia with `corrected: true` and `"austraila" was read as Australia` in the explanation, and `"Is Cannda getting hotter?"` → Canada. In the browser the plan read `Australia average · 12 stations · 1990–2025 · °C` with the same sentence, and running it opened `CASE-A113 · COUNTRY AVERAGE · 12 STATIONS · OCEANIA`; the plain static server over `dist` produced the identical plan, so this needs no Worker.
+
+- [x] G102: A misspelt ocean basin answers that basin instead of silently falling back to the global ocean.
+  CHECK: node scripts/verify_resolve.mjs
+  EXPECT: resolver verified
+  EVIDENCE: Before this, `"Is the Indain Ocean warming?"` matched the generic alias `ocean` (the global aggregate) exactly and answered the world. A repaired alias may now replace an exact one only when the exact words are all words of the repaired name — `ocean` is inside `indian ocean`, so the repair wins; a name that was spelled correctly never can. `verify_resolve.mjs` asserts `"Is the Indain Ocean warming?"` → Indian Ocean with `corrected: true` and `"Is the Pacfic warming?"` → a Pacific basin, also corrected. In the browser the plans read `Indian Ocean · 373 ocean cells` and `Tropical Pacific · 314 ocean cells` with `was read as …` in the explanation, on both the dev server and the static build.
+
+- [x] G103: The repair never replaces a name that is already right, and the exact controls are unchanged.
+  CHECK: node scripts/verify_resolve.mjs && node scripts/verify_search.mjs && npm run build
+  EXPECT: search verified
+  EVIDENCE: `"Australia"` is one edit from `"Austria"`, and an early version of this swapped them; the guard added for that is pinned in `verify_resolve.mjs`: `"Is Austria warming?"` → Austria with `corrected: false`, `"Is Australia warming?"` → Australia with `corrected: false`, `"Is the Indian Ocean warming?"` → Indian Ocean with `corrected: false`, while `"Is the ocean warming?"` still answers the global ocean. In the browser the Austria control read `Austria average · 3 stations` with the plain wording. A repaired country or basin also cannot outrank a station the question really names. `verify_search.mjs` and `verify_resolve.mjs` pass, the build succeeds, and first-load stays at 294 kB gzip.
+
+MET: 102
 UNMET: 1
 ABANDONED: 0
