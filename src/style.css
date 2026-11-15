@@ -1695,6 +1695,10 @@ details.work p {
     top: 14px;
     right: 16px;
     margin: 0;
+    /* Every case block keeps a translateY(0) from the settle animation, so each
+       one is its own stacking context and would paint over this out-of-flow
+       row, leaving only the few pixels above the title clickable. */
+    z-index: 5;
   }
   .case-panel .place-title { padding-right: 68px; }
 }
