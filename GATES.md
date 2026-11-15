@@ -497,6 +497,41 @@ Last verified: 2026-11-14
   MANUAL: Cloud browser, built site, 1440x900, temporary probe removed before committing.
   EVIDENCE: With a temporary probe (grep now finds 0 hits in `hero.js`, and the built page reports `typeof window.__heroProbe === "undefined"`), two samples 9.465 s apart read `rotation.y` 0.48957 -> 1.96083 = 0.15544 rad/s, one turn in 40.42 s, against the 0.15708 target (1% low, timing noise) and the 0.12581 measured at the 50 s setting; `camera.up` was `[0, 1, 0]` and `pov` `[-6.5, 145]` at both samples. The screenshot shows New Guinea across the middle of the disc with Australia below-right and Asia above, no upward lean: `artifacts/hero-png-final.png`, plus a second frame 4 s later (`artifacts/hero-png-final-t1.png`). `scripts/verify_all.sh` passes on this build.
 
-MET: 96
-UNMET: 1
+- [x] G98: Every published trend reproduces from the published series: a refit pass over the shipped bundle reports zero differences, so the number a reader recomputes from the bundle is the number the app shows.
+  CHECK: uv run python scripts/refit_bundle.py --check --quiet
+  EXPECT: BUNDLE SELF-CONSISTENT
+  EVIDENCE: `exit=0`, output `points 0 / grid 0 / countries 0 / ocean 0 / sea ice 0 records differ · verdicts 0 changed · BUNDLE SELF-CONSISTENT`. Before the repair the same pass reported 8,460 points, 12,056 grid, 2,661 countries, 27 ocean and 18 sea-ice records differing with exactly 1 verdict changed — the audit's figure — and a second run after the repair reports 0 everywhere, which is the idempotence the oracle relies on.
+
+- [x] G99: The build fits exactly what it ships: station, grid, global and country trends are computed from the rounded values that are serialised, and a refit from already-shipped values is a no-op.
+  CHECK: uv run --with pytest pytest -q tests/test_statistics.py::test_shipped_values_reproduce_the_published_trend
+  EXPECT: 1 passed
+  EVIDENCE: `1 passed in 1.09s`. The test fits one series raw and once from its 4 dp serialisation, asserts the two fits differ (rounding moves Sen's slope, so this is not a formality), then asserts a second pass over already-shipped values is identical.
+
+- [x] G100: jeddah / GWETROOT / 1990-2025 no longer ships as significant on an irreproducible p-value: its stored trend and its stored series agree, and the verdict is "no significant trend".
+  CHECK: uv run python scripts/verify_refit.py
+  EXPECT: jeddah GWETROOT 1990-2025 does not claim significance
+  EVIDENCE: shipped after repair: verdict `no significant trend`, p = 0.0508029, slope 0.0020835 /decade, CI -7.7e-06..0.0041748, n = 36 (was `significant increasing` on p 0.0499968). The p the bundle now carries is the p its own series produces, so a reader recomputing gets the same verdict.
+
+- [x] G101: grid.json names the candidate grid (4,050) and the analysed grid (4,039) separately instead of reporting the candidate count under an analysed-count name.
+  CHECK: uv run python scripts/verify_refit.py
+  EXPECT: REFIT CHECKS PASS
+  EVIDENCE: `total_grid_cells 4039` = `len(cells)` = `meta.counts.cells`, `candidate_grid_cells 4050`, every shipped cell carries a 1990-2025 trend. Publishes 3,039 increasing / 78 decreasing / 922 not significant, median +0.2324 °C/decade, unchanged by the refit.
+
+- [x] G102: The method copy states what the audit found unstated: POWER's shared cells, the global-ocean overlap with the basins, absent root-zone soil moisture at the ice sheets, and significance not being size.
+  CHECK: uv run python scripts/verify_refit.py
+  EXPECT: REFIT CHECKS PASS
+  EVIDENCE: four `ok` lines for `0.5° × 0.625°` (141 duplicate station variables), `already counted inside them` (global ocean vs the eight basins), `no root-zone soil moisture at all` (12 stations), `distinguishable from noise at 5%, not large`; the app narrative closes with "this is a trend detection, not an attribution — and significance is not size".
+
+- [x] G103: Nothing that worked before is broken: every local check in the suite (data, bundle, gazetteer, search, resolve, rag, plans, locate, offline, textures, clean, proxy, red herring, ocean, sea ice, export, build, first load, app) still passes.
+  CHECK: SKIP_LIVE=1 bash scripts/verify_all.sh
+  EXPECT: all checks passed
+  EVIDENCE: `all checks passed` with 19 `verified` lines including `data verified`, `bundle verified`, `ocean verified: 2,672 ocean cells · 9 regions`, `sea ice verified`, `export verified`, `app verified`. One regression was caught and fixed on the way: the ocean refit first recomputed q across the aggregate too, and `verify_ocean.mjs` failed with "Global ocean 1990-2025 borrows a basin q value"; the refit now excludes `family: aggregate` and leaves its q null, as the build does.
+
+- [ ] G104: The result is committed to main and pushed.
+  CHECK: git status --porcelain
+  EXPECT: (clean)
+  EVIDENCE: pending
+
+MET: 102
+UNMET: 2
 ABANDONED: 0

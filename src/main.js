@@ -1245,7 +1245,7 @@ function countryNarrative(country, variable, trend, windowKey) {
     "–"
   )} (95% CI ${signed(trend.ci_low_per_decade)} to ${signed(
     trend.ci_high_per_decade
-  )}; n = ${trend.n}; HAC p ${pText(trend.p_value)}).${correction} A country mean describes the stations, not every square kilometre: they cluster where people live, so desert and mountain interiors are represented only as far as the network reaches. This is a trend detection, not an attribution.`;
+  )}; n = ${trend.n}; HAC p ${pText(trend.p_value)}).${correction} A country mean describes the stations, not every square kilometre: they cluster where people live, so desert and mountain interiors are represented only as far as the network reaches. This is a trend detection, not an attribution — and significance is not size.`;
 }
 
 function renderCountryCase() {
@@ -1377,7 +1377,7 @@ function oceanNarrative(region, trend, windowKey) {
   )} °C per decade</strong> over ${windowKey.replace(
     "-",
     "–"
-  )} (95% CI ${signed(trend.ci_low_per_decade)} to ${signed(trend.ci_high_per_decade)}; n = ${trend.n}). ${agreement}${family} Each 4° cell counts in proportion to its area, because a cell near a pole covers less ground than one at the equator. These cells carry ERSST-based sea surface temperature, with land influence inside roughly 1,200 km of a coast. This is a trend detection, not an attribution.`;
+  )} (95% CI ${signed(trend.ci_low_per_decade)} to ${signed(trend.ci_high_per_decade)}; n = ${trend.n}). ${agreement}${family} Each 4° cell counts in proportion to its area, because a cell near a pole covers less ground than one at the equator. These cells carry ERSST-based sea surface temperature, with land influence inside roughly 1,200 km of a coast. This is a trend detection, not an attribution — and significance is not size.`;
 }
 
 function oceanFacts(region, trend, window) {
@@ -1535,7 +1535,7 @@ function seaIceNarrative(record, trend, windowKey, variable) {
     variable.code === "SEAICECONC"
       ? "Concentration is ice area ÷ extent: how much of the ice-covered area is actually ice, not how far the ice reaches, so it can rise while the extent falls."
       : "Extent counts every cell with at least 15% ice cover; it is not concentration, and it is not thickness."
-  } This is a trend detection, not an attribution.`;
+  } This is a trend detection, not an attribution — and significance is not size.`;
 }
 
 function seaIceFacts(record, trend, window, variable) {
@@ -1928,7 +1928,7 @@ function derivedNarrative(place, item, trend, variable, windowKey) {
     item.distanceKm
   )} from the requested coordinate and covers roughly 440 km across, so read it as the region around ${
     place.name
-  }, not as the town itself. This is a trend detection, not an attribution.`;
+  }, not as the town itself. This is a trend detection, not an attribution — and significance is not size.`;
 }
 
 function renderGlobalCase() {
@@ -2261,7 +2261,7 @@ function cityNarrative(point, variable, trend, windowKey) {
     trend.sen_slope_per_decade
   )} ${escapeHtml(
     variable.units
-  )}/decade. The Mann–Kendall p-value uses the Hamed–Rao variance correction for autocorrelation, computed on the Sen-detrended series. This is a trend detection, not an attribution.`;
+  )}/decade. The Mann–Kendall p-value uses the Hamed–Rao variance correction for autocorrelation, computed on the Sen-detrended series. This is a trend detection, not an attribution — and significance is not size.`;
 }
 
 function gridNarrative(cell, trend, variable, windowKey) {
@@ -2291,7 +2291,7 @@ function gridNarrative(cell, trend, variable, windowKey) {
           trend.q_value
         )}).`
       : ` It does not survive the HAC test at the 5% level (q = ${formatP(trend.q_value)}).`;
-  return `${local}${correction} This is a trend detection, not an attribution.`;
+  return `${local}${correction} This is a trend detection, not an attribution — and significance is not size.`;
 }
 
 function globalNarrative(trend, variable, windowKey, counts) {
@@ -2306,7 +2306,7 @@ function globalNarrative(trend, variable, windowKey, counts) {
     "–"
   )} (95% CI ${signed(trend.ci_low_per_decade)} to ${signed(
     trend.ci_high_per_decade
-  )}; n = ${trend.n}; HAC p ${pText(trend.p_value)}). Across the 4° grid, ${counts.significant_increasing.toLocaleString()} cells survive Benjamini–Hochberg FDR correction at q = 0.05 as increases, ${counts.significant_decreasing.toLocaleString()} as decreases, and ${counts.not_significant.toLocaleString()} are not significant. Neighbouring cells are correlated, so that correction is approximate. This is a trend detection, not an attribution.`;
+  )}; n = ${trend.n}; HAC p ${pText(trend.p_value)}). Across the 4° grid, ${counts.significant_increasing.toLocaleString()} cells survive Benjamini–Hochberg FDR correction at q = 0.05 as increases, ${counts.significant_decreasing.toLocaleString()} as decreases, and ${counts.not_significant.toLocaleString()} are not significant. Neighbouring cells are correlated, so that correction is approximate. This is a trend detection, not an attribution — and significance is not size.`;
 }
 
 /* --------------------------------------------------------------- intake UI */

@@ -5,6 +5,7 @@ set -euo pipefail
 cd "$(dirname "$0")/.."
 
 uv run python scripts/verify_data.py
+uv run python scripts/verify_refit.py
 uv run python scripts/verify_countries.py
 node scripts/verify_bundle.mjs
 node scripts/verify_gazetteer.mjs
@@ -26,7 +27,11 @@ npm run build
 node scripts/verify_firstload.mjs
 node scripts/verify_app.mjs
 # The deployed app must still serve exactly this build. This is last because it
-# is the only check that needs the network.
-bash scripts/verify_live.sh
+# is the only check that needs the network, and the only one that can fail
+# between a commit and the Pages workflow finishing. SKIP_LIVE=1 runs everything
+# local and leaves the deploy comparison to the caller.
+if [ "${SKIP_LIVE:-0}" != "1" ]; then
+  bash scripts/verify_live.sh
+fi
 
 echo "all checks passed"

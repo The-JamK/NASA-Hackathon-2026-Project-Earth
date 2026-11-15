@@ -148,3 +148,33 @@ def test_power_parser_drops_annual_aggregate_and_incomplete_years() -> None:
     annual = annual_from_power(series, 2020, 2021)
     assert annual == [(2020, 10.0)]
     assert series_array(annual, 2020, 2021) == [10.0, None]
+
+
+def test_shipped_values_reproduce_the_published_trend() -> None:
+    """A published trend must be re-derivable from the published series.
+
+    The build rounds a series before serialising it. If the fit used the
+    unrounded values, a reader recomputing from the bundle gets a different Sen
+    slope, Kendall tau and Hamed-Rao p — which is how jeddah / GWETROOT /
+    1990-2025 shipped as significant on a p-value its own series does not
+    reproduce.
+    """
+    import numpy as np
+
+    from scripts.statistics import SHIP_DIGITS_POINT, compute_trend, shipped
+
+    years = np.arange(1990, 2026, dtype=float)
+    raw = 0.5 + 0.001 * (years - 1990) + np.sin(years) * 0.3
+    published = shipped(list(raw), SHIP_DIGITS_POINT)
+
+    from_raw = compute_trend(years, raw)
+    from_published = compute_trend(years, np.array(published, dtype=float))
+
+    # Not a formality: rounding moves the rank statistics, so the two fits differ.
+    assert from_raw != from_published
+    assert from_raw["sen_slope_per_decade"] != from_published["sen_slope_per_decade"]
+
+    # And re-shipping what already shipped is a no-op, which is what makes the
+    # offline refit pass idempotent.
+    twice = compute_trend(years, np.array(shipped(published), dtype=float))
+    assert twice == from_published

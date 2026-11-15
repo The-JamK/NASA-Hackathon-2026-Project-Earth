@@ -42,6 +42,7 @@ from scripts.fetch_sources import (
     load_gistemp_grid,
 )
 from scripts.statistics import (
+    SHIP_DIGITS_GRID,
     annual_from_power,
     benjamini_hochberg,
     compute_trend,
@@ -238,8 +239,11 @@ def build_grid(env: dict[str, str], sources: list[dict[str, Any]]) -> dict[str, 
     global_pairs = [(year, value) for year, value in load_gistemp_global() if START <= year <= END]
     global_series = series_array(global_pairs, START, END)
     global_trends = {}
+    shipped_global = [
+        (START + offset, value) for offset, value in enumerate(global_series) if value is not None
+    ]
     for window_start, window_end, key in WINDOWS:
-        pairs = [(year, value) for year, value in global_pairs if window_start <= year <= window_end]
+        pairs = [(year, value) for year, value in shipped_global if window_start <= year <= window_end]
         global_trends[key] = compute_trend([year for year, _ in pairs], [value for _, value in pairs])
 
     print("· GISTEMP gridded field")
@@ -254,17 +258,20 @@ def build_grid(env: dict[str, str], sources: list[dict[str, Any]]) -> dict[str, 
             finite = np.isfinite(series)
             if int(finite.sum()) < 20:
                 continue
+            published = [None if not math.isfinite(float(v)) else round(float(v), SHIP_DIGITS_GRID) for v in series]
             cell = {
                 "lat": round(float(lat), 2),
                 "lon": round(float(lon), 2),
-                "values": [None if not math.isfinite(float(v)) else round(float(v), 3) for v in series],
+                "values": published,
                 "trends": {},
             }
             index = len(cells)
             cells.append(cell)
+            # Fit the 3 dp values that ship, so the published p-value reproduces.
+            shipped_series = np.array([np.nan if value is None else value for value in published], dtype=float)
             for window_start, window_end, key in WINDOWS:
                 mask = (years >= window_start) & (years <= window_end)
-                trend = compute_trend(years[mask], series[mask])
+                trend = compute_trend(years[mask], shipped_series[mask])
                 if trend is None:
                     cell["trends"][key] = None
                     continue
@@ -344,7 +351,10 @@ def build_grid(env: dict[str, str], sources: list[dict[str, Any]]) -> dict[str, 
                 "series": global_series,
                 "trends": global_trends,
             },
-            "total_grid_cells": total,
+            # 4,050 candidate cells, 4,039 analysed: 11 cells have fewer than 20
+            # finite years and are dropped. Report both, under names that say which.
+            "total_grid_cells": len(cells),
+            "candidate_grid_cells": total,
         },
         "cells": cells,
     }
@@ -387,8 +397,13 @@ def _series_and_trends(
         annual = annual_from_power(parameters[code], START, END)
         series[code] = series_array(annual, START, END)
         trends[code] = {}
+        # Fit the values that ship, not the unrounded ones: a reader can only
+        # reproduce a p-value from the series that is in the bundle.
+        published = [
+            (START + offset, value) for offset, value in enumerate(series[code]) if value is not None
+        ]
         for window_start, window_end, key in WINDOWS:
-            pairs = [(year, value) for year, value in annual if window_start <= year <= window_end]
+            pairs = [(year, value) for year, value in published if window_start <= year <= window_end]
             trends[code][key] = compute_trend([year for year, _ in pairs], [value for _, value in pairs])
     return series, trends
 

@@ -29,6 +29,14 @@ from statsmodels.stats.stattools import durbin_watson
 MIN_YEARS = 20
 DEFAULT_ALPHA = 0.05
 
+# A trend must be reproducible from the numbers that ship. A build rounds a
+# series to these precisions before it fits it, and `scripts/refit_bundle.py`
+# enforces the same rule on the published files, so a reader can re-derive every
+# published p-value from the published series instead of from values the bundle
+# never contained.
+SHIP_DIGITS_POINT = 4
+SHIP_DIGITS_GRID = 3
+
 VERDICT_INCREASING = "significant increasing"
 VERDICT_DECREASING = "significant decreasing"
 VERDICT_NONE = "no significant trend"
@@ -148,6 +156,19 @@ def combined_verdict(
     if (slope > 0.0) != (mk_tau > 0.0):
         return VERDICT_NONE
     return VERDICT_INCREASING if slope > 0.0 else VERDICT_DECREASING
+
+
+def shipped(
+    values: Sequence[float | None], digits: int = SHIP_DIGITS_POINT
+) -> list[float | None]:
+    """The values as they will be serialised, ready to be fitted."""
+    out: list[float | None] = []
+    for value in values:
+        if value is None or not math.isfinite(float(value)):
+            out.append(None)
+        else:
+            out.append(round(float(value), digits))
+    return out
 
 
 def compute_trend(
@@ -297,4 +318,7 @@ def series_array(
 ) -> list[float | None]:
     """Project annual pairs onto a fixed year grid, using None for gaps."""
     lookup = {year: value for year, value in annual}
-    return [round(lookup[year], 4) if year in lookup else None for year in range(start, end + 1)]
+    return [
+        round(lookup[year], SHIP_DIGITS_POINT) if year in lookup else None
+        for year in range(start, end + 1)
+    ]

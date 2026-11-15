@@ -110,14 +110,15 @@
             <li>Below 20 annual means: <strong>exploratory</strong>, no significance claim.</li>
             <li>Map cells use Benjamini–Hochberg FDR correction at q = 0.05 across the grid.</li>
             <li>Neighbouring cells are correlated, so that correction is approximate.</li>
+            <li>Significant means distinguishable from noise at 5%, not large: a trend can pass and still be too small to matter.</li>
           </ul>
         </section>
         <section>
           <h3>Data</h3>
           <ul id="method-sources">
             <li>NASA GISTEMP v4 — global gridded temperature anomalies, baseline 1951–1980.</li>
-            <li>Ocean cells carry ERSST-based sea surface temperature; land cells carry surface air temperature. Ocean regions average their cells by area (cos lat) and correct across the eight basins, not the mixed field.</li>
-            <li>NASA POWER — point temperature, rainfall, root-zone wetness and solar irradiance, MERRA-2 derived.</li>
+            <li>Ocean cells carry ERSST-based sea surface temperature; land cells carry surface air temperature. Ocean regions average their cells by area (cos lat) and correct across the eight basins, not the mixed field. The “global ocean” row is the area-weighted mean of those eight basins, so its cells are already counted inside them.</li>
+            <li>NASA POWER — point temperature, rainfall, root-zone wetness and solar irradiance, MERRA-2 derived. POWER answers per 0.5° × 0.625° cell, so neighbouring stations can share one series: 141 station variables are identical to another station's, and a country average can count a cell twice. Twelve stations on the Antarctic and Greenland ice sheets have no root-zone soil moisture at all — that variable is absent there, not zero.</li>
             <li>Meteomatics — current conditions for every point, proxied server-side so the app itself holds no weather credentials. The build snapshot is labelled and used when the proxy is unavailable.</li>
             <li>NASA Earthdata — MERRA-2 catalogue access check.</li>
             <li>NSIDC/NOAA Sea Ice Index (G02135) — monthly ice extent per hemisphere, averaged to annual means and served as a timeseries by NOAA PSL.</li>
@@ -137,6 +138,7 @@
             <li>It does not attribute cause.</li>
             <li>“Not significant” means “not proven”, not “no trend”.</li>
             <li>Absolute POWER values are not anomalies; GISTEMP is an anomaly.</li>
+            <li>A significant trend is not necessarily a large one.</li>
             <li>The AI proposes and explains; it never computes a number.</li>
           </ul>
         </section>
