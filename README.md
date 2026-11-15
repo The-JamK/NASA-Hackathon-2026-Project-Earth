@@ -165,6 +165,15 @@ deployment is live at
 — the same build as GitHub Pages, with `/api/live` and `/api/resolve` in front of
 it, so places outside the bundle resolve there and not on the Pages site.
 
+A push to `main` redeploys the Worker the way it already publishes Pages:
+`.github/workflows/deploy-worker.yml` runs `npm ci && npm run build` and then
+`npx wrangler@4 deploy` from `worker/`. It needs one repository secret,
+`CLOUDFLARE_API_TOKEN` (the **Edit Cloudflare Workers** template under
+**My Profile → API Tokens**), and takes the account from
+`CLOUDFLARE_ACCOUNT_ID` if you set it. Without the token the deploy step is
+skipped with a notice on the run rather than failing the build, so the Worker
+cannot be left serving a half-published build by a broken credential.
+
 ## The ocean
 
 The ocean is presented as places, not as points. The GISTEMP field already
