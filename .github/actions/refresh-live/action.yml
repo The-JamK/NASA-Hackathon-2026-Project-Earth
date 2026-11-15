@@ -1,0 +1,52 @@
+name: Refresh live conditions
+description: >-
+  Refetch the stored live conditions, so the fallback snapshot a deploy ships is
+  not older than the deploy itself. Nothing is committed: the refreshed bundle
+  goes straight into the build, which means the site stays current without
+  anyone pushing. With no credentials in the repository the step skips itself
+  with a notice and the committed snapshot ships, so a fork or a keyless clone
+  still deploys.
+
+inputs:
+  username:
+    description: Meteomatics username, passed from the repository secret
+    required: false
+  password:
+    description: Meteomatics password, passed from the repository secret
+    required: false
+
+runs:
+  using: composite
+  steps:
+    - uses: actions/setup-python@v5
+      with:
+        python-version: "3.13"
+
+    - name: Install uv
+      shell: bash
+      run: pip install --quiet uv
+
+    # The credentials reach the build through a file in $RUNNER_TEMP rather than
+    # the job environment, for the same reason the Cloudflare token is not at
+    # job level: `npm ci` and `npm run build` must not be able to read them.
+    - name: Refetch the live conditions
+      shell: bash
+      env:
+        METEOMATICS_USERNAME: ${{ inputs.username }}
+        METEOMATICS_PASSWORD: ${{ inputs.password }}
+      run: |
+        set -euo pipefail
+        if [ -z "${METEOMATICS_USERNAME:-}" ] || [ -z "${METEOMATICS_PASSWORD:-}" ]; then
+          echo "::notice title=Live snapshot not refreshed::METEOMATICS_USERNAME and METEOMATICS_PASSWORD are not set as Actions secrets, so this deploy carries the committed snapshot."
+          exit 0
+        fi
+        env_file="$RUNNER_TEMP/meteomatics.env"
+        umask 077
+        printf 'METEOMATICS_USERNAME=%s\nMETEOMATICS_PASSWORD=%s\n' \
+          "$METEOMATICS_USERNAME" "$METEOMATICS_PASSWORD" > "$env_file"
+        trap 'rm -f "$env_file"' EXIT
+        # Six API calls and a JSON edit. Deliberately not `build_data.py
+        # --refresh-live`: a full rebuild reads the POWER cache under
+        # `data/cache/`, which is not tracked, so on a clean checkout it would
+        # fetch 708 stations from NASA before it touched a live reading.
+        uv run python scripts/refresh_live.py --env-file "$env_file"

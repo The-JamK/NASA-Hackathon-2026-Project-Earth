@@ -1723,8 +1723,8 @@ html.landing body {
    the rows nearest the equator stand furthest out, while the top and bottom rows
    step inwards with the circle. The statement sits above all of them. */
 .hero-box--name { left: calc(var(--box-left) + var(--box-bend)); top: 3vh; width: clamp(238px, 19vw, 290px); }
-.hero-box--public { left: var(--box-left); top: 27vh; }
-.hero-box--members { left: var(--box-left); top: 51vh; }
+.hero-box--public { left: var(--box-left); top: calc(27vh + 10px); }
+.hero-box--members { left: var(--box-left); top: calc(51vh + 10px); }
 .hero-box--about { left: calc(var(--box-left) + var(--box-bend)); bottom: 4vh; }
 .hero-box--challenge { right: calc(var(--box-left) + var(--box-bend)); top: 6vh; }
 .hero-box--analyst { right: var(--box-left); top: 30vh; }

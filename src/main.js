@@ -357,7 +357,7 @@ function buildGlobe() {
   globe.width(window.innerWidth).height(window.innerHeight);
   globe.pointOfView({ lat: 12, lng: 8, altitude: 3.0 }, 0);
   globe.controls().autoRotate = true;
-  globe.controls().autoRotateSpeed = 0.3;
+  globe.controls().autoRotateSpeed = 0.18;
   globe.controls().enableDamping = true;
   globe.controls().dampingFactor = 0.08;
   globe.controls().minPolarAngle = 0.08;

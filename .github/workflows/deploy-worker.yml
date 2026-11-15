@@ -4,6 +4,11 @@ on:
   push:
     branches: [main]
   workflow_dispatch:
+  # The Worker serves its own copy of the bundle, so it refreshes on the same
+  # schedule as Pages: the deploy rebuilds the data on the runner with the live
+  # API and ships that, without a commit.
+  schedule:
+    - cron: "27 5 * * *"
 
 permissions:
   contents: read
@@ -29,6 +34,16 @@ jobs:
           node-version: 22
           cache: npm
       - run: npm ci
+      # Only on a schedule or a manual run; see deploy.yml for why.
+      # The deploy must never depend on this; see deploy.yml.
+      - name: Refresh the live snapshot
+        if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
+        continue-on-error: true
+        timeout-minutes: 10
+        uses: ./.github/actions/refresh-live
+        with:
+          username: ${{ secrets.METEOMATICS_USERNAME }}
+          password: ${{ secrets.METEOMATICS_PASSWORD }}
       - run: npm run build
 
       # A missing token skips the deploy with a notice instead of failing the
