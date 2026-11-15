@@ -159,6 +159,15 @@ function fuzzyRecord(question, records, { slack = 1, maxEdits = null } = {}) {
         if (key.length / Math.max(window.compact.length, 1) < 0.6) continue;
         const distance = editDistance(window.compact, key, limit);
         if (!distance || distance > limit) continue;
+        // The same rules the place matcher uses: a misspelling rarely changes the
+        // first letter, and a whole extra ending is a different name. Without
+        // them "Queenland" (Queensland) was read as Greenland.
+        if (distance >= 2 && window.compact[0] !== key[0]) continue;
+        {
+          const [shorter, longer] =
+            window.compact.length <= key.length ? [window.compact, key] : [key, window.compact];
+          if (longer.length - shorter.length >= 2 && longer.startsWith(shorter)) continue;
+        }
         // Longer names are more specific: "Indian Ocean" over "ocean".
         const score = 1 - distance / Math.max(window.compact.length, key.length) + key.length * 0.01;
         if (!best || score > best.score) {

@@ -513,6 +513,14 @@ const NOMINATIM_BROADBEACH = [
   check(control.place?.name === "Pennsylvania", `the control resolved to ${control.place?.name}`);
   check(control.corrected === false, "a correctly spelled state was flagged as a typo");
 
+  // "Queenland" is one letter from Queensland and two from Greenland. The place
+  // matcher has to leave it for the gazetteer instead of letting the country
+  // matcher answer Greenland.
+  const queenland = await (
+    await call({ question: "Is Queenland getting hotter?" }, { fetchImpl: geocoderStub({}) })
+  ).json();
+  check(queenland.place?.name === "Queensland", `Queenland resolved to ${queenland.place?.name}`);
+
   const context = {
     rag: read("public/data/rag_index.json"),
     points: points.points,
@@ -551,6 +559,14 @@ const NOMINATIM_BROADBEACH = [
   const antarctica = planCase("Is Antarctica warming?", context);
   check(antarctica?.kind === "country", `Antarctica became a ${antarctica?.kind} case`);
   check(antarctica?.corrected === false, "Antarctica was flagged as a typo");
+
+  // The country matcher must not swallow a state typo that is closer to it than
+  // to any country: "Queenland" is Queensland with one letter missing.
+  const queenlandPlan = planCase("Is Queenland getting hotter?", context);
+  check(
+    queenlandPlan?.resolved === false,
+    `Queenland resolved to ${queenlandPlan?.place?.name}, not the derived path`
+  );
 }
 
 if (failures) {
