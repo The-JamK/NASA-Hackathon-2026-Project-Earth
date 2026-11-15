@@ -440,6 +440,7 @@ def build_points(
     sources: list[dict[str, Any]],
     rows: list[dict[str, Any]],
     existing: dict[str, dict[str, Any]],
+    refresh_live: bool = False,
 ) -> dict[str, Any]:
     username = env.get("METEOMATICS_USERNAME", "")
     password = env.get("METEOMATICS_PASSWORD", "")
@@ -477,7 +478,9 @@ def build_points(
         live = None
         if slug in LIVE_IDS:
             try:
-                live = fetch_meteomatics(slug, row["lat"], row["lon"], username, password)
+                live = fetch_meteomatics(
+                    slug, row["lat"], row["lon"], username, password, refresh=refresh_live
+                )
             except Exception:  # noqa: BLE001 - live conditions are optional
                 live = None
             if live is None:
@@ -734,6 +737,14 @@ def main() -> int:
         action="store_true",
         help="reuse the committed context imagery instead of fetching it again",
     )
+    parser.add_argument(
+        "--refresh-live",
+        action="store_true",
+        help=(
+            "refetch current conditions for the featured points instead of reusing "
+            "the cached snapshot; needs METEOMATICS_USERNAME and METEOMATICS_PASSWORD"
+        ),
+    )
     args = parser.parse_args()
 
     env = load_env(Path(args.env_file).expanduser())
@@ -794,7 +805,13 @@ def main() -> int:
         f"+ {len(sparse_rows)} sparse-region points"
     )
 
-    points_payload = build_points(env, sources, [*curated, *new_rows, *sparse_rows], existing_points)
+    points_payload = build_points(
+        env,
+        sources,
+        [*curated, *new_rows, *sparse_rows],
+        existing_points,
+        refresh_live=args.refresh_live,
+    )
     # Two tiers: an index the app loads eagerly and per-shard detail it fetches
     # when a case is opened. See scripts/points_bundle.py.
     point_report = points_bundle.write_bundle(PUBLIC, points_payload)
