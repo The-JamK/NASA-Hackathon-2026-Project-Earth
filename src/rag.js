@@ -599,6 +599,10 @@ export function planCase(question, { rag, points, variables, countries, ocean, s
     // A station the question really names beats a country it merely almost
     // spells; only an unresolved question may be repaired into a country.
     (!countryHit.corrected || !city.resolved) &&
+    // Nor may a repaired country take a question from a basin that was spelled
+    // right: "south ocean" is the Southern Ocean's own alias, and a three-edit
+    // repair was reading it as South Korea.
+    (!countryHit.corrected || !oceanHit || oceanHit.corrected) &&
     (!city.resolved || countryHit.alias.length >= (city.alias || "").length);
   // Likewise a basin beats a country word ("Indian Ocean" is not India), and a
   // sea-ice question is answered by the sea-ice record itself.
@@ -607,7 +611,9 @@ export function planCase(question, { rag, points, variables, countries, ocean, s
     iceRegion !== null ||
     (Boolean(oceanHit) &&
       (!oceanHit.corrected || !city.resolved) &&
-      (!useCountry || oceanHit.alias.length > countryHit.alias.length) &&
+      (!useCountry ||
+        oceanHit.alias.length > countryHit.alias.length ||
+        (!oceanHit.corrected && countryHit.corrected)) &&
       (!city.resolved || oceanHit.alias.length >= (city.alias || "").length));
 
   const region = iceRegion || oceanHit?.region || null;

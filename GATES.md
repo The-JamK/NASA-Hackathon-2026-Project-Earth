@@ -593,6 +593,11 @@ Last verified: 2026-11-14
   EXPECT: (clean)
   EVIDENCE: pending
 
-MET: 114
+- [x] G117: An exact basin name is never taken over by a repaired country name: `"south ocean"` — the Southern Ocean's own alias — answers the Southern Ocean, not South Korea.
+  CHECK: node scripts/verify_ocean.mjs
+  EXPECT: ocean verified
+  EVIDENCE: On merged `main` this failed: `FAIL: "south ocean" planned country at South Korea`. The country repair budget is three edits for a ten-letter name, and `southocean` is three edits from `southkorea` with a shared first letter, so `"south ocean"` was repaired into South Korea and the equal-length tie-break handed it the question. A repaired hit may now only displace a name that is itself repaired: `(!countryHit.corrected || !oceanHit || oceanHit.corrected)` in `useCountry`, and the ocean/country length comparison defers to an uncorrected ocean alias on a tie. Measured after the fix: `"Is south ocean warming?"` → `ocean southern-ocean` (358 cells, 75–55°S), while `"Is ocean warming?"` → global ocean, `"Is southern ocean warming?"` → Southern Ocean and `"Is south atlantic warming?"` → South Atlantic are unchanged, and `verify_ocean`, `verify_resolve` and `verify_search` all pass.
+
+MET: 115
 UNMET: 2
 ABANDONED: 0
