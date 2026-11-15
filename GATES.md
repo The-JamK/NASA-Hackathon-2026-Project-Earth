@@ -940,6 +940,11 @@ Last verified: 2026-11-15
   EXPECT: chips wrap without clipping, both axes stay legible, and no page overflow appears
   EVIDENCE: At 660 px the window row is one 32 px line under the variable chips; the chart measures 572 px with a 552 px svg. At 420 px the dialog is 388 px, the chart 340 px with a 320 px svg, the chips and their counts end inside the body, the note wraps to four lines inside 342 px, and the page has no horizontal overflow. A resize while the dialog is open re-measured the charts from 320 to 552 px; before that fix the svg kept its old width and overflowed its box.
 
-MET: 186
+- [x] G188: The saved-places menu is reachable before anything is starred, so a fresh reader can find it and add places.
+  CHECK: node scripts/verify_stars_ui.mjs
+  EXPECT: stars ui verified
+  EVIDENCE: The top-bar button used to hide itself at zero stars, and the only star lives inside an opened case, so a fresh browser (or the deployed site, where the saved list is empty) showed no way into the menu at all. It now stays visible as "Saved 0" with the label "No saved places yet, open to add some". Live at 1280x800 from an empty store: the button measured visible, the dialog opened on its empty state with the add field and no CSV button, searching "oyem" found and added the station, and the draft section and count appeared. stars ui and app verified; prose check passes.
+
+MET: 187
 UNMET: 1
 ABANDONED: 0

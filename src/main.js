@@ -1123,12 +1123,15 @@ function starButton() {
 function refreshStarsButton() {
   if (!els.starsBtn) return;
   const count = state.stars.length;
-  // No stars, no button: a reader who never uses this sees no new top-bar chrome.
-  els.starsBtn.hidden = count === 0;
+  // The button stays visible at zero. Hiding it left a fresh reader with no way in:
+  // the only star lives inside a case, so nothing on the page said saved places
+  // existed, and the dialog's add field was unreachable.
+  els.starsBtn.hidden = false;
+  els.starsBtn.classList.toggle("is-empty", count === 0);
   if (els.starsCount) els.starsCount.textContent = String(count);
   els.starsBtn.setAttribute(
     "aria-label",
-    `${count} saved place${count === 1 ? "" : "s"}, compare them`
+    count === 0 ? "No saved places yet, open to add some" : `${count} saved place${count === 1 ? "" : "s"}, compare them`
   );
 }
 

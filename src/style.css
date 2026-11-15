@@ -622,6 +622,9 @@ body.has-case .case-panel { display: block; }
 
 /* The dialog's window chips reuse the case's chip styles; the wrapper only spaces
    them away from the variable row above and the add field below. */
+/* At zero saved the button is still there, just quieter. */
+.ghost-btn.is-empty { color: var(--muted); }
+
 .compare-window-row { margin: 0 0 12px; }
 .compare-window-row .chip-label { margin-right: 8px; }
 

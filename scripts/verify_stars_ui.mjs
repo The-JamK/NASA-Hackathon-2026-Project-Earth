@@ -38,7 +38,8 @@ check(!/compare-intervals/.test(app), "the old interval button is gone, because 
 
 const starsBtn = app.match(/<button[^>]*id="stars-btn"[^>]*>/)?.[0] || "";
 check(starsBtn !== "", "app.html carries the saved-places button");
-check(/\shidden/.test(starsBtn), "the saved-places button ships hidden at zero stars");
+check(!/\shidden(\s|>|=)/.test(starsBtn), "the saved-places button is visible even before anything is starred");
+check(/title="Saved places/.test(starsBtn), "the button says what it is for");
 check(/aria-haspopup="dialog"/.test(starsBtn), "the saved-places button announces that it opens a dialog");
 check(/id="stars-count"/.test(app), "the saved-places button carries its count");
 
@@ -59,7 +60,10 @@ check(/name === "toggle-star"/.test(main), "the delegated handler answers the st
 check(/function toggleStarForCase\(/.test(main), "starring has one entry point");
 check(/aria-pressed="\$\{on\}"/.test(main), "the star reports its pressed state");
 check(/function refreshStarsButton\(/.test(main), "the top-bar count is refreshed from state");
-check(/els\.starsBtn\.hidden = count === 0/.test(main), "the top-bar button hides itself at zero stars");
+check(
+  /els\.starsBtn\.hidden = false/.test(main) && !/els\.starsBtn\.hidden = count === 0/.test(main),
+  "the top-bar button never hides itself, so the dialog stays reachable at zero"
+);
 check(/els\.compareDialog\.showModal\(\)/.test(main), "the comparison opens as a native modal dialog");
 check(/function renderCompare\(/.test(main), "there is one comparison renderer");
 check(/function openCompare\(/.test(main), "there is one entry point");
