@@ -327,7 +327,33 @@ Washington below it. States and provinces come from Natural Earth's admin-1 laye
 so `Is Queensland getting wetter?` is answerable too — the case is the GISTEMP 4°
 cell nearest the division's label point, and the notice says so. Every candidate
 carries its own coordinates, so choosing one costs no extra request on either host.
-`scripts/verify_search.mjs` pins that behaviour.
+`scripts/verify_search.mjs` pins that behaviour. Ask for a **state** and you mean
+the state: `Washington state` is the state of Washington, while plain `Washington`
+is Washington, D.C., and the popup offers all three. A station name is only
+repaired for a real typo — one edit at the same length — so `Nairobii` reaches
+Nairobi but `Washington` never becomes Wellington.
+
+The same tolerance covers the rest of the question. A station name one letter off
+(`Nairobii`, `Melborne`) is matched to the bundle's own station and offered in a
+"Did you mean" popup — choosing it opens that station's record instead of a
+derived cell. A misspelt climate word (`precipitiation`, `temperture`, `drougt`)
+still asks the right variable, and the plan says so: `read "precipitiation" as
+precipitation`. Countries and ocean basins are covered the same way — `Austraila`
+answers the Australia average, `Pacfic` answers a Pacific basin, `Indain Ocean`
+answers the Indian Ocean rather than the global one — while a name that is
+already right is never swapped for a neighbour (`Australia` and `Austria` are one
+edit apart, and each answers itself). `scripts/verify_typos.mjs` measures that
+across the whole table: one letter dropped from the middle of 300 sampled cities
+gets the right city first 95% of the time (99% appear in the popup), and 300
+sampled states and provinces land first 96% of the time (99% in the popup), with
+nothing unplaced. Every repair now raises the popup, including a climate word, a
+country, a basin and an ice record, not just a place name. States and provinces come through the same
+gazetteer matcher (`Illonois` → Illinois), and sea ice has its own repairs: a
+misspelt `Antartic sea ice` gets that hemisphere's record rather than the global
+one, and `Arctic see ice` is still recognised as an ice question instead of being
+answered by the nearest land station. Only words of five or six letters or more
+are repaired, and only when nothing matched exactly, so a correct question never
+gets "corrected".
 
 Vite uses relative asset paths (`base: "./"`) and the app resolves data,
 textures and point imagery through `import.meta.env.BASE_URL`, so the build works

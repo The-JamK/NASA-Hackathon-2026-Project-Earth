@@ -2418,6 +2418,9 @@ async function handleAsk(question) {
   renderPlan(plan);
   // On a phone the intake panel scrolls; bring the plan's buttons into view.
   if (plan) els.plan.scrollIntoView({ block: "nearest" });
+  // Every word the app had to repair is offered, not quietly used: the popup
+  // says which place, basin, record or climate word it read.
+  if (plan?.corrected || plan?.repairs?.length) showSuggestions(plan);
   // A global plan the question did not ask for is the planner saying "no place
   // in this bundle matches". That is the derived case: resolve the name, then
   // answer from the field.
@@ -2443,23 +2446,16 @@ async function offerDerivedPlan(question, seq) {
   if (resolution.ambiguous || resolution.expanded || resolution.corrected) showSuggestions(resolution);
 }
 
-const compactNumber = new Intl.NumberFormat("en", {
-  notation: "compact",
-  maximumFractionDigits: 1,
-});
-
 function suggestionLabel(candidate) {
   const kind =
     candidate.kind === "region"
       ? (candidate.subtype || "region").toLowerCase()
-      : candidate.kind === "place"
-        ? "city"
-        : "place";
-  const people =
-    candidate.kind === "region" || !(candidate.population > 0)
-      ? ""
-      : ` · ${compactNumber.format(candidate.population)}`;
-  return candidate.country ? `${kind} · ${candidate.country}${people}` : `${kind}${people}`;
+      : candidate.kind === "station"
+        ? "station"
+        : candidate.kind === "place"
+          ? "city"
+          : "place";
+  return candidate.country ? `${kind} · ${candidate.country}` : kind;
 }
 
 function hideSuggestions() {
@@ -2468,6 +2464,15 @@ function hideSuggestions() {
 
 function chooseSuggestion(resolution, candidate) {
   hideSuggestions();
+  // A station candidate is one the bundle already holds: choosing it opens the
+  // station's own case instead of swapping in a derived cell.
+  const station = candidate.id ? state.byId.get(candidate.id) : null;
+  if (station) {
+    planForCity(station.id);
+    els.plan.scrollIntoView({ block: "nearest" });
+    showToast(`Using ${station.name}${station.country ? `, ${station.country}` : ""}`);
+    return;
+  }
   const plan = derivedPlan({ ...resolution, place: { ...candidate, detail: "" } });
   if (!plan) return;
   state.plan = plan;
@@ -2479,14 +2484,21 @@ function chooseSuggestion(resolution, candidate) {
 function showSuggestions(resolution) {
   hideSuggestions();
   const candidates = (resolution.candidates || []).slice(0, 3);
-  if (!candidates.length) return;
+  // Place names already have a button of their own; the other repairs are
+  // words with a single right reading, so their button accepts it.
+  const repairs = (resolution.repairs || []).filter(
+    (repair) => !["station", "region"].includes(repair.kind)
+  );
+  if (!candidates.length && !repairs.length) return;
   const box = document.createElement("div");
   box.id = "suggest-popover";
   box.className = "suggest-popover";
   box.setAttribute("role", "dialog");
   box.setAttribute("aria-label", "Did you mean");
   box.innerHTML = `
-    <p class="suggest-title">${resolution.corrected ? "Did you mean" : "Did you mean one of these?"}</p>
+    <p class="suggest-title">${
+      candidates.length && !resolution.corrected ? "Did you mean one of these?" : "Did you mean"
+    }</p>
     <ul class="suggest-list">
       ${candidates
         .map(
@@ -2499,6 +2511,17 @@ function showSuggestions(resolution) {
         </li>`
         )
         .join("")}
+      ${repairs
+        .map(
+          (repair, index) => `
+        <li>
+          <button type="button" class="suggest-item" data-repair="${index}">
+            <span class="suggest-name">${escapeHtml(repair.name)}</span>
+            <span class="suggest-meta">${escapeHtml(repair.kind)}</span>
+          </button>
+        </li>`
+        )
+        .join("")}
     </ul>
     <button type="button" class="suggest-dismiss" data-suggest="dismiss">Keep my wording</button>
   `;
@@ -2507,8 +2530,15 @@ function showSuggestions(resolution) {
   box.style.left = `${Math.round(rect.left + window.scrollX)}px`;
   box.style.width = `${Math.round(Math.max(rect.width, 280))}px`;
   box.addEventListener("click", (event) => {
-    const button = event.target.closest("[data-suggest]");
+    const button = event.target.closest("[data-suggest], [data-repair]");
     if (!button) return;
+    const repairIndex = button.getAttribute("data-repair");
+    if (repairIndex !== null) {
+      const repair = repairs[Number(repairIndex)];
+      hideSuggestions();
+      if (repair) showToast(`Using ${repair.name}`);
+      return;
+    }
     const key = button.getAttribute("data-suggest");
     if (key === "dismiss") {
       hideSuggestions();

@@ -393,6 +393,213 @@ const NOMINATIM_BROADBEACH = [
   check(gold.expanded === false, "Gold Coast was wrongly marked an expansion");
 }
 
+// 13. A climate word or a station name that is nearly right still asks the right
+//     question, and the plan says what it had to read.
+{
+  const context = {
+    rag: read("public/data/rag_index.json"),
+    points: points.points,
+    variables,
+    countries: [],
+    ocean: [],
+    seaIce: [],
+  };
+
+  const wet = planCase("Is precipitiation in Nairobi changing?", context);
+  check(wet?.variable?.code === "PRECTOTCORR", `a misspelt precipitation asked ${wet?.variable?.code}`);
+  check(wet?.variableCorrection?.typed === "precipitiation", "the variable correction was not reported");
+  check(
+    wet?.variableCorrection?.word === "precipitation",
+    `the correction named ${wet?.variableCorrection?.word}`
+  );
+  check(wet?.place?.name === "Nairobi", `the place beside it became ${wet?.place?.name}`);
+  check(wet?.corrected === false, "an exact station name was flagged as a typo");
+  check(
+    /read "precipitiation" as precipitation/i.test(wet?.explanation || ""),
+    `the plan does not say what it read: ${wet?.explanation}`
+  );
+
+  const warm = planCase("Is temperture in Chicago rising?", context);
+  check(warm?.variable?.code === "T2M", `a misspelt temperature asked ${warm?.variable?.code}`);
+
+  const station = planCase("Is Nairobii getting hotter?", context);
+  check(station?.place?.name === "Nairobi", `Nairobii resolved to ${station?.place?.name}`);
+  check(station?.kind === "city", `Nairobii became a ${station?.kind} case`);
+  check(station?.corrected === true, "the station typo was not flagged");
+  check(station?.candidates?.[0]?.id === "nairobi", "the station was not offered as the first candidate");
+  check(station?.candidates?.[0]?.kind === "station", "the candidate is not a station");
+
+  const clean = planCase("Is Nairobi getting hotter?", context);
+  check(clean?.corrected === false, "an exact station name was flagged as a typo");
+  check(clean?.variableCorrection === null, "an exact climate word was flagged");
+
+  // A misspelt climate word is not part of the place name. Left in the query it
+  // sank coverage below the floor and hid the place standing next to it.
+  const resolved = await (
+    await call({ question: "Is precipitiation in London changing?" }, { fetchImpl: geocoderStub({}) })
+  ).json();
+  check(resolved.ok === true, `the resolver could not place a misspelt-rain question: ${resolved.error}`);
+  check(/london/i.test(resolved.place?.name || ""), `the place became ${resolved.place?.name}`);
+  check(resolved.variable === "PRECTOTCORR", `the resolver read ${resolved.variable}`);
+}
+
+// 14. A country or ocean basin one letter off is repaired, and a name that is
+//     already right is never "repaired" into a different one.
+{
+  const context = {
+    rag: read("public/data/rag_index.json"),
+    points: points.points,
+    variables,
+    countries: read("public/data/countries.json").countries,
+    ocean: read("public/data/ocean.json").regions,
+    seaIce: [],
+  };
+
+  const aus = planCase("Is Austraila warming?", context);
+  check(aus?.kind === "country", `Austraila became a ${aus?.kind} case`);
+  check(aus?.place?.name === "Australia", `Austraila resolved to ${aus?.place?.name}`);
+  check(aus?.corrected === true, "the country typo was not flagged");
+  check(/was read as australia/i.test(aus?.explanation || ""), `the plan does not say what it read: ${aus?.explanation}`);
+
+  const exact = planCase("Is Australia warming?", context);
+  check(exact?.place?.name === "Australia", `Australia resolved to ${exact?.place?.name}`);
+  check(exact?.corrected === false, "a correctly spelled country was flagged as a typo");
+
+  // One edit apart and both real: the exact name has to win.
+  const austria = planCase("Is Austria warming?", context);
+  check(austria?.place?.name === "Austria", `Austria resolved to ${austria?.place?.name}`);
+  check(austria?.corrected === false, "Austria was flagged as a typo");
+
+  const canada = planCase("Is Cannda getting hotter?", context);
+  check(canada?.place?.name === "Canada" && canada?.corrected === true, `Cannda resolved to ${canada?.place?.name}`);
+
+  const pacific = planCase("Is the Pacfic warming?", context);
+  check(pacific?.kind === "ocean", `Pacfic became a ${pacific?.kind} case`);
+  check(/pacific/i.test(pacific?.place?.name || ""), `Pacfic resolved to ${pacific?.place?.name}`);
+  check(pacific?.corrected === true, "the ocean typo was not flagged");
+
+  // The generic word "ocean" matches the global aggregate exactly; the repaired
+  // name has to win over it, or a misspelt Indian Ocean answers as the world.
+  const indian = planCase("Is the Indain Ocean warming?", context);
+  check(indian?.place?.name === "Indian Ocean", `Indain Ocean resolved to ${indian?.place?.name}`);
+  check(indian?.corrected === true, "the misspelt Indian Ocean was not flagged");
+
+  const control = planCase("Is the Indian Ocean warming?", context);
+  check(control?.place?.name === "Indian Ocean", `the control resolved to ${control?.place?.name}`);
+  check(control?.corrected === false, "a correctly spelled ocean was flagged as a typo");
+}
+
+// 15. Misspelt states, provinces and sea-ice names are repaired; correctly
+//     spelled ones are not, and a continent next to the ice record is not eaten
+//     by it.
+{
+  const illinois = await (
+    await call({ question: "Is Illonois getting hotter?" }, { fetchImpl: geocoderStub({}) })
+  ).json();
+  check(illinois.ok === true, `Illonois did not resolve: ${illinois.error}`);
+  check(illinois.place?.name === "Illinois", `Illonois resolved to ${illinois.place?.name}`);
+  check(illinois.place?.kind === "region", `Illonois came back as a ${illinois.place?.kind}`);
+  check(illinois.corrected === true, "the state typo was not flagged");
+
+  const pennsylvania = await (
+    await call({ question: "Is Pensylvannia getting hotter?" }, { fetchImpl: geocoderStub({}) })
+  ).json();
+  check(pennsylvania.place?.name === "Pennsylvania", `Pensylvannia resolved to ${pennsylvania.place?.name}`);
+  check(pennsylvania.corrected === true, "the province typo was not flagged");
+
+  const control = await (
+    await call({ question: "Is Pennsylvania getting hotter?" }, { fetchImpl: geocoderStub({}) })
+  ).json();
+  check(control.place?.name === "Pennsylvania", `the control resolved to ${control.place?.name}`);
+  check(control.corrected === false, "a correctly spelled state was flagged as a typo");
+
+  // "Queenland" is one letter from Queensland and two from Greenland. The place
+  // matcher has to leave it for the gazetteer instead of letting the country
+  // matcher answer Greenland.
+  const queenland = await (
+    await call({ question: "Is Queenland getting hotter?" }, { fetchImpl: geocoderStub({}) })
+  ).json();
+  check(queenland.place?.name === "Queensland", `Queenland resolved to ${queenland.place?.name}`);
+
+  const context = {
+    rag: read("public/data/rag_index.json"),
+    points: points.points,
+    variables,
+    countries: read("public/data/countries.json").countries,
+    ocean: read("public/data/ocean.json").regions,
+    seaIce: read("public/data/seaice.json").records,
+  };
+
+  const antarctic = planCase("Is Antartic sea ice shrinking?", context);
+  check(antarctic?.kind === "seaice", `Antartic sea ice became a ${antarctic?.kind} case`);
+  check(antarctic?.place?.name === "Antarctic sea ice", `Antartic sea ice resolved to ${antarctic?.place?.name}`);
+  check(antarctic?.corrected === true, "the sea-ice typo was not flagged");
+  check(
+    /was read as antarctic sea ice/i.test(antarctic?.explanation || ""),
+    `the plan does not say what it read: ${antarctic?.explanation}`
+  );
+
+  const seeIce = planCase("Is the Arctic see ice shrinking?", context);
+  check(seeIce?.kind === "seaice", `"see ice" became a ${seeIce?.kind} case — the ice question was missed`);
+  check(seeIce?.place?.name === "Arctic sea ice", `"see ice" resolved to ${seeIce?.place?.name}`);
+  check(seeIce?.corrected === true, "the misspelt sea ice was not flagged");
+
+  const artic = planCase("Is the Artic sea ice shrinking?", context);
+  check(artic?.place?.name === "Arctic sea ice", `Artic resolved to ${artic?.place?.name}`);
+  check(artic?.corrected === true, "the hemisphere typo was not flagged");
+
+  const exactIce = planCase("Is Arctic sea ice shrinking?", context);
+  check(exactIce?.place?.name === "Arctic sea ice", `the control resolved to ${exactIce?.place?.name}`);
+  check(exactIce?.corrected === false, "a correctly spelled ice record was flagged as a typo");
+
+  const globalIce = planCase("Is global sea ice shrinking?", context);
+  check(globalIce?.place?.name === "Global sea ice", `global sea ice resolved to ${globalIce?.place?.name}`);
+  check(globalIce?.corrected === false, "global sea ice was flagged as a typo");
+
+  const antarctica = planCase("Is Antarctica warming?", context);
+  check(antarctica?.kind === "country", `Antarctica became a ${antarctica?.kind} case`);
+  check(antarctica?.corrected === false, "Antarctica was flagged as a typo");
+
+  // The country matcher must not swallow a state typo that is closer to it than
+  // to any country: "Queenland" is Queensland with one letter missing.
+  const queenlandPlan = planCase("Is Queenland getting hotter?", context);
+  check(
+    queenlandPlan?.resolved === false,
+    `Queenland resolved to ${queenlandPlan?.place?.name}, not the derived path`
+  );
+
+  // Washington is not one of the bundle's 708 stations, so the plan must leave it
+  // for the gazetteer, which knows Washington, D.C. A loose station repair used
+  // to answer Wellington here — three edits away — and never ask the gazetteer.
+  for (const washington of [
+    "Is Washington getting hotter?",
+    "Is Washington DC getting hotter?",
+    "Is Washington, D.C. getting hotter?",
+  ]) {
+    const plan = planCase(washington, context);
+    check(
+      plan?.resolved === false,
+      `"${washington}" resolved to ${plan?.place?.name} instead of the derived path`
+    );
+  }
+
+  // "Washington state" names the state; the district shares the word Washington
+  // as an alias, and used to win on population.
+  const state = await (
+    await call({ question: "Is Washington state getting hotter?" }, { fetchImpl: geocoderStub({}) })
+  ).json();
+  check(state.place?.name === "Washington", `Washington state resolved to ${state.place?.name}`);
+  check(state.place?.kind === "region", `Washington state came back as a ${state.place?.kind}`);
+
+  const district = await (
+    await call({ question: "Is Washington DC getting hotter?" }, { fetchImpl: geocoderStub({}) })
+  ).json();
+  check(
+    foldPlace(district.place?.name || "") === "washington d c",
+    `Washington DC resolved to ${district.place?.name}`
+  );
+}
+
 if (failures) {
   console.error(`\n${failures} resolver check(s) failed`);
   process.exit(1);

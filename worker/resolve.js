@@ -24,7 +24,7 @@
 // This file is shared by the Workers entry (worker/index.js) and the Vite
 // dev/preview middleware, so both paths run identical validation and caching.
 
-import { chooseWindow, parseTime, variableFromQuestion } from "../src/rag.js";
+import { chooseWindow, climateTypo, editDistance, parseTime, variableFromQuestion } from "../src/rag.js";
 
 const UPSTREAM_TIMEOUT_MS = 8_000;
 const MAX_QUESTION_LENGTH = 240;
@@ -156,6 +156,9 @@ export function placeQuery(question) {
         token &&
         !QUESTION_WORDS.has(token) &&
         !CLIMATE_WORDS.has(token) &&
+        // A misspelt climate word is not part of the place name; leaving it in
+        // would drag coverage below the floor and hide a real place beside it.
+        !climateTypo(token) &&
         !/^(19|20)\d{2}$/.test(token)
     );
   return kept.join(" ").trim().slice(0, MAX_PLACE_QUERY);
@@ -204,24 +207,6 @@ function populationPrior(population) {
   return 0.25 * Math.min(1, Math.log10((Number(population) || 0) + 1) / 7);
 }
 
-/** Levenshtein distance, abandoned as soon as it passes `limit`. */
-function editDistance(a, b, limit) {
-  if (Math.abs(a.length - b.length) > limit) return limit + 1;
-  let previous = Array.from({ length: b.length + 1 }, (_, index) => index);
-  for (let i = 1; i <= a.length; i += 1) {
-    const current = [i];
-    let rowBest = i;
-    for (let j = 1; j <= b.length; j += 1) {
-      const cost = a[i - 1] === b[j - 1] ? 0 : 1;
-      current[j] = Math.min(previous[j] + 1, current[j - 1] + 1, previous[j - 1] + cost);
-      if (current[j] < rowBest) rowBest = current[j];
-    }
-    if (rowBest > limit) return limit + 1;
-    previous = current;
-  }
-  return previous[b.length];
-}
-
 /**
  * How well one gazetteer key fits the question, or null.
  *
@@ -247,10 +232,12 @@ function rateKey(key, folded, place, compact) {
       : { base: 0.9, match: "prefix", coverage: 1 };
   }
   const compactKey = key.replace(/ /g, "");
-  // The key has to be most of what was typed: "goldcoast" should not match a
-  // region that happens to be called "Coast".
-  if (compact.includes(compactKey) && compactKey.length >= Math.max(5, Math.ceil(compact.length * 0.6))) {
-    return { base: 0.85, match: "compact", coverage: Math.min(1, compactKey.length / Math.max(compact.length, 1)) };
+  // Dropping the spaces is the whole test: "goldcoast" is "gold coast" with the
+  // space removed. A key that only sits inside the typed word is a different,
+  // shorter name — "Guandong" contains "Andong", and that is not an unspaced
+  // match of Andong.
+  if (compact === compactKey) {
+    return { base: 0.85, match: "compact", coverage: 1 };
   }
   return null;
 }
@@ -265,10 +252,20 @@ function rateTypo(key, compact) {
   if (!limit) return null;
   const distance = editDistance(compact, compactKey, limit);
   if (!distance || distance > limit) return null;
+  // A misspelling rarely changes the first letter, and two different names that
+  // share a tail are not typos of each other: "Andalucia" (absent from the
+  // layer) was matching "Santa Lucía" three edits in. One edit is still allowed
+  // to touch the first letter, because "Kairobi" is a typo of Nairobi.
+  if (distance >= 2 && compact[0] !== compactKey[0]) return null;
+  // A whole extra ending is a different name, not a misspelling: "Normandy" is
+  // not "Norman" with two letters left over.
+  const [shorter, longer] = compact.length <= compactKey.length ? [compact, compactKey] : [compactKey, compact];
+  if (longer.length - shorter.length >= 2 && longer.startsWith(shorter)) return null;
   return {
     base: 0.75 * (1 - distance / longest),
     match: "typo",
     distance,
+    keyLength: compactKey.length,
     coverage: Math.min(1, compactKey.length / Math.max(compact.length, 1)),
   };
 }
@@ -281,6 +278,10 @@ function rateTypo(key, compact) {
  * should come back with what it probably meant instead of a refusal. The caller
  * decides whether to use the best one silently or to ask.
  */
+// "Washington state" names the state, not the city that happens to share the
+// name; asking for a state, province or territory is a reason to prefer one.
+const REGION_WORDS = /\b(state|province|prefecture|territory)\b/i;
+
 export function searchPlaces(question, entries = [], { limit = 4 } = {}) {
   const folded = foldPlace(question);
   if (folded.length < 3 || !entries.length) return [];
@@ -297,7 +298,27 @@ export function searchPlaces(question, entries = [], { limit = 4 } = {}) {
     // question actually used.
     if ((hit.coverage ?? 1) < MIN_COVERAGE) return;
     const id = `${foldPlace(entry.name)}|${foldPlace(entry.country)}|${entry.kind}`;
-    const score = hit.base + populationPrior(entry.population);
+    // How many people live somewhere says which of several same-named places is
+    // meant (Washington, D.C. over the state), not which of several differently
+    // spelled names a typo meant. Ranking a repair by population sent
+    // "Guandong" to Andong and "Cataonia" to Catania, so a repair is ranked by
+    // how much of the word it has to change — and a state breaks an exact tie
+    // with a town, because that is the larger thing to be wrong about.
+    // Asking for a state prefers a region, and among regions prefers the one whose
+    // own name is what the question started with: "Washington state" is the state
+    // called Washington, not the district that also carries Washington as an
+    // alias.
+    const wantsRegion = REGION_WORDS.test(question) && entry.kind === "region";
+    const ownName = foldPlace(entry.name);
+    const regionBonus = wantsRegion
+      ? 0.3 + (` ${place} `.includes(` ${ownName} `) ? 0.15 : 0)
+      : 0;
+    const score =
+      (hit.match === "typo"
+        ? hit.base +
+          0.05 * (1 - Math.abs(hit.keyLength - compact.length) / Math.max(hit.keyLength, compact.length, 1)) +
+          (entry.kind === "region" ? 0.01 : 0)
+        : hit.base + populationPrior(entry.population)) + regionBonus;
     const current = found.get(id);
     if (current && current.score >= score) return;
     found.set(id, { entry, score, match: hit.match, distance: hit.distance || 0 });

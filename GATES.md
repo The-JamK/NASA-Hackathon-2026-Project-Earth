@@ -497,41 +497,102 @@ Last verified: 2026-11-14
   MANUAL: Cloud browser, built site, 1440x900, temporary probe removed before committing.
   EVIDENCE: With a temporary probe (grep now finds 0 hits in `hero.js`, and the built page reports `typeof window.__heroProbe === "undefined"`), two samples 9.465 s apart read `rotation.y` 0.48957 -> 1.96083 = 0.15544 rad/s, one turn in 40.42 s, against the 0.15708 target (1% low, timing noise) and the 0.12581 measured at the 50 s setting; `camera.up` was `[0, 1, 0]` and `pov` `[-6.5, 145]` at both samples. The screenshot shows New Guinea across the middle of the disc with Australia below-right and Asia above, no upward lean: `artifacts/hero-png-final.png`, plus a second frame 4 s later (`artifacts/hero-png-final-t1.png`). `scripts/verify_all.sh` passes on this build.
 
-- [x] G98: Every published trend reproduces from the published series: a refit pass over the shipped bundle reports zero differences, so the number a reader recomputes from the bundle is the number the app shows.
+- [x] G98: A misspelt climate word asks the right variable, and the plan says which word it read.
+  CHECK: node scripts/verify_resolve.mjs
+  EXPECT: resolver verified
+  EVIDENCE: `readVariable()` keeps the old keyword regexes and only when none of them fires does it repair one word against the climate vocabulary — `precipitation`, `rainfall`, `drought`, `monsoon`, `moisture`, `wetness`, `radiation`, `sunshine`, `cloudiness`, `temperature`, `warming` — within the length-scaled typo budget and only for words of six letters or more, because a wrong variable is a worse answer than a fallback. `verify_resolve.mjs` asserts `"Is precipitiation in Nairobi changing?"` asks PRECTOTCORR, reports `variableCorrection {typed: "precipitiation", word: "precipitation"}`, and says `read "precipitiation" as precipitation; "nairobi" resolves to Nairobi` in its explanation; `"Is temperture in Chicago rising?"` asks T2M. In the browser the plan read `Precipitation (corrected) · Chicago` with the same explanation, and running it opened `CASE-20CA` on rainfall (−0.04 mm/day per decade) rather than silently answering temperature.
+
+- [x] G99: A misspelt station name opens the station's own case and offers it in the popup, instead of falling through to a coarser derived cell.
+  CHECK: node scripts/verify_resolve.mjs
+  EXPECT: resolver verified
+  EVIDENCE: `stationCandidates()` compares the question's one-, two- and three-word windows against the 708 station names only — never country aliases — and only after the exact pass found nothing, so a correct name can never be "repaired". `"Is Nairobii getting hotter?"` returns Nairobi with `corrected: true` and `candidates[0] = {id: "nairobi", kind: "station"}`; `"Is Melborne warming?"` returns Melbourne the same way. In the browser the ask showed a "Did you mean" popup containing exactly `Nairobi station · Kenya · 3M`, the plan behind it read `"nairobii" was read as Nairobi, Kenya, which is one of the bundle's stations`, and choosing the candidate replaced it with the station plan (Nairobi · 1990–2025 · °C). The same two steps produced the same popup and plan on a plain static server over `dist`, so no server is needed for this either.
+
+- [x] G100: The tolerance does not fire on names that are already right, and it does not hide the place standing next to a misspelt climate word.
+  CHECK: node scripts/verify_resolve.mjs && node scripts/verify_search.mjs && npm run build
+  EXPECT: search verified
+  EVIDENCE: Exact questions are untouched: Nairobi, Paris, Sydney, Chicago and Gold Coast all come back with `corrected: false` and `variableCorrection: null`, and the typo budget is zero below five letters so short words are never mangled. A misspelt climate word is dropped from the place query in `worker/resolve.js` (`climateTypo` in the `placeQuery` filter) — without that, `"precipitiation"` stayed in the name, dragged coverage under the 0.6 floor and hid the city beside it; `"Is precipitiation in London changing?"` now places London and asks PRECTOTCORR, which `verify_resolve.mjs` asserts through `handleResolve`. `verify_search.mjs` and `verify_resolve.mjs` both pass, the build succeeds, and first-load is 294 kB gzip (+1 kB).
+
+- [x] G101: A misspelt country name answers that country's average and says which name it read.
+  CHECK: node scripts/verify_resolve.mjs
+  EXPECT: resolver verified
+  EVIDENCE: `resolveCountry()` keeps its exact pass and adds one repaired pass over country aliases of five letters or more, using the same window-and-budget matcher as stations. `verify_resolve.mjs` asserts `"Is Austraila warming?"` → country Australia with `corrected: true` and `"austraila" was read as Australia` in the explanation, and `"Is Cannda getting hotter?"` → Canada. In the browser the plan read `Australia average · 12 stations · 1990–2025 · °C` with the same sentence, and running it opened `CASE-A113 · COUNTRY AVERAGE · 12 STATIONS · OCEANIA`; the plain static server over `dist` produced the identical plan, so this needs no Worker.
+
+- [x] G102: A misspelt ocean basin answers that basin instead of silently falling back to the global ocean.
+  CHECK: node scripts/verify_resolve.mjs
+  EXPECT: resolver verified
+  EVIDENCE: Before this, `"Is the Indain Ocean warming?"` matched the generic alias `ocean` (the global aggregate) exactly and answered the world. A repaired alias may now replace an exact one only when the exact words are all words of the repaired name — `ocean` is inside `indian ocean`, so the repair wins; a name that was spelled correctly never can. `verify_resolve.mjs` asserts `"Is the Indain Ocean warming?"` → Indian Ocean with `corrected: true` and `"Is the Pacfic warming?"` → a Pacific basin, also corrected. In the browser the plans read `Indian Ocean · 373 ocean cells` and `Tropical Pacific · 314 ocean cells` with `was read as …` in the explanation, on both the dev server and the static build.
+
+- [x] G103: The repair never replaces a name that is already right, and the exact controls are unchanged.
+  CHECK: node scripts/verify_resolve.mjs && node scripts/verify_search.mjs && npm run build
+  EXPECT: search verified
+  EVIDENCE: `"Australia"` is one edit from `"Austria"`, and an early version of this swapped them; the guard added for that is pinned in `verify_resolve.mjs`: `"Is Austria warming?"` → Austria with `corrected: false`, `"Is Australia warming?"` → Australia with `corrected: false`, `"Is the Indian Ocean warming?"` → Indian Ocean with `corrected: false`, while `"Is the ocean warming?"` still answers the global ocean. In the browser the Austria control read `Austria average · 3 stations` with the plain wording. A repaired country or basin also cannot outrank a station the question really names. `verify_search.mjs` and `verify_resolve.mjs` pass, the build succeeds, and first-load stays at 294 kB gzip.
+
+- [x] G104: A misspelt state or province resolves to it, in the ask box and in the popup.
+  CHECK: node scripts/verify_resolve.mjs
+  EXPECT: resolver verified
+  EVIDENCE: States and provinces ride the gazetteer's shared matcher, so they were already typo-tolerant once the gazetteer carried them; this pins it. `verify_resolve.mjs` asserts `"Is Illonois getting hotter?"` → Illinois with `kind: "region"` and `corrected: true`, `"Is Pensylvannia getting hotter?"` → Pennsylvania, and the exact control `"Is Pennsylvania getting hotter?"` → Pennsylvania with `corrected: false`. In the browser the same question produced a "Did you mean" popup whose only entry was `Illinois state · United States of America`, and the plan behind it read `Derived case · United States of America · 39.95°N 89.20°W · nearest GISTEMP cell` — on the dev server and on the plain static build alike, since the page carries its own gazetteer.
+
+- [x] G105: A misspelt sea-ice name answers that hemisphere's record instead of the global one or a land station.
+  CHECK: node scripts/verify_resolve.mjs
+  EXPECT: resolver verified
+  EVIDENCE: Two separate misses were fixed. `"Is Antartic sea ice shrinking?"` matched only the words "sea ice" — the global record — and now repairs to Antarctic sea ice via a strict alias match (one edit, same length); `"Is the Arctic see ice shrinking?"` never looked like an ice question at all, so the station table's `arctic` alias answered with Tromsø air temperature, and `mentionsIce()` now recognises "see ice" as "sea ice" within one letter. `defaultSeaIceRecord()` also repairs a hemisphere word ("artic", "antartic") instead of defaulting to both poles. `verify_resolve.mjs` pins `Antartic` → Antarctic sea ice (corrected), `Artic` → Arctic sea ice (corrected), `Arctic see ice` → Arctic sea ice (corrected, `kind: "seaice"`), and the controls `"Is Arctic sea ice shrinking?"` and `"Is global sea ice shrinking?"` → not corrected. `"Is Antarctica warming?"` still answers the Antarctica country average rather than being eaten by the ice record. In the browser the plan read `Sea ice extent · Antarctic sea ice · 12-month mean`, and running it opened `CASE-68B7 · SEA ICE EXTENT` on the static build.
+
+- [x] G106: A dropped letter finds the right name anywhere on the map, and it is measured rather than asserted for one country.
+  CHECK: node scripts/verify_typos.mjs
+  EXPECT: typos verified
+  EVIDENCE: `verify_typos.mjs` takes a seeded sample of 300 names from the 6,421 cities and 300 from the 4,560 states and provinces, drops one letter from the middle of each folded name, and asks the shared matcher for it. Results: cities 95.0% first and 99.0% in the first three; states and provinces 95.7% first and 99.3% in the first three; nothing unplaced in either set. Named spot checks across six continents all land first: Queensland (`queenland`), Alberta, Ontario, Jalisco, Santa Catarina, Gauteng, KwaZulu-Natal, Guangdong (`guandong`), Sichuan, Yunnan, Maharashtra, Tamil Nadu, Hokkaido (`hokkido` → Hokkaidō), Kyoto (`kyto` → Kyōto), Reykjavik, Nairobi, Ulaanbaatar, Medellín, Wellington, and Bavaria/Saxony by their English names (→ Bayern/Sachsen, which is what the layer calls them). Three ranking bugs came out of the measurement: a repair used to be ranked by population, so `Guandong` lost to Andong and `Cataonia` lost to Catania (repairs now rank by how much of the word changes, with a state breaking an exact tie); the unspaced rule matched any key inside the typed word, so `Guandong` counted as an unspaced `Andong` (it now requires the whole word, spaces aside); and `Andalucia` was matching `Santa Lucía` three edits in (a repair that changes the first letter and more than one edit is now rejected) while `Normandy` matched `Norman` (a whole extra ending is a different name). `"Is Canada warming?"` is answered by the country path before this table is asked, so the clean-question controls use place and state names. A live check then caught a fourth, cross-path version of the same mistake: `Queenland` (Queensland) was captured by the *country* matcher as Greenland, because the first-letter guard lived only in the place matcher. The guard and the extra-ending rule now apply to country, basin and ice-record repairs too, `Queenland` reaches the gazetteer and resolves to Queensland, and `verify_resolve.mjs` pins both ends of that — the plan must leave it unresolved, and the resolver must return Queensland.
+  NOTE: Coverage follows the Natural Earth layer, which is not uniformly first-order: Germany, China, India, Japan, Brazil, Australia and the US arrive as states/provinces, while Italy, Spain and the UK arrive as provinces, communities and districts. Names the layer does not carry — Lombardy, Scotland, Andalusia, Brittany — resolve to nothing rather than to a lookalike; `verify_typos.mjs` asserts they are never answered silently.
+
+- [x] G107: Every repair raises the "Did you mean" popup, not only place names.
+  MANUAL: browser measurement on the built page, dev server and static build.
+  EVIDENCE: `planCase` now returns a `repairs` list naming each word it changed (station, state/ocean/country, ice record, climate word), and `showSuggestions` renders the non-place repairs as popup buttons beside any place candidates. On the built page: `Is precipitiation in Chicago changing?` → "Did you mean" → `precipitation · climate word`; `Is Austraila warming?` → `Australia · country`; `Is the Pacfic warming?` → `Tropical Pacific · ocean`; `Is Antartic sea ice shrinking?` → `Antarctic sea ice · ice record`; `Is Nairobii getting hotter?` → `Nairobi · station · Kenya · 3M`; and `Is Nairobi getting hotter?` raises nothing. Clicking a repair closes the popup with a `Using Australia` toast; clicking a station still opens that station's plan. The same five popups appeared on a plain static server over `dist`. A first version wired the click handler to `[data-suggest]` only, so repair buttons did nothing — fixed and re-measured.
+
+- [x] G108: A question about Washington reaches Washington, not Wellington, and "Washington state" means the state.
+  CHECK: node scripts/verify_resolve.mjs
+  EXPECT: resolver verified
+  EVIDENCE: Two faults, reported from the running site. First, the station repair had a three-edit budget, and "Washington" is three edits from "Wellington" — so the plan answered Wellington as a station typo and the gazetteer, which knows Washington, D.C., was never asked. The station repair is now one edit at the same length, which still covers `Nairobii` → Nairobi and `Melborne` → Melbourne; `verify_resolve.mjs` asserts that `"Is Washington getting hotter?"`, `"Washington DC"` and `"Washington, D.C."` all leave the plan unresolved (the derived path owns them), that the resolver returns `Washington,  D.C.` for the first two, and that the station examples still resolve. Second, "Washington state" answered the District of Columbia, because the district carries Washington as an alias and won on population; asking for a state, province or territory now prefers a region, and among regions prefers the one whose own name appears in the question. In the browser `"Is Washington state getting hotter?"` opens the derived case at 47.49°N 120.36°W and `"Washington"` opens 38.90°N 77.01°W, with the popup offering D.C., the district and the state.
+
+- [x] G109: A deploy cannot leave a browser running the previous build's JavaScript.
+  CHECK: npm run build && grep -o 'assets/[^"]*' dist/app.html
+  EXPECT: assets/app.js?v=
+  EVIDENCE: GitHub Pages serves every file with `cache-control: max-age=600`, and the bundle names are deliberately stable (`assets/app.js`) so the build does not add a new file to the repository each release — which meant a tab could keep the old planner for ten minutes after a fix. That is what "it still says Wellington" was: the deployed `assets/app.js` on both hosts was already byte-identical to the local build (md5 `d393265b…`), and `/api/resolve` on the Worker returned `Washington,  D.C.` with the D.C./district/state candidates, but the browser was running the cached script. A small Vite plugin now appends a content hash to each asset URL in `dist/app.html` and `dist/index.html` at build time (`assets/app.js?v=dad450fcd5`, `style.css?v=b4ea886b7b`), so a new build is a new cache entry. File names stay stable, so no churn in Git. Measured: the built page loads `./assets/app.js?v=dad450fcd5`, the versioned URL returns 200 from a plain static server, and `Is Washington getting hotter?` opens Washington, D.C. there. First-load and offline checks still pass (295 kB gzip critical path).
+  NOTE: The HTML itself is still served with `max-age=600`, so a tab opened before the deploy needs one hard reload (Cmd+Shift+R) to pick up the new versioned URL; after that, every deploy is picked up immediately.
+
+- [x] G110: Every published trend reproduces from the published series: a refit pass over the shipped bundle reports zero differences, so the number a reader recomputes from the bundle is the number the app shows.
   CHECK: uv run python scripts/refit_bundle.py --check --quiet
   EXPECT: BUNDLE SELF-CONSISTENT
   EVIDENCE: `exit=0`, output `points 0 / grid 0 / countries 0 / ocean 0 / sea ice 0 records differ · verdicts 0 changed · BUNDLE SELF-CONSISTENT`. Before the repair the same pass reported 8,460 points, 12,056 grid, 2,661 countries, 27 ocean and 18 sea-ice records differing with exactly 1 verdict changed — the audit's figure — and a second run after the repair reports 0 everywhere, which is the idempotence the oracle relies on.
 
-- [x] G99: The build fits exactly what it ships: station, grid, global and country trends are computed from the rounded values that are serialised, and a refit from already-shipped values is a no-op.
+- [x] G111: The build fits exactly what it ships: station, grid, global and country trends are computed from the rounded values that are serialised, and a refit from already-shipped values is a no-op.
   CHECK: uv run --with pytest pytest -q tests/test_statistics.py::test_shipped_values_reproduce_the_published_trend
   EXPECT: 1 passed
   EVIDENCE: `1 passed in 1.09s`. The test fits one series raw and once from its 4 dp serialisation, asserts the two fits differ (rounding moves Sen's slope, so this is not a formality), then asserts a second pass over already-shipped values is identical.
 
-- [x] G100: jeddah / GWETROOT / 1990-2025 no longer ships as significant on an irreproducible p-value: its stored trend and its stored series agree, and the verdict is "no significant trend".
+- [x] G112: jeddah / GWETROOT / 1990-2025 no longer ships as significant on an irreproducible p-value: its stored trend and its stored series agree, and the verdict is "no significant trend".
   CHECK: uv run python scripts/verify_refit.py
   EXPECT: jeddah GWETROOT 1990-2025 does not claim significance
   EVIDENCE: shipped after repair: verdict `no significant trend`, p = 0.0508029, slope 0.0020835 /decade, CI -7.7e-06..0.0041748, n = 36 (was `significant increasing` on p 0.0499968). The p the bundle now carries is the p its own series produces, so a reader recomputing gets the same verdict.
 
-- [x] G101: grid.json names the candidate grid (4,050) and the analysed grid (4,039) separately instead of reporting the candidate count under an analysed-count name.
+- [x] G113: grid.json names the candidate grid (4,050) and the analysed grid (4,039) separately instead of reporting the candidate count under an analysed-count name.
   CHECK: uv run python scripts/verify_refit.py
   EXPECT: REFIT CHECKS PASS
   EVIDENCE: `total_grid_cells 4039` = `len(cells)` = `meta.counts.cells`, `candidate_grid_cells 4050`, every shipped cell carries a 1990-2025 trend. Publishes 3,039 increasing / 78 decreasing / 922 not significant, median +0.2324 °C/decade, unchanged by the refit.
 
-- [x] G102: The method copy states what the audit found unstated: POWER's shared cells, the global-ocean overlap with the basins, absent root-zone soil moisture at the ice sheets, and significance not being size.
+- [x] G114: The method copy states what the audit found unstated: POWER's shared cells, the global-ocean overlap with the basins, absent root-zone soil moisture at the ice sheets, and significance not being size.
   CHECK: uv run python scripts/verify_refit.py
   EXPECT: REFIT CHECKS PASS
   EVIDENCE: four `ok` lines for `0.5° × 0.625°` (141 duplicate station variables), `already counted inside them` (global ocean vs the eight basins), `no root-zone soil moisture at all` (12 stations), `distinguishable from noise at 5%, not large`; the app narrative closes with "this is a trend detection, not an attribution — and significance is not size".
 
-- [x] G103: Nothing that worked before is broken: every local check in the suite (data, bundle, gazetteer, search, resolve, rag, plans, locate, offline, textures, clean, proxy, red herring, ocean, sea ice, export, build, first load, app) still passes.
+- [x] G115: Nothing that worked before is broken: every local check in the suite (data, bundle, gazetteer, search, resolve, rag, plans, locate, offline, textures, clean, proxy, red herring, ocean, sea ice, export, build, first load, app) still passes.
   CHECK: SKIP_LIVE=1 bash scripts/verify_all.sh
   EXPECT: all checks passed
   EVIDENCE: `all checks passed` with 19 `verified` lines including `data verified`, `bundle verified`, `ocean verified: 2,672 ocean cells · 9 regions`, `sea ice verified`, `export verified`, `app verified`. One regression was caught and fixed on the way: the ocean refit first recomputed q across the aggregate too, and `verify_ocean.mjs` failed with "Global ocean 1990-2025 borrows a basin q value"; the refit now excludes `family: aggregate` and leaves its q null, as the build does.
 
-- [ ] G104: The result is committed to main and pushed.
+- [ ] G116: The result is committed to main and pushed.
   CHECK: git status --porcelain
   EXPECT: (clean)
   EVIDENCE: pending
 
-MET: 102
+MET: 114
 UNMET: 2
 ABANDONED: 0
