@@ -24,7 +24,7 @@
 // This file is shared by the Workers entry (worker/index.js) and the Vite
 // dev/preview middleware, so both paths run identical validation and caching.
 
-import { chooseWindow, parseTime, variableFromQuestion } from "../src/rag.js";
+import { chooseWindow, climateTypo, editDistance, parseTime, variableFromQuestion } from "../src/rag.js";
 
 const UPSTREAM_TIMEOUT_MS = 8_000;
 const MAX_QUESTION_LENGTH = 240;
@@ -156,6 +156,9 @@ export function placeQuery(question) {
         token &&
         !QUESTION_WORDS.has(token) &&
         !CLIMATE_WORDS.has(token) &&
+        // A misspelt climate word is not part of the place name; leaving it in
+        // would drag coverage below the floor and hide a real place beside it.
+        !climateTypo(token) &&
         !/^(19|20)\d{2}$/.test(token)
     );
   return kept.join(" ").trim().slice(0, MAX_PLACE_QUERY);
@@ -202,24 +205,6 @@ const MIN_COVERAGE = 0.6;
 /** A name people keep in mind is a name they search for: "New York" over "York". */
 function populationPrior(population) {
   return 0.25 * Math.min(1, Math.log10((Number(population) || 0) + 1) / 7);
-}
-
-/** Levenshtein distance, abandoned as soon as it passes `limit`. */
-function editDistance(a, b, limit) {
-  if (Math.abs(a.length - b.length) > limit) return limit + 1;
-  let previous = Array.from({ length: b.length + 1 }, (_, index) => index);
-  for (let i = 1; i <= a.length; i += 1) {
-    const current = [i];
-    let rowBest = i;
-    for (let j = 1; j <= b.length; j += 1) {
-      const cost = a[i - 1] === b[j - 1] ? 0 : 1;
-      current[j] = Math.min(previous[j] + 1, current[j - 1] + 1, previous[j - 1] + cost);
-      if (current[j] < rowBest) rowBest = current[j];
-    }
-    if (rowBest > limit) return limit + 1;
-    previous = current;
-  }
-  return previous[b.length];
 }
 
 /**

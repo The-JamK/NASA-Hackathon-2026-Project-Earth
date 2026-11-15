@@ -76,7 +76,75 @@ export function resolvePlace(question, rag, points) {
     return { place: { global: true, name: "Global", lat: 0, lon: 0 }, resolved: true, alias: "global" };
   }
 
+  const typo = stationCandidates(text, points);
+  if (typo.length) {
+    const best = typo[0];
+    return {
+      place: best.point,
+      resolved: true,
+      alias: best.point.name,
+      corrected: true,
+      typed: best.typed,
+      candidates: typo.map(({ point }) => ({
+        id: point.id,
+        name: point.name,
+        country: point.country,
+        lat: point.lat,
+        lon: point.lon,
+        population: point.population,
+        kind: "station",
+      })),
+    };
+  }
+
   return { place: { global: true, name: "Global", lat: 0, lon: 0 }, resolved: false, alias: null };
+}
+
+/**
+ * Stations whose own name a question nearly spells.
+ *
+ * The bundle's 708 station records are better than any derived cell, so a
+ * one-edit misspelling should reach the station itself rather than fall through
+ * to the gazetteer and answer from a coarser 4° cell. Only the station's own name
+ * is compared — a country alias ("Kenya") is not a station — and only when the
+ * exact pass found nothing, so a correctly spelled name never becomes a typo.
+ *
+ * Returns the best few, because "Did you mean" is a question the reader answers.
+ */
+function stationCandidates(question, points) {
+  if (!Array.isArray(points) || !points.length) return [];
+  const tokens = tokenize(question);
+  if (!tokens.length) return [];
+
+  const windows = [];
+  for (let size = 1; size <= 3; size += 1) {
+    for (let start = 0; start + size <= tokens.length; start += 1) {
+      const words = tokens.slice(start, start + size);
+      windows.push({ text: words.join(" "), compact: words.join("") });
+    }
+  }
+
+  const found = new Map();
+  for (const point of points) {
+    const key = fold(point.name).replace(/ /g, "");
+    const limit = typoLimit(key.length);
+    // Short names make a one-letter difference a different word; skip them.
+    if (key.length < 5 || !limit) continue;
+    for (const window of windows) {
+      if (Math.abs(window.compact.length - key.length) > limit) continue;
+      // The typed word has to be most of the name, not a fragment of it.
+      if (key.length / Math.max(window.compact.length, 1) < 0.6) continue;
+      const distance = editDistance(window.compact, key, limit);
+      if (!distance || distance > limit) continue;
+      const score = 1 - distance / Math.max(window.compact.length, key.length);
+      const current = found.get(point.id);
+      if (!current || score > current.score) found.set(point.id, { point, score, typed: window.text });
+    }
+  }
+
+  return [...found.values()]
+    .sort((a, b) => b.score - a.score || (b.point.population || 0) - (a.point.population || 0))
+    .slice(0, 3);
 }
 
 /**
@@ -261,32 +329,134 @@ export function chooseWindow(time, windows) {
   return windows.find((key) => key.startsWith("2010")) || windows[windows.length - 1];
 }
 
+/* ------------------------------------------------------- spelling tolerance */
+
+/** Levenshtein distance, abandoned as soon as it passes `limit`. */
+export function editDistance(a, b, limit) {
+  if (Math.abs(a.length - b.length) > limit) return limit + 1;
+  let previous = Array.from({ length: b.length + 1 }, (_, index) => index);
+  for (let i = 1; i <= a.length; i += 1) {
+    const current = [i];
+    let rowBest = i;
+    for (let j = 1; j <= b.length; j += 1) {
+      const cost = a[i - 1] === b[j - 1] ? 0 : 1;
+      current[j] = Math.min(previous[j] + 1, current[j - 1] + 1, previous[j - 1] + cost);
+      if (current[j] < rowBest) rowBest = current[j];
+    }
+    if (rowBest > limit) return limit + 1;
+    previous = current;
+  }
+  return previous[b.length];
+}
+
+/** How many edits a word of this length may carry: one per five letters. */
+export function typoLimit(length) {
+  return length >= 10 ? 3 : length >= 7 ? 2 : length >= 5 ? 1 : 0;
+}
+
+/** Lowercase, accent-free, single-spaced, so "Reykjavík" meets "Reykjavik". */
+function fold(text) {
+  return String(text || "")
+    .normalize("NFKD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, " ")
+    .trim();
+}
+
 /**
- * The variable a question names, from the wording alone. Exported because the
- * resolver (`worker/resolve.js`) reads the same vocabulary for places the bundle
- * does not hold, so a niche question and a station question agree on the variable.
+ * The climate vocabulary, grouped by the variable each group asks for. The
+ * regexes are what runs; `repair` holds the ordinary spellings a mangled word
+ * is matched against, because "precipitiation" has to find precipitation without
+ * a rain word in it.
  */
-export function variableFromQuestion(question) {
+const CLIMATE_TERMS = [
+  {
+    code: "PRECTOTCORR",
+    label: "precipitation",
+    words:
+      /\b(rain|rainfall|raining|precip|precipitation|dry|drier|drying|drought|wet|wetter|monsoon|storm)\b/i,
+    repair: ["precipitation", "rainfall", "drought", "monsoon"],
+  },
+  {
+    code: "GWETROOT",
+    label: "soil moisture",
+    words: /\b(soil|moisture|wetness|root|agriculture|land)\b/i,
+    repair: ["moisture", "wetness"],
+  },
+  {
+    code: "ALLSKY_SFC_SW_DWN",
+    label: "solar radiation",
+    words: /\b(solar|sun|sunlight|radiation|sunshine|irradiance|cloud|cloudiness|bright)\b/i,
+    repair: ["radiation", "sunshine", "cloudiness"],
+  },
+  {
+    code: "T2M",
+    label: "temperature",
+    words: /\b(temperature|temp|warm|warming|warmed|heat|hot|cold|cool|degrees)\b/i,
+    repair: ["temperature", "warming"],
+  },
+];
+
+/**
+ * One word of a question repaired to the climate word it nearly is.
+ *
+ * Only words of five letters or more are considered: "hot" and "sun" are short
+ * enough that a one-edit neighbour is usually a different word, and a wrong
+ * variable is a worse answer than a fallback.
+ */
+export function climateTypo(question) {
+  const text = String(question || "");
+  const folded = fold(text);
+  let best = null;
+  for (const term of CLIMATE_TERMS) {
+    for (const word of term.repair) {
+      for (const token of folded.split(" ")) {
+        if (token.length < 6 || Math.abs(token.length - word.length) > typoLimit(word.length)) continue;
+        const distance = editDistance(token, word, typoLimit(word.length));
+        if (!distance || distance > typoLimit(word.length)) continue;
+        const score = 1 - distance / Math.max(token.length, word.length);
+        // The word shown back is the one that was matched, not the variable's
+        // name: "drougt" was read as "drought", not as "precipitation".
+        if (!best || score > best.score) {
+          best = { code: term.code, typed: token, word, score };
+        }
+      }
+    }
+  }
+  return best;
+}
+
+/**
+ * The variable a question names, from the wording alone, with the correction it
+ * had to make. Exported because the resolver (`worker/resolve.js`) reads the same
+ * vocabulary for places the bundle does not hold, so a niche question and a
+ * station question agree on the variable.
+ */
+export function readVariable(question) {
   const text = String(question || "").toLowerCase();
-  if (/\b(rain|rainfall|raining|precip|precipitation|dry|drier|drying|drought|wet|wetter|monsoon|storm)\b/i.test(text)) {
-    return "PRECTOTCORR";
+  for (const term of CLIMATE_TERMS) {
+    if (term.words.test(text)) return { code: term.code, corrected: null };
   }
-  if (/\b(soil|moisture|wetness|root|agriculture|land)\b/i.test(text)) return "GWETROOT";
-  if (/\b(solar|sun|sunlight|radiation|sunshine|irradiance|cloud|cloudiness|bright)\b/i.test(text)) {
-    return "ALLSKY_SFC_SW_DWN";
-  }
-  if (/\b(temperature|temp|warm|warming|warmed|heat|hot|cold|cool|degrees)\b/i.test(text)) return "T2M";
-  return null;
+  const typo = climateTypo(question);
+  if (typo) return { code: typo.code, corrected: { typed: typo.typed, word: typo.word } };
+  return { code: null, corrected: null };
+}
+
+export function variableFromQuestion(question) {
+  return readVariable(question).code;
 }
 
 function chooseVariable(question, place, ranked) {
   const top = ranked[0]?.id || "T2M";
 
   if (place.global || place.cells) {
-    return "GISTEMP";
+    return { code: "GISTEMP", corrected: null };
   }
 
-  return variableFromQuestion(question) || (top === "GISTEMP" ? "T2M" : top);
+  const read = readVariable(question);
+  if (read.code) return read;
+  return { code: top === "GISTEMP" ? "T2M" : top, corrected: null };
 }
 
 function matchedTerms(question, variable) {
@@ -358,7 +528,8 @@ export function planCase(question, { rag, points, variables, countries, ocean, s
 
   const time = parseTime(clean);
   const iceCode = iceRecord ? seaIceVariableCode(clean) : null;
-  const code = iceRecord ? iceCode : chooseVariable(clean, place, ranked);
+  const chosen = iceRecord ? { code: iceCode, corrected: null } : chooseVariable(clean, place, ranked);
+  const code = chosen.code;
   const base = variables.find((item) => item.code === code) || variables[0];
   const variable = iceRecord ? seaIceVariable(iceCode) : useOcean ? oceanVariable(base) : base;
   const windowKey = chooseWindow(time, ["1990-2025", "2000-2025", "2010-2025"]);
@@ -374,10 +545,18 @@ export function planCase(question, { rag, points, variables, countries, ocean, s
         ? `"${alias}" is a country, so this is the mean of its ${place.stations} station${
             place.stations === 1 ? "" : "s"
           }`
-        : `${alias ? `"${alias}"` : "the named place"} resolves to ${place.name}`;
-  const termPhrase = terms.length
-    ? `matched ${terms.map((term) => `"${term}"`).join(", ")} to ${variable.short.toLowerCase()}`
-    : `the closest supported variable is ${variable.short.toLowerCase()}`;
+        : city.corrected
+          ? `"${city.typed}" was read as ${place.name}${
+              place.country ? `, ${place.country}` : ""
+            }, which is one of the bundle's stations`
+          : `${alias ? `"${alias}"` : "the named place"} resolves to ${place.name}`;
+  // A repaired climate word is stated as the reading it is; "the closest
+  // supported variable" would describe a guess the app did not have to make.
+  const termPhrase = chosen.corrected
+    ? `read "${chosen.corrected.typed}" as ${chosen.corrected.word}`
+    : terms.length
+      ? `matched ${terms.map((term) => `"${term}"`).join(", ")} to ${variable.short.toLowerCase()}`
+      : `the closest supported variable is ${variable.short.toLowerCase()}`;
 
   const topScore = ranked[0]?.score || 0;
   const confidence = Math.max(0.42, Math.min(0.97, 0.56 + topScore * 0.65 - (resolved ? 0 : 0.08)));
@@ -387,6 +566,7 @@ export function planCase(question, { rag, points, variables, countries, ocean, s
     : iceQuestion
       ? "No sea-ice record is loaded here, so the case below is the named basin's sea surface temperature, which is the nearest supported record."
       : "";
+
 
   return {
     question: clean,
@@ -419,5 +599,11 @@ export function planCase(question, { rag, points, variables, countries, ocean, s
       .map((item) => variables.find((variable) => variable.code === item.id))
       .filter(Boolean),
     note: [time.note, iceNote].filter(Boolean).join(" "),
+    // A station the question only nearly spelled: the caller offers the station
+    // rather than quietly answering from it, and keeps the typed word for the
+    // explanation.
+    corrected: Boolean(city.corrected),
+    candidates: city.candidates || [],
+    variableCorrection: chosen.corrected || null,
   };
 }

@@ -2418,6 +2418,9 @@ async function handleAsk(question) {
   renderPlan(plan);
   // On a phone the intake panel scrolls; bring the plan's buttons into view.
   if (plan) els.plan.scrollIntoView({ block: "nearest" });
+  // A station whose name the question nearly spells is offered, not quietly
+  // used: the popup says which station it read and the alternatives beside it.
+  if (plan?.corrected) showSuggestions(plan);
   // A global plan the question did not ask for is the planner saying "no place
   // in this bundle matches". That is the derived case: resolve the name, then
   // answer from the field.
@@ -2452,9 +2455,11 @@ function suggestionLabel(candidate) {
   const kind =
     candidate.kind === "region"
       ? (candidate.subtype || "region").toLowerCase()
-      : candidate.kind === "place"
-        ? "city"
-        : "place";
+      : candidate.kind === "station"
+        ? "station"
+        : candidate.kind === "place"
+          ? "city"
+          : "place";
   const people =
     candidate.kind === "region" || !(candidate.population > 0)
       ? ""
@@ -2468,6 +2473,15 @@ function hideSuggestions() {
 
 function chooseSuggestion(resolution, candidate) {
   hideSuggestions();
+  // A station candidate is one the bundle already holds: choosing it opens the
+  // station's own case instead of swapping in a derived cell.
+  const station = candidate.id ? state.byId.get(candidate.id) : null;
+  if (station) {
+    planForCity(station.id);
+    els.plan.scrollIntoView({ block: "nearest" });
+    showToast(`Using ${station.name}${station.country ? `, ${station.country}` : ""}`);
+    return;
+  }
   const plan = derivedPlan({ ...resolution, place: { ...candidate, detail: "" } });
   if (!plan) return;
   state.plan = plan;

@@ -497,6 +497,21 @@ Last verified: 2026-11-14
   MANUAL: Cloud browser, built site, 1440x900, temporary probe removed before committing.
   EVIDENCE: With a temporary probe (grep now finds 0 hits in `hero.js`, and the built page reports `typeof window.__heroProbe === "undefined"`), two samples 9.465 s apart read `rotation.y` 0.48957 -> 1.96083 = 0.15544 rad/s, one turn in 40.42 s, against the 0.15708 target (1% low, timing noise) and the 0.12581 measured at the 50 s setting; `camera.up` was `[0, 1, 0]` and `pov` `[-6.5, 145]` at both samples. The screenshot shows New Guinea across the middle of the disc with Australia below-right and Asia above, no upward lean: `artifacts/hero-png-final.png`, plus a second frame 4 s later (`artifacts/hero-png-final-t1.png`). `scripts/verify_all.sh` passes on this build.
 
-MET: 96
+- [x] G98: A misspelt climate word asks the right variable, and the plan says which word it read.
+  CHECK: node scripts/verify_resolve.mjs
+  EXPECT: resolver verified
+  EVIDENCE: `readVariable()` keeps the old keyword regexes and only when none of them fires does it repair one word against the climate vocabulary — `precipitation`, `rainfall`, `drought`, `monsoon`, `moisture`, `wetness`, `radiation`, `sunshine`, `cloudiness`, `temperature`, `warming` — within the length-scaled typo budget and only for words of six letters or more, because a wrong variable is a worse answer than a fallback. `verify_resolve.mjs` asserts `"Is precipitiation in Nairobi changing?"` asks PRECTOTCORR, reports `variableCorrection {typed: "precipitiation", word: "precipitation"}`, and says `read "precipitiation" as precipitation; "nairobi" resolves to Nairobi` in its explanation; `"Is temperture in Chicago rising?"` asks T2M. In the browser the plan read `Precipitation (corrected) · Chicago` with the same explanation, and running it opened `CASE-20CA` on rainfall (−0.04 mm/day per decade) rather than silently answering temperature.
+
+- [x] G99: A misspelt station name opens the station's own case and offers it in the popup, instead of falling through to a coarser derived cell.
+  CHECK: node scripts/verify_resolve.mjs
+  EXPECT: resolver verified
+  EVIDENCE: `stationCandidates()` compares the question's one-, two- and three-word windows against the 708 station names only — never country aliases — and only after the exact pass found nothing, so a correct name can never be "repaired". `"Is Nairobii getting hotter?"` returns Nairobi with `corrected: true` and `candidates[0] = {id: "nairobi", kind: "station"}`; `"Is Melborne warming?"` returns Melbourne the same way. In the browser the ask showed a "Did you mean" popup containing exactly `Nairobi station · Kenya · 3M`, the plan behind it read `"nairobii" was read as Nairobi, Kenya, which is one of the bundle's stations`, and choosing the candidate replaced it with the station plan (Nairobi · 1990–2025 · °C). The same two steps produced the same popup and plan on a plain static server over `dist`, so no server is needed for this either.
+
+- [x] G100: The tolerance does not fire on names that are already right, and it does not hide the place standing next to a misspelt climate word.
+  CHECK: node scripts/verify_resolve.mjs && node scripts/verify_search.mjs && npm run build
+  EXPECT: search verified
+  EVIDENCE: Exact questions are untouched: Nairobi, Paris, Sydney, Chicago and Gold Coast all come back with `corrected: false` and `variableCorrection: null`, and the typo budget is zero below five letters so short words are never mangled. A misspelt climate word is dropped from the place query in `worker/resolve.js` (`climateTypo` in the `placeQuery` filter) — without that, `"precipitiation"` stayed in the name, dragged coverage under the 0.6 floor and hid the city beside it; `"Is precipitiation in London changing?"` now places London and asks PRECTOTCORR, which `verify_resolve.mjs` asserts through `handleResolve`. `verify_search.mjs` and `verify_resolve.mjs` both pass, the build succeeds, and first-load is 294 kB gzip (+1 kB).
+
+MET: 99
 UNMET: 1
 ABANDONED: 0

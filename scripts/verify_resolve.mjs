@@ -393,6 +393,56 @@ const NOMINATIM_BROADBEACH = [
   check(gold.expanded === false, "Gold Coast was wrongly marked an expansion");
 }
 
+// 13. A climate word or a station name that is nearly right still asks the right
+//     question, and the plan says what it had to read.
+{
+  const context = {
+    rag: read("public/data/rag_index.json"),
+    points: points.points,
+    variables,
+    countries: [],
+    ocean: [],
+    seaIce: [],
+  };
+
+  const wet = planCase("Is precipitiation in Nairobi changing?", context);
+  check(wet?.variable?.code === "PRECTOTCORR", `a misspelt precipitation asked ${wet?.variable?.code}`);
+  check(wet?.variableCorrection?.typed === "precipitiation", "the variable correction was not reported");
+  check(
+    wet?.variableCorrection?.word === "precipitation",
+    `the correction named ${wet?.variableCorrection?.word}`
+  );
+  check(wet?.place?.name === "Nairobi", `the place beside it became ${wet?.place?.name}`);
+  check(wet?.corrected === false, "an exact station name was flagged as a typo");
+  check(
+    /read "precipitiation" as precipitation/i.test(wet?.explanation || ""),
+    `the plan does not say what it read: ${wet?.explanation}`
+  );
+
+  const warm = planCase("Is temperture in Chicago rising?", context);
+  check(warm?.variable?.code === "T2M", `a misspelt temperature asked ${warm?.variable?.code}`);
+
+  const station = planCase("Is Nairobii getting hotter?", context);
+  check(station?.place?.name === "Nairobi", `Nairobii resolved to ${station?.place?.name}`);
+  check(station?.kind === "city", `Nairobii became a ${station?.kind} case`);
+  check(station?.corrected === true, "the station typo was not flagged");
+  check(station?.candidates?.[0]?.id === "nairobi", "the station was not offered as the first candidate");
+  check(station?.candidates?.[0]?.kind === "station", "the candidate is not a station");
+
+  const clean = planCase("Is Nairobi getting hotter?", context);
+  check(clean?.corrected === false, "an exact station name was flagged as a typo");
+  check(clean?.variableCorrection === null, "an exact climate word was flagged");
+
+  // A misspelt climate word is not part of the place name. Left in the query it
+  // sank coverage below the floor and hid the place standing next to it.
+  const resolved = await (
+    await call({ question: "Is precipitiation in London changing?" }, { fetchImpl: geocoderStub({}) })
+  ).json();
+  check(resolved.ok === true, `the resolver could not place a misspelt-rain question: ${resolved.error}`);
+  check(/london/i.test(resolved.place?.name || ""), `the place became ${resolved.place?.name}`);
+  check(resolved.variable === "PRECTOTCORR", `the resolver read ${resolved.variable}`);
+}
+
 if (failures) {
   console.error(`\n${failures} resolver check(s) failed`);
   process.exit(1);

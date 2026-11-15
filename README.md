@@ -329,6 +329,14 @@ cell nearest the division's label point, and the notice says so. Every candidate
 carries its own coordinates, so choosing one costs no extra request on either host.
 `scripts/verify_search.mjs` pins that behaviour.
 
+The same tolerance covers the rest of the question. A station name one letter off
+(`Nairobii`, `Melborne`) is matched to the bundle's own station and offered in a
+"Did you mean" popup — choosing it opens that station's record instead of a
+derived cell. A misspelt climate word (`precipitiation`, `temperture`, `drougt`)
+still asks the right variable, and the plan says so: `read "precipitiation" as
+precipitation`. Only words of six letters or more are repaired, and only when no
+ordinary climate word matched, so a correct question never gets "corrected".
+
 Vite uses relative asset paths (`base: "./"`) and the app resolves data,
 textures and point imagery through `import.meta.env.BASE_URL`, so the build works
 under the repository subpath rather than only at the domain root.
