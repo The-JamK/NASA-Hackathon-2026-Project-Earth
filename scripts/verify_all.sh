@@ -7,6 +7,8 @@ cd "$(dirname "$0")/.."
 uv run python scripts/verify_data.py
 uv run python scripts/verify_countries.py
 node scripts/verify_bundle.mjs
+node scripts/verify_gazetteer.mjs
+node scripts/verify_search.mjs
 node scripts/verify_resolve.mjs
 uv run --with pytest pytest -q
 node scripts/verify_rag.mjs

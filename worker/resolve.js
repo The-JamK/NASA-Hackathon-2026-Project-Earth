@@ -161,71 +161,193 @@ export function placeQuery(question) {
   return kept.join(" ").trim().slice(0, MAX_PLACE_QUERY);
 }
 
-/** Gazetteer rows -> matchable entries. Called once per isolate. */
-export function indexGazetteer(places = []) {
+/**
+ * Gazetteer rows -> matchable entries. Called once per isolate.
+ *
+ * Cities arrive as `[name, country, lat, lon, population, altNames]`; states and
+ * provinces as `[name, country, lat, lon, type, altNames]`, where the label point
+ * stands in for the division. Both become the same entry shape, tagged with the
+ * kind so the answer can say whether it means a city or a state.
+ */
+export function indexGazetteer(rows = [], { kind = "place" } = {}) {
   const entries = [];
-  for (const row of places) {
+  for (const row of rows) {
     if (!Array.isArray(row) || row.length < 4) continue;
-    const [name, country, lat, lon, population = 0, alt = ""] = row;
-    if (!Number.isFinite(lat) || !Number.isFinite(lon)) continue;
-    const keys = [name, ...String(alt).split(",")]
+    const [rawName, rawCountry, rawLat, rawLon, extra = 0, alt = ""] = row;
+    const lat = Number(rawLat);
+    const lon = Number(rawLon);
+    const name = String(rawName || "").trim();
+    if (!name || !Number.isFinite(lat) || !Number.isFinite(lon)) continue;
+    const keys = [name, ...String(alt || "").split(",")]
       .map(foldPlace)
       .filter((key) => key.length >= 3 && !IGNORED_NAMES.has(key));
     if (!keys.length) continue;
     entries.push({
-      name: String(name),
-      country: String(country || ""),
-      lat: Number(lat),
-      lon: Number(lon),
-      population: Number(population) || 0,
+      name,
+      country: String(rawCountry || "").trim(),
+      lat,
+      lon,
+      population: kind === "place" ? Number(extra) || 0 : 0,
+      kind,
+      subtype: kind === "region" ? String(extra || "").trim() : "",
       keys: [...new Set(keys)],
     });
   }
   return entries;
 }
 
-function better(candidate, best) {
-  if (!best) return true;
-  if (candidate.rank[0] !== best.rank[0]) return candidate.rank[0] > best.rank[0];
-  return candidate.rank[1] > best.rank[1];
+const PREFIX_MIN_QUERY = 5;
+const MIN_COVERAGE = 0.6;
+
+/** A name people keep in mind is a name they search for: "New York" over "York". */
+function populationPrior(population) {
+  return 0.25 * Math.min(1, Math.log10((Number(population) || 0) + 1) / 7);
+}
+
+/** Levenshtein distance, abandoned as soon as it passes `limit`. */
+function editDistance(a, b, limit) {
+  if (Math.abs(a.length - b.length) > limit) return limit + 1;
+  let previous = Array.from({ length: b.length + 1 }, (_, index) => index);
+  for (let i = 1; i <= a.length; i += 1) {
+    const current = [i];
+    let rowBest = i;
+    for (let j = 1; j <= b.length; j += 1) {
+      const cost = a[i - 1] === b[j - 1] ? 0 : 1;
+      current[j] = Math.min(previous[j] + 1, current[j - 1] + 1, previous[j - 1] + cost);
+      if (current[j] < rowBest) rowBest = current[j];
+    }
+    if (rowBest > limit) return limit + 1;
+    previous = current;
+  }
+  return previous[b.length];
 }
 
 /**
- * The longest gazetteer name the question mentions wins, so "gold coast" beats a
- * stray "coast", and the most populous place breaks a tie between identical names
- * (Springfield, and Springfield).
+ * How well one gazetteer key fits the question, or null.
  *
- * A name typed without its space — "Goldcoast", the way the question usually
- * gets written — is the same place, so a second pass compares the words run
- * together. It only runs when nothing matched with spaces, and only for names of
- * five characters or more, because a short key would match inside other words.
+ * - `exact` — the key appears as whole words ("gold coast").
+ * - `exact` with initials — the question is a prefix and only abbreviations
+ *   follow, which is how "washington" reaches "Washington, D.C.".
+ * - `prefix` — the question is the start of a longer name ("san" -> San Diego).
+ * - `compact` — the spaces were left out ("goldcoast").
  */
-export function matchGazetteer(question, entries = []) {
-  const folded = foldPlace(question);
-  if (folded.length < 3) return null;
-  const haystack = ` ${folded} `;
-
-  let best = null;
-  for (const entry of entries) {
-    for (const key of entry.keys) {
-      if (!haystack.includes(` ${key} `)) continue;
-      const candidate = { place: entry, alias: key, rank: [key.length, entry.population] };
-      if (better(candidate, best)) best = candidate;
-    }
+function rateKey(key, folded, place, compact) {
+  // How much of the typed name a key accounts for. "gold coast" is covered by
+  // "gold coast"; the Kenyan region "Coast" covers half of it and is not an
+  // answer to that question.
+  const coverage = Math.min(1, key.length / Math.max(place.length, 1));
+  if (` ${folded} `.includes(` ${key} `)) return { base: 1, match: "exact", coverage };
+  if (place.length >= PREFIX_MIN_QUERY && key.startsWith(`${place} `)) {
+    const extra = key.slice(place.length).trim().split(" ").filter(Boolean);
+    const initials = extra.length > 0 && extra.every((word) => word.length <= 3);
+    // "washington" only reaches "Washington, D.C." because the rest is initials,
+    // and the reader deserves to see that expansion rather than be told it.
+    return initials
+      ? { base: 0.98, match: "expanded", coverage: 1 }
+      : { base: 0.9, match: "prefix", coverage: 1 };
   }
-  if (best) return best;
-
-  const compact = folded.replace(/ /g, "");
-  for (const entry of entries) {
-    for (const key of entry.keys) {
-      const needle = key.replace(/ /g, "");
-      if (needle.length < 5 || !compact.includes(needle)) continue;
-      const candidate = { place: entry, alias: key, rank: [needle.length, entry.population] };
-      if (better(candidate, best)) best = candidate;
-    }
+  const compactKey = key.replace(/ /g, "");
+  // The key has to be most of what was typed: "goldcoast" should not match a
+  // region that happens to be called "Coast".
+  if (compact.includes(compactKey) && compactKey.length >= Math.max(5, Math.ceil(compact.length * 0.6))) {
+    return { base: 0.85, match: "compact", coverage: Math.min(1, compactKey.length / Math.max(compact.length, 1)) };
   }
-  return best;
+  return null;
 }
+
+/** A typo, not a different place: only run when nothing else matched. */
+function rateTypo(key, compact) {
+  const compactKey = key.replace(/ /g, "");
+  const longest = Math.max(compact.length, compactKey.length);
+  // "illonoisis" is three edits from "illinois" (o for i, then the doubled
+  // ending), so the budget has to grow with the word: one edit per five letters.
+  const limit = longest >= 10 ? 3 : longest >= 7 ? 2 : longest >= 5 ? 1 : 0;
+  if (!limit) return null;
+  const distance = editDistance(compact, compactKey, limit);
+  if (!distance || distance > limit) return null;
+  return {
+    base: 0.75 * (1 - distance / longest),
+    match: "typo",
+    distance,
+    coverage: Math.min(1, compactKey.length / Math.max(compact.length, 1)),
+  };
+}
+
+/**
+ * Every plausible place for a question, best first.
+ *
+ * Searching returns a list rather than one answer because a name alone is
+ * ambiguous — there are 20-odd Washingtons — and because a near miss ("illonoisis")
+ * should come back with what it probably meant instead of a refusal. The caller
+ * decides whether to use the best one silently or to ask.
+ */
+export function searchPlaces(question, entries = [], { limit = 4 } = {}) {
+  const folded = foldPlace(question);
+  if (folded.length < 3 || !entries.length) return [];
+  // The name the question is about, with the question and the variable removed:
+  // "Is Washington getting hotter?" -> "washington". Fuzzy and prefix matching
+  // work on this, never on the whole sentence, or every name would look like a
+  // typo of "is ... getting hotter".
+  const place = placeQuery(question) || folded;
+  const compact = place.replace(/ /g, "");
+  const found = new Map();
+
+  const consider = (entry, hit) => {
+    // A fragment is not a place: the key has to account for most of the name the
+    // question actually used.
+    if ((hit.coverage ?? 1) < MIN_COVERAGE) return;
+    const id = `${foldPlace(entry.name)}|${foldPlace(entry.country)}|${entry.kind}`;
+    const score = hit.base + populationPrior(entry.population);
+    const current = found.get(id);
+    if (current && current.score >= score) return;
+    found.set(id, { entry, score, match: hit.match, distance: hit.distance || 0 });
+  };
+
+  for (const entry of entries) {
+    for (const key of entry.keys) {
+      const hit = rateKey(key, folded, place, compact);
+      if (hit) consider(entry, hit);
+    }
+  }
+
+  if (!found.size) {
+    for (const entry of entries) {
+      for (const key of entry.keys) {
+        const hit = rateTypo(key, compact);
+        if (hit) consider(entry, hit);
+      }
+    }
+  }
+
+  return [...found.values()]
+    .sort((a, b) => b.score - a.score || b.entry.population - a.entry.population)
+    .slice(0, limit);
+}
+
+/** The best single match, in the shape the older callers expect. */
+export function matchGazetteer(question, entries = []) {
+  const [best] = searchPlaces(question, entries, { limit: 1 });
+  if (!best) return null;
+  return { place: best.entry, alias: best.entry.keys[0], match: best.match, rank: [best.score, best.entry.population] };
+}
+
+/** The public face of a candidate: enough to build a case without another call. */
+export function candidateOf(item) {
+  return {
+    name: item.entry.name,
+    country: item.entry.country,
+    lat: item.entry.lat,
+    lon: item.entry.lon,
+    kind: item.entry.kind,
+    subtype: item.entry.subtype,
+    population: item.entry.population,
+    score: Number(item.score.toFixed(3)),
+    match: item.match,
+  };
+}
+
+/** Two answers this close are both worth offering: that is the popup. */
+export const AMBIGUITY_MARGIN = 0.12;
 
 /** The variable and window the question asks for, from the app's own vocabulary. */
 export function readIntent(question) {
@@ -297,11 +419,16 @@ function takeBudget(now) {
 export async function handleResolve(request, options = {}) {
   const {
     places = [],
+    regions = [],
     entries: providedEntries,
     providers = GEOCODERS,
     fetchImpl = fetch,
     now = () => new Date(),
   } = options;
+
+  const entries =
+    providedEntries ||
+    [...indexGazetteer(places), ...indexGazetteer(regions, { kind: "region" })];
 
   if (request.method === "GET") {
     // A capability probe: which resolvers are available, and how many places the
@@ -309,7 +436,7 @@ export async function handleResolve(request, options = {}) {
     return jsonResponse(
       {
         ok: true,
-        places: (providedEntries || indexGazetteer(places)).length,
+        places: entries.length,
         providers: providers.map((provider) => provider.id),
         attribution: providers.map((provider) => provider.attribution),
       },
@@ -348,8 +475,8 @@ export async function handleResolve(request, options = {}) {
     return jsonResponse({ ...cached.body, cache: "hit" }, 200);
   }
 
-  const entries = providedEntries || indexGazetteer(places);
-  const local = matchGazetteer(question, entries);
+  const candidates = searchPlaces(question, entries);
+  const local = candidates[0] || null;
   const base = {
     ok: true,
     question,
@@ -360,19 +487,33 @@ export async function handleResolve(request, options = {}) {
   };
 
   if (local) {
+    const region = local.entry.kind === "region";
     const body = {
       ...base,
       place: {
-        name: local.place.name,
-        country: local.place.country,
-        lat: local.place.lat,
-        lon: local.place.lon,
+        name: local.entry.name,
+        country: local.entry.country,
+        lat: local.entry.lat,
+        lon: local.entry.lon,
+        kind: local.entry.kind,
+        subtype: local.entry.subtype,
       },
       source: "gazetteer",
       provider: null,
-      providerLabel: "the Natural Earth gazetteer",
-      attribution: "Natural Earth populated places, public domain",
-      note: "Place resolved from the Natural Earth gazetteer; the GISTEMP field supplies the numbers.",
+      providerLabel: region
+        ? `the Natural Earth gazetteer (${(local.entry.subtype || "region").toLowerCase()})`
+        : "the Natural Earth gazetteer",
+      attribution: "Natural Earth populated places and admin-1 boundaries, public domain",
+      note: region
+        ? `Read as ${local.entry.subtype || "a state or province"}; the GISTEMP field supplies the numbers at its centre.`
+        : "Place resolved from the Natural Earth gazetteer; the GISTEMP field supplies the numbers.",
+      candidates: candidates.map(candidateOf),
+      // Two possible meanings: the runner-up is close enough to be plausible.
+      ambiguous: candidates.length > 1 && candidates[1].score >= local.score - AMBIGUITY_MARGIN,
+      // The answer is a name the question did not spell out ("washington" ->
+      // Washington, D.C.), so it has to be shown, not assumed.
+      expanded: local.match === "expanded" || local.match === "prefix",
+      corrected: local.match === "typo",
     };
     cache.set(cacheKey, { storedAt: current.getTime(), body });
     while (cache.size > CACHE_LIMIT) cache.delete(cache.keys().next().value);
@@ -443,6 +584,9 @@ export async function handleResolve(request, options = {}) {
     providerLabel: found.provider.label,
     attribution: found.provider.attribution,
     note: `Coordinates from ${found.provider.label} (${found.provider.attribution}); the GISTEMP field supplies the numbers.`,
+    candidates: [],
+    ambiguous: false,
+    corrected: false,
   };
   cache.set(cacheKey, { storedAt: current.getTime(), body });
   while (cache.size > CACHE_LIMIT) cache.delete(cache.keys().next().value);

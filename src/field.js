@@ -11,7 +11,13 @@
 // resolver is a gazetteer first and a keyless public geocoder second, so there is
 // nothing to configure — no key ever reaches this module.
 
-import { indexGazetteer, matchGazetteer, readIntent } from "../worker/resolve.js";
+import {
+  AMBIGUITY_MARGIN,
+  candidateOf,
+  indexGazetteer,
+  readIntent,
+  searchPlaces,
+} from "../worker/resolve.js";
 
 const RESOLVE_TIMEOUT_MS = 15_000;
 const GAZETTEER_TIMEOUT_MS = 10_000;
@@ -44,31 +50,47 @@ async function localPlace(question, fetchImpl) {
       if (!response.ok) return null;
       const payload = await response.json();
       const rows = Array.isArray(payload) ? payload : payload?.places || [];
-      gazetteerEntries = indexGazetteer(rows);
+      const regions = Array.isArray(payload) ? [] : payload?.regions || [];
+      gazetteerEntries = [
+        ...indexGazetteer(rows),
+        ...indexGazetteer(regions, { kind: "region" }),
+      ];
     } catch {
       return null;
     }
   }
 
-  const match = matchGazetteer(question, gazetteerEntries);
-  if (!match?.place) return null;
+  const candidates = searchPlaces(question, gazetteerEntries);
+  const best = candidates[0];
+  if (!best) return null;
   const intent = readIntent(question);
+  const region = best.entry.kind === "region";
   return {
     ok: true,
     place: {
-      name: match.place.name,
-      country: match.place.country,
+      name: best.entry.name,
+      country: best.entry.country,
       detail: "",
-      lat: match.place.lat,
-      lon: match.place.lon,
+      kind: best.entry.kind,
+      subtype: best.entry.subtype,
+      lat: best.entry.lat,
+      lon: best.entry.lon,
     },
     source: "gazetteer",
     provider: null,
-    providerLabel: "the bundled Natural Earth gazetteer",
-    attribution: "Natural Earth populated places, public domain",
-    note: "This page placed the name from its bundled gazetteer; the GISTEMP field supplies the numbers.",
+    providerLabel: region
+      ? `the bundled gazetteer (${(best.entry.subtype || "region").toLowerCase()})`
+      : "the bundled Natural Earth gazetteer",
+    attribution: "Natural Earth populated places and admin-1 boundaries, public domain",
+    note: region
+      ? `Read as ${best.entry.subtype || "a state or province"}; the GISTEMP field supplies the numbers at its centre.`
+      : "This page placed the name from its bundled gazetteer; the GISTEMP field supplies the numbers.",
     variable: intent.variable,
     windowKey: intent.windowKey,
+    candidates: candidates.map(candidateOf),
+    ambiguous: candidates.length > 1 && candidates[1].score >= best.score - AMBIGUITY_MARGIN,
+    expanded: best.match === "expanded" || best.match === "prefix",
+    corrected: best.match === "typo",
   };
 }
 
@@ -142,6 +164,8 @@ export async function resolveQuestion(question, { fetchImpl = fetch } = {}) {
       name: String(place.name || clean).slice(0, 80),
       country: String(place.country || "").slice(0, 60),
       detail: String(place.detail || "").slice(0, 80),
+      kind: place.kind === "region" ? "region" : "place",
+      subtype: String(place.subtype || "").slice(0, 40),
       lat,
       lon,
     },
@@ -152,6 +176,10 @@ export async function resolveQuestion(question, { fetchImpl = fetch } = {}) {
     note: payload.note || "",
     variable: payload.variable || "T2M",
     windowKey: payload.windowKey || "1990-2025",
+    candidates: Array.isArray(payload.candidates) ? payload.candidates : [],
+    ambiguous: Boolean(payload.ambiguous),
+    expanded: Boolean(payload.expanded),
+    corrected: Boolean(payload.corrected),
   };
 }
 
@@ -170,9 +198,13 @@ export function derivedPlan(resolution) {
     windowKey: resolution.windowKey,
     confidence: resolution.source === "gazetteer" ? 0.74 : 0.68,
     explanation:
-      `"${resolution.place.name.toLowerCase()}" is not one of the bundle's stations, ` +
-      `so this case is the GISTEMP field over its coordinate` +
-      (resolution.place.country ? ` (${resolution.place.country})` : ""),
+      resolution.place.kind === "region"
+        ? `"${resolution.place.name.toLowerCase()}" is a state or province, not a station, ` +
+          `so this case is the GISTEMP field at its centre` +
+          (resolution.place.country ? ` (${resolution.place.country})` : "")
+        : `"${resolution.place.name.toLowerCase()}" is not one of the bundle's stations, ` +
+          `so this case is the GISTEMP field over its coordinate` +
+          (resolution.place.country ? ` (${resolution.place.country})` : ""),
     sources: `NASA GISTEMP v4 · nearest 4° cell to ${resolution.place.name} · baseline 1951–1980`,
     cities: [],
     alternatives: [],
