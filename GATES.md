@@ -675,6 +675,11 @@ Last verified: 2026-11-14
   EXPECT: found 0 vulnerabilities
   EVIDENCE: `found 0 vulnerabilities` with 88 packages installed (d3, globe.gl, three, topojson-client, world-atlas, vite 7). Python: `uv run --with pip-audit pip-audit` → `No known vulnerabilities found` against the resolved numpy/pandas/scipy/statsmodels/xarray/requests/earthaccess/pillow/rasterio set.
 
-MET: 132
+- [x] G134: The committed live snapshot carries this hour's conditions for every featured point that had one.
+  CHECK: uv run python scripts/verify_data.py
+  EXPECT: data verified
+  EVIDENCE: Credentials alone were not enough: `fetch_meteomatics` is cache-first (`if path.exists() … return`), so a build with valid credentials would still have shipped the 2026-11-14 snapshot and labelled it current. The six stale `data/cache/meteomatics/*.json` files were cleared and the build's own helper re-run against `.env`: 6/6 refreshed at `2026-11-15T08:00:00Z` — nairobi 23.3 °C / 3.0 m/s, niamey 26.8 / 2.8, delhi 25.8 / 1.0, london 2.7 / 1.3, manaus 26.6 / 1.8, sydney 18.7 / 5.1 — matching the live `/api/live` answer for the same hour. The diff is 3 lines (`points.json` is one line, `sources.json` two: `generated_utc` and the detail that no longer claims "snapshot carried from the cache; no credentials in this environment"). `verify_data` → `points: 708 · featured: 14 · live: 6` and `data verified`; `verify_bundle` → 8,460 summaries agree, index 199 kB gzip of 1,671 kB; `verify_firstload` → 294 kB gzip critical path, under the 1,050 kB limit.
+
+MET: 133
 UNMET: 1
 ABANDONED: 0
