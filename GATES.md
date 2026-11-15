@@ -458,6 +458,15 @@ Last verified: 2026-11-14
   MANUAL: Cloud browser, built site, 1440x900.
   EVIDENCE: `#suggestions .chip` returns exactly 4 nodes: `Is the Sahel getting drier?`, `Is Nairobi warming?`, `Is the Pacific warming?` (chip-ocean) and `Is Gold Coast getting hotter?` (chip-derived) — neither removed chip is present. Typing `Is the Arctic sea ice shrinking?` into the ask box still plans `CASE PLAN 56% MATCH Sea ice extent Arctic sea ice · 12-month mean · 1990–2025 · 10⁶ km²`, and typing `Is McMurdo warming?` still plans `CASE PLAN 72% MATCH Temperature at 2 m McMurdo · 1990–2025 · °C`, so only the chips were removed, not the cases. Screenshot: `artifacts/ask-chips.png`. `scripts/verify_all.sh` passes on this build after one rerun: the first run's only failure was `verify_live.sh` seeing 503 from GitHub Pages mid-deploy for `/dist/index.html`, which returned 404 seconds later and passes standalone.
 
-MET: 89
+- [x] G90: The hero opens centred on Papua New Guinea with a neutral, upright view, and spins faster than one turn per 50 s.
+  CHECK: node scripts/verify_app.mjs
+  EXPECT: app verified
+  EVIDENCE: `START_LAT` moves from -25.3 to -6.5 and `START_LNG` from 133.8 to 145.0, which puts New Guinea on the disc's midline instead of Australia, so nothing sits tilted up above the centre; `camera.up.set(0, 1, 0)` already keeps the view neutral and is unchanged, and `controls.autoRotate` stays off. `SPIN_IDLE` goes from `(2 * Math.PI) / 50` to `(2 * Math.PI) / 40` — one eastward turn per 40 s, 1.25x the old rate — with hover still a fifth of it. `verify_app.mjs` expects the new latitude, longitude and rate, so a silent revert fails.
+
+- [x] G91: On the built page the island is centred and upright, and the measured spin matches one turn in 40 s.
+  MANUAL: Cloud browser, built site, 1440x900, temporary probe removed before committing.
+  EVIDENCE: With a temporary probe (grep now finds 0 hits in `hero.js`, and the built page reports `typeof window.__heroProbe === "undefined"`), two samples 9.465 s apart read `rotation.y` 0.48957 -> 1.96083 = 0.15544 rad/s, one turn in 40.42 s, against the 0.15708 target (1% low, timing noise) and the 0.12581 measured at the 50 s setting; `camera.up` was `[0, 1, 0]` and `pov` `[-6.5, 145]` at both samples. The screenshot shows New Guinea across the middle of the disc with Australia below-right and Asia above, no upward lean: `artifacts/hero-png-final.png`, plus a second frame 4 s later (`artifacts/hero-png-final-t1.png`). `scripts/verify_all.sh` passes on this build.
+
+MET: 91
 UNMET: 1
 ABANDONED: 0

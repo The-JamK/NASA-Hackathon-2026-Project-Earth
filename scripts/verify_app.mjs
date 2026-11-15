@@ -134,9 +134,9 @@ if (!heroSource.includes('CASE_URL = "./app.html"')) {
 }
 // The hero opens over Australia and turns the way Earth turns, standing upright.
 for (const marker of [
-  "const START_LAT = -25.3",
-  "const START_LNG = 133.8",
-  "const SPIN_IDLE = (2 * Math.PI) / 50",
+  "const START_LAT = -6.5",
+  "const START_LNG = 145.0",
+  "const SPIN_IDLE = (2 * Math.PI) / 40",
   "rotation.y +=",
   "controls.autoRotate = false",
   "camera.up.set(0, 1, 0)",

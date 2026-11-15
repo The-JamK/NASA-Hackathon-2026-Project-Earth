@@ -8,13 +8,14 @@ import Globe from "globe.gl";
 
 const BASE_URL = import.meta.env.BASE_URL || "/";
 
-// Open over Australia, then let the planet turn under a fixed camera.
-const START_LAT = -25.3;
-const START_LNG = 133.8;
+// Open centred on Papua New Guinea, then let the planet turn under a fixed
+// camera: the island sits on the disc's midline, with nothing leaning above it.
+const START_LAT = -6.5;
+const START_LNG = 145.0;
 // Lower altitude = larger globe on screen.
 const altitudeFor = (width) => (width < 700 ? 2.05 : width < 1080 ? 1.82 : 1.44);
-// Earth stands upright here — no axial lean — and spins eastward once per 50 s.
-const SPIN_IDLE = (2 * Math.PI) / 50;
+// Earth stands upright here — no axial lean — and spins eastward once per 40 s.
+const SPIN_IDLE = (2 * Math.PI) / 40;
 const SPIN_HOVER = SPIN_IDLE / 5;
 const CASE_URL = "./app.html";
 
