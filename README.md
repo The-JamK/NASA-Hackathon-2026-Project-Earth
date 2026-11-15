@@ -333,6 +333,12 @@ is Washington, D.C., and the popup offers all three. A station name is only
 repaired for a real typo — one edit at the same length — so `Nairobii` reaches
 Nairobi but `Washington` never becomes Wellington.
 
+The variable comes from the words too, including comparatives: `hotter` and
+`cooler` are temperature, `wetter` and `drier` are rainfall, `sunnier` is solar
+radiation, and the plan names the word it matched (`matched "hotter" to
+temperature`) rather than calling it a guess. Asking for a state or province
+still needs no special phrasing.
+
 The same tolerance covers the rest of the question. A station name one letter off
 (`Nairobii`, `Melborne`) is matched to the bundle's own station and offered in a
 "Did you mean" popup — choosing it opens that station's record instead of a

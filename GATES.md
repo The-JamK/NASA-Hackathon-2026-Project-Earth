@@ -598,29 +598,39 @@ Last verified: 2026-11-14
   EXPECT: ocean verified
   EVIDENCE: On merged `main` this failed: `FAIL: "south ocean" planned country at South Korea`. The country repair budget is three edits for a ten-letter name, and `southocean` is three edits from `southkorea` with a shared first letter, so `"south ocean"` was repaired into South Korea and the equal-length tie-break handed it the question. A repaired hit may now only displace a name that is itself repaired: `(!countryHit.corrected || !oceanHit || oceanHit.corrected)` in `useCountry`, and the ocean/country length comparison defers to an uncorrected ocean alias on a tie. Measured after the fix: `"Is south ocean warming?"` → `ocean southern-ocean` (358 cells, 75–55°S), while `"Is ocean warming?"` → global ocean, `"Is southern ocean warming?"` → Southern Ocean and `"Is south atlantic warming?"` → South Atlantic are unchanged, and `verify_ocean`, `verify_resolve` and `verify_search` all pass.
 
-- [ ] G118: The motion is small and can be switched off: every keyframe animates only opacity or transform, nothing runs longer than 1.2 s except the loader spinner, the case stagger tops out at 0.15 s, at least five controls give press feedback, and the reduced-motion block still zeroes both animation and transition durations.
+- [x] G118: A comparative word names the variable it asks about.
+  CHECK: node scripts/verify_rag.mjs
+  EXPECT: rag verified
+  EVIDENCE: `Is Brisbane getting hotter?` was answering temperature only because temperature is the first document in the vector index: `rankVariables("hotter")` scores 0.000 for every variable, the vocabulary had `hot` but not `hotter`, so the plan fell through to "the closest supported variable is temperature". `Is Brisbane getting sunnier?` fell through the same way and answered temperature — the wrong record for that question. The vocabulary now carries the comparatives (`hotter`, `hottest`, `warmer`, `warmest`, `cooler`, `coolest`, `colder`, `coldest`, `heating`, `warmth` for temperature; `sunny`, `sunnier`, `sunniest`, `cloudier`, `brighter` for solar; `wettest`, `driest` for rainfall), and `readVariable` returns the word that matched so the plan can say `matched "hotter" to temperature` instead of describing a guess. Measured in the browser: `Is Brisbane getting hotter?` opens **Temperature at 2 m, Brisbane** with that sentence, and `Is Brisbane getting sunnier?` opens **Surface solar irradiance**. `verify_rag.mjs` pins hotter, cooler and sunnier; `verify_typos.mjs`, `verify_resolve.mjs`, `verify_ocean.mjs` and `verify_seaice.mjs` still pass.
+
+- [x] G119: A near-miss country or basin name is repaired by at most two edits, whatever the name's length.
+  CHECK: node scripts/verify_ocean.mjs
+  EXPECT: ocean verified
+  EVIDENCE: G117 stopped a repaired country from displacing an exact basin alias; this is the independent guard underneath it, so the repair cannot fire at all. `typoLimit(10) = 3` gave a ten-letter name a three-edit budget, and `southocean` is three edits from `southkorea`, which is how a correctly spelled Southern Ocean alias was read as South Korea. Country and basin repairs are now capped at two edits regardless of length — the lesson the station matcher already learned, where three edits turned Washington into Wellington. Measured: `south ocean` and `southern ocean` plan **Southern Ocean**, while `Austraila` → Australia, `Cannda` → Canada and `Indain Ocean` → Indian Ocean still repair; `verify_ocean`, `verify_resolve`, `verify_typos`, `verify_rag` and `verify_seaice` all pass.
+
+- [x] G120: The motion is small and can be switched off: every keyframe animates only opacity or transform, nothing runs longer than 1.2 s except the loader spinner, the case stagger tops out well under a tenth of a second, at least five controls give press feedback, and the reduced-motion block still zeroes both animation and transition durations.
   CHECK: node scripts/verify_motion.mjs
   EXPECT: MOTION CHECK PASS
   EVIDENCE: `exit=0`, output `8 keyframe blocks parsed · every animation declaration stays within 1.2s (the spinner excepted) · case stagger: 7 steps, last delay 0.08s · 8 controls give press feedback · reduced motion zeroes animation and transition durations for every element · MOTION CHECK PASS`. Red before it was green: on the untouched stylesheet the same command printed `FAIL: no case-panel entrance stagger found`, `FAIL: the case panel's children are not given the settle animation` and `FAIL: only 0 rules give press feedback` and exited 1. Two rules were softened after the first visual check: the settle starts at opacity 0.45 and travels 3px over 0.22s (it began at opacity 0 and read as a flash over a glass panel), and the stagger's ceiling came down from 0.15s to 0.08s.
 
-- [ ] G119: Every check that passed before still passes with the motion in place — no layout, wording, data or routing regression.
+- [x] G121: Every check that passed before still passes with the motion in place — no layout, wording, data or routing regression.
   CHECK: SKIP_LIVE=1 bash scripts/verify_all.sh
   EXPECT: all checks passed
   EVIDENCE: `all checks passed` with the motion check as its third step (`MOTION CHECK PASS`) and every previous check unchanged: `data verified`, `bundle verified`, `ocean verified`, `sea ice verified`, `export verified`, `app verified`, `case layout: narrative paragraph above the verdict block`, `verdict: tone fills the box, no left bar · snapshot chip carries no dot`. First-load cost is unchanged at `critical path 294 kB gzip` against the 1,025 kB budget, so the 3 kB of stylesheet does not reach the first case.
 
-- [ ] G120: With reduced motion requested the app animates nothing and still renders a full case file.
+- [x] G122: With reduced motion requested the app animates nothing and still renders a full case file.
   MANUAL: measured in the cloud browser with `prefers-reduced-motion: reduce`.
   EVIDENCE: Signed-in cloud browser, `Emulation.setEmulatedMedia` with `prefers-reduced-motion: reduce`: `matchMedia("(prefers-reduced-motion: reduce)").matches` true, the first case block's `animation-duration` `1e-06s`, and every direct child of the case panel already at `opacity 1` the moment the case opened. The case rendered in full — verdict `OPEN AND SHUT +0.31°C / decade · Significant warming · 95% CI +0.24 to …` — so the motion switches off without hiding anything. Screenshot: `artifacts/motion-case-reduced.png`.
 
-- [ ] G121: The motion reads as a panel settling, not a show: the case file mid-settle and at rest look like the same screen, and nothing is hidden once it lands.
+- [x] G123: The motion reads as a panel settling, not a show: the case file mid-settle and at rest look like the same screen, and nothing is hidden once it lands.
   MANUAL: screenshots of the opening case at two moments.
   EVIDENCE: `artifacts/motion-case-mid.png` is the case frozen 80 ms into its settle: the panel itself is fully opaque (`opacity 1`, background `rgba(9, 15, 23, 0.9)`), the case id, title and chips are at 0.92–0.83, the narrative and the blocks under it at 0.78–0.63, and the layout is identical to rest — a cascade, not a fade-in. `artifacts/motion-case-rest.png` is the same screen 500 ms later. In an untouched flow after a variable switch all 15 children read `opacity 1` with no running animations, and after opening a different case all 14 do with the panel at `opacity 1`, so nothing stays dim. The first deliberate check caught a real defect: freezing every animation on the page also rewound the panel's own pre-existing 0.5s fade, and the frame looked washed out — which is why the settle now starts at 0.45 and no longer fades the panel body.
 
-- [ ] G122: The result is committed to main and pushed.
+- [ ] G124: The result is committed to main and pushed.
   CHECK: git status --porcelain --untracked-files=no
   EXPECT: (no output)
   EVIDENCE: pending
 
-MET: 120
+MET: 122
 UNMET: 2
 ABANDONED: 0

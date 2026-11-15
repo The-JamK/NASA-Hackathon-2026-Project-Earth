@@ -229,7 +229,10 @@ export function resolveCountry(question, countries) {
   // global ocean is a worse answer than repairing one letter. It may never
   // replace a name that was spelled correctly — "Australia" is one edit from
   // "Austria", and an exact name is not a typo of a different one.
-  const fuzzy = fuzzyRecord(question, countries);
+  // Two edits at most, however long the name: three let "south ocean" become
+  // "south korea", the same over-generous budget that turned Washington into
+  // Wellington in the station matcher.
+  const fuzzy = fuzzyRecord(question, countries, { maxEdits: 2 });
   if (fuzzy && (!best || covers(fuzzy.alias, best.alias))) {
     return { country: fuzzy.record, alias: fuzzy.alias, corrected: true, typed: fuzzy.typed };
   }
@@ -252,7 +255,7 @@ export function resolveOcean(question, ocean) {
       if (!best || alias.length > best.alias.length) best = { region, alias };
     }
   }
-  const fuzzy = fuzzyRecord(question, ocean);
+  const fuzzy = fuzzyRecord(question, ocean, { maxEdits: 2 });
   if (fuzzy && (!best || covers(fuzzy.alias, best.alias))) {
     return { region: fuzzy.record, alias: fuzzy.alias, corrected: true, typed: fuzzy.typed };
   }
@@ -476,7 +479,7 @@ const CLIMATE_TERMS = [
     code: "PRECTOTCORR",
     label: "precipitation",
     words:
-      /\b(rain|rainfall|raining|precip|precipitation|dry|drier|drying|drought|wet|wetter|monsoon|storm)\b/i,
+      /\b(rain|rainfall|raining|precip|precipitation|dry|drier|driest|drying|drought|wet|wetter|wettest|monsoon|storm)\b/i,
     repair: ["precipitation", "rainfall", "drought", "monsoon"],
   },
   {
@@ -488,13 +491,15 @@ const CLIMATE_TERMS = [
   {
     code: "ALLSKY_SFC_SW_DWN",
     label: "solar radiation",
-    words: /\b(solar|sun|sunlight|radiation|sunshine|irradiance|cloud|cloudiness|bright)\b/i,
+    words:
+      /\b(solar|sun|sunny|sunnier|sunniest|sunlight|radiation|sunshine|irradiance|cloud|cloudier|cloudiness|bright|brighter|brightest)\b/i,
     repair: ["radiation", "sunshine", "cloudiness"],
   },
   {
     code: "T2M",
     label: "temperature",
-    words: /\b(temperature|temp|warm|warming|warmed|heat|hot|cold|cool|degrees)\b/i,
+    words:
+      /\b(temperature|temp|warm|warming|warmed|warmer|warmest|warmth|heat|heating|heated|hot|hotter|hottest|cold|colder|coldest|cool|cooler|coolest|cooling|degrees)\b/i,
     repair: ["temperature", "warming"],
   },
 ];
@@ -537,7 +542,10 @@ export function climateTypo(question) {
 export function readVariable(question) {
   const text = String(question || "").toLowerCase();
   for (const term of CLIMATE_TERMS) {
-    if (term.words.test(text)) return { code: term.code, corrected: null };
+    // The word that matched travels with the choice, so the plan can say
+    // `matched "hotter" to temperature` instead of calling it a closest guess.
+    const hit = text.match(term.words);
+    if (hit) return { code: term.code, corrected: null, matched: hit[0].toLowerCase() };
   }
   const typo = climateTypo(question);
   if (typo) return { code: typo.code, corrected: { typed: typo.typed, word: typo.word } };
@@ -676,7 +684,9 @@ export function planCase(question, { rag, points, variables, countries, ocean, s
     ? `read "${chosen.corrected.typed}" as ${chosen.corrected.word}`
     : terms.length
       ? `matched ${terms.map((term) => `"${term}"`).join(", ")} to ${variable.short.toLowerCase()}`
-      : `the closest supported variable is ${variable.short.toLowerCase()}`;
+      : chosen.matched
+        ? `matched "${chosen.matched}" to ${variable.short.toLowerCase()}`
+        : `the closest supported variable is ${variable.short.toLowerCase()}`;
 
   const topScore = ranked[0]?.score || 0;
   const confidence = Math.max(0.42, Math.min(0.97, 0.56 + topScore * 0.65 - (resolved ? 0 : 0.08)));
