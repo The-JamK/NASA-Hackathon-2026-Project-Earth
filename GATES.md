@@ -410,6 +410,12 @@ Last verified: 2026-11-14
   MANUAL: Cloud browser, built site, 1440x900.
   EVIDENCE: `document.documentElement.scrollHeight` is 900 against `window.innerHeight` 900, so there is no scrollbar; `innerText` contains no occurrence of the word scroll; the top bar's text is exactly `GAUSSIAN FRONTIERS` with zero links or buttons in it; six `.hero-box` articles remain, `.landing-main`, `footer` and `section.section` all return null and there are 0 such sections; `main` measures 834 px tall, filling the height under the 66 px bar. Clicking `#hero-globe` navigated to `/app.html` (title `Gaussian Frontiers — Signal & Noise`), which is now the only route into the app. Screenshot: `artifacts/hero-only.png`.
 
-MET: 79
+- [x] G80: A push to `main` redeploys the Worker, the same way it republishes Pages, and a repository without a Cloudflare token still goes green.
+  CHECK: curl -s https://api.github.com/repos/The-JamK/NASA-Hackathon-2026-Project-Earth/actions/runs/43660441943/jobs
+  EXPECT: the deploy job builds `dist` and either deploys or skips the deploy step with a notice
+  EVIDENCE: `.github/workflows/deploy-worker.yml` runs `npm ci && npm run build` on push to `main` and then `npx --yes wrangler@4 deploy` from `worker/` — the exact command that published the live Worker. The first run on commit `acb66e1` completed green (run 43660441943): checkout, setup-node, `npm ci`, `npm run build` and the credential check all succeeded, and `Deploy worker` reported **skipped** because the repository has no `CLOUDFLARE_API_TOKEN` yet — the run is not failed by a missing optional secret, so Pages keeps publishing and the Worker simply keeps its previous version. The guard's branching was also run outside CI both ways (`present=false` with no token, `present=true` with one). The account id defaults to the account's own id and can be overridden with a `CLOUDFLARE_ACCOUNT_ID` secret. Adding the token is one dashboard step; until then this workflow cannot be said to have deployed anything, only to have been wired correctly.
+  NOTE: The file is not on the default branch of the first push attempt — it was rebased past two teammate commits to `main` (`2847fed`, `8ff90cc`) before GitHub would register the workflow, which is why there is no earlier run.
+
+MET: 80
 UNMET: 1
 ABANDONED: 0
