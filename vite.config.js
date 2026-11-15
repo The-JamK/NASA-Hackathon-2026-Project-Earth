@@ -2,11 +2,14 @@ import { readFileSync, statSync } from "node:fs";
 import { defineConfig, loadEnv } from "vite";
 import { fileURLToPath } from "node:url";
 import { handleLive } from "./worker/live.js";
+import { handleResolve, indexGazetteer } from "./worker/resolve.js";
 
 const entry = (file) => fileURLToPath(new URL(file, import.meta.url));
 const POINTS_FILE = fileURLToPath(new URL("./public/data/points.json", import.meta.url));
+const GAZETTEER_FILE = fileURLToPath(new URL("./public/data/gazetteer.json", import.meta.url));
 
 let pointsCache = { mtimeMs: 0, points: [] };
+let gazetteerCache = { mtimeMs: 0, entries: [] };
 
 function readPoints() {
   const stat = statSync(POINTS_FILE);
@@ -19,18 +22,60 @@ function readPoints() {
   return pointsCache.points;
 }
 
-// Mirror the deployed Worker locally. Credentials come from .env and stay on
-// the dev-server side; the browser only sees the normalised JSON.
-function liveApi(env) {
+function readGazetteer() {
+  try {
+    const stat = statSync(GAZETTEER_FILE);
+    if (stat.mtimeMs !== gazetteerCache.mtimeMs) {
+      gazetteerCache = {
+        mtimeMs: stat.mtimeMs,
+        entries: indexGazetteer(JSON.parse(readFileSync(GAZETTEER_FILE, "utf8")).places || []),
+      };
+    }
+    return gazetteerCache.entries;
+  } catch {
+    // The gazetteer is built by `uv run python scripts/build_gazetteer.py`;
+    // without it the resolver still answers through the keyless geocoders.
+    return [];
+  }
+}
+
+function readBody(req) {
+  return new Promise((resolve, reject) => {
+    const chunks = [];
+    req.on("data", (chunk) => chunks.push(chunk));
+    req.on("end", () => resolve(Buffer.concat(chunks).toString("utf8")));
+    req.on("error", reject);
+  });
+}
+
+// Mirror the deployed Worker locally. Credentials come from .env and stay on the
+// dev-server side; the browser only sees the normalised JSON.
+function apiPlugin(env) {
   const middleware = async (req, res, next) => {
     const url = new URL(req.url, `http://${req.headers.host || "127.0.0.1"}`);
-    if (url.pathname !== "/api/live") return next();
+    if (!url.pathname.startsWith("/api/")) return next();
+
     try {
-      const response = await handleLive(new Request(url.toString(), { method: req.method }), {
-        points: readPoints(),
-        username: env.METEOMATICS_USERNAME,
-        password: env.METEOMATICS_PASSWORD,
-      });
+      let response;
+      if (url.pathname === "/api/live") {
+        response = await handleLive(new Request(url.toString(), { method: req.method }), {
+          points: readPoints(),
+          username: env.METEOMATICS_USERNAME,
+          password: env.METEOMATICS_PASSWORD,
+        });
+      } else if (url.pathname === "/api/resolve") {
+        const body = req.method === "POST" ? await readBody(req) : undefined;
+        response = await handleResolve(
+          new Request(url.toString(), {
+            method: req.method,
+            body,
+            headers: { "content-type": "application/json" },
+          }),
+          { entries: readGazetteer() }
+        );
+      } else {
+        return next();
+      }
       res.statusCode = response.status;
       response.headers.forEach((value, key) => res.setHeader(key, value));
       res.end(await response.text());
@@ -42,7 +87,7 @@ function liveApi(env) {
   };
 
   return {
-    name: "case-files-live-api",
+    name: "case-files-api",
     configureServer(server) {
       server.middlewares.use(middleware);
     },
@@ -60,7 +105,7 @@ export default defineConfig(({ mode }) => {
   return {
     base: "./",
     plugins: [
-      liveApi({
+      apiPlugin({
         METEOMATICS_USERNAME: env.METEOMATICS_USERNAME || process.env.METEOMATICS_USERNAME,
         METEOMATICS_PASSWORD: env.METEOMATICS_PASSWORD || process.env.METEOMATICS_PASSWORD,
       }),

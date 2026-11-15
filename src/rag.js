@@ -261,14 +261,13 @@ export function chooseWindow(time, windows) {
   return windows.find((key) => key.startsWith("2010")) || windows[windows.length - 1];
 }
 
-function chooseVariable(question, place, ranked) {
-  const text = question.toLowerCase();
-  const top = ranked[0]?.id || "T2M";
-
-  if (place.global || place.cells) {
-    return "GISTEMP";
-  }
-
+/**
+ * The variable a question names, from the wording alone. Exported because the
+ * resolver (`worker/resolve.js`) reads the same vocabulary for places the bundle
+ * does not hold, so a niche question and a station question agree on the variable.
+ */
+export function variableFromQuestion(question) {
+  const text = String(question || "").toLowerCase();
   if (/\b(rain|rainfall|raining|precip|precipitation|dry|drier|drying|drought|wet|wetter|monsoon|storm)\b/i.test(text)) {
     return "PRECTOTCORR";
   }
@@ -277,7 +276,17 @@ function chooseVariable(question, place, ranked) {
     return "ALLSKY_SFC_SW_DWN";
   }
   if (/\b(temperature|temp|warm|warming|warmed|heat|hot|cold|cool|degrees)\b/i.test(text)) return "T2M";
-  return top === "GISTEMP" ? "T2M" : top;
+  return null;
+}
+
+function chooseVariable(question, place, ranked) {
+  const top = ranked[0]?.id || "T2M";
+
+  if (place.global || place.cells) {
+    return "GISTEMP";
+  }
+
+  return variableFromQuestion(question) || (top === "GISTEMP" ? "T2M" : top);
 }
 
 function matchedTerms(question, variable) {
@@ -381,6 +390,10 @@ export function planCase(question, { rag, points, variables, countries, ocean, s
 
   return {
     question: clean,
+    // Whether a place, basin or record was actually named. A question that
+    // matched nothing falls through to the global field with resolved: false,
+    // which is the app's signal to ask the resolver for a coordinate.
+    resolved,
     variable,
     place,
     time,

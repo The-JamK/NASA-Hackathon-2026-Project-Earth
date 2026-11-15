@@ -4,18 +4,28 @@
 // the seed is actually wired into the ask chips.
 import { readFileSync } from "node:fs";
 import { deriveSteepUnproven } from "../src/herring.js";
+import { loadPoints } from "./bundle.mjs";
 
 function fail(message) {
   console.error(`FAIL: ${message}`);
   process.exit(1);
 }
 
-const points = JSON.parse(readFileSync(new URL("../public/data/points.json", import.meta.url), "utf8"));
+const points = loadPoints(new URL("../", import.meta.url));
 const windowKey = points.meta.windows[0];
 const featured = points.points.filter((point) => point.featured);
 
 const seed = deriveSteepUnproven(points.points, windowKey);
 if (!seed) fail(`no featured case in ${windowKey} is steep but unproven`);
+
+// The app derives it from the index alone, before any station record is
+// fetched: the summary has to pick the same case as the full trend records.
+const index = JSON.parse(readFileSync(new URL("../public/data/points.json", import.meta.url), "utf8"));
+const fromIndex = deriveSteepUnproven(index.points, windowKey);
+if (!fromIndex) fail("the shipped index cannot derive the red herring on its own");
+if (fromIndex.point.id !== seed.point.id) {
+  fail(`the index picks ${fromIndex.point.id}, the full bundle picks ${seed.point.id}`);
+}
 
 const trend = seed.trend;
 if (!seed.point.featured) fail("the seed is not a featured case");

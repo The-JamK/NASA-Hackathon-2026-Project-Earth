@@ -42,6 +42,18 @@ for (const [path, loader] of [
   if (!main.includes(`function ${loader}(`)) fail(`${loader} is missing`);
 }
 
+// The station index is the only station data on the critical path: no series, no
+// trend records, and a shard loader for the case that needs one.
+const index = JSON.parse(readFileSync(new URL("public/data/points.json", root), "utf8"));
+const leaked = index.points.filter((point) => point.series || point.trends);
+if (leaked.length) fail(`${leaked.length} stations still carry series or trends in the index`);
+if (!index.meta?.detail_shards) fail("the station index does not name its detail shards");
+if (index.points.some((point) => !point.summary || !Object.keys(point.summary).length)) {
+  fail("a station in the index has no verdict summary for the globe");
+}
+if (!main.includes("ensurePointDetail")) fail("main.js has no station detail loader");
+if (init[1].includes("point-details")) fail("a detail shard is back on the critical path");
+
 // Report the bytes the first case actually pays, and fail if they creep back up.
 const files = [
   "public/data/variables.json",
@@ -50,7 +62,7 @@ const files = [
   "public/data/sources.json",
   "dist/assets/app.js",
 ];
-const BUDGET = 2_400_000; // gzip bytes for the first case's code and bundles
+const BUDGET = 1_050_000; // gzip bytes for the first case's code and bundles
 let total = 0;
 const rows = [];
 for (const file of files) {
@@ -65,7 +77,7 @@ for (const file of files) {
   rows.push(`  ${file.padEnd(30)} ${(gz / 1024).toFixed(0).padStart(6)} kB gzip`);
 }
 
-if (total > BUDGET) fail(`the first case costs ${(total / 1024).toFixed(0)} kB gzip (budget 2344)`);
+if (total > BUDGET) fail(`the first case costs ${(total / 1024).toFixed(0)} kB gzip (budget 1025)`);
 
 console.log("first load verified: grid and country bundles are lazy");
 for (const row of rows) console.log(row);

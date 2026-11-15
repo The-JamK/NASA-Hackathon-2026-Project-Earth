@@ -4,6 +4,7 @@
 // instead of rounding it.
 import { readFileSync } from "node:fs";
 import { caseSlug, reportRows, seriesRows, toCsv } from "../src/export.js";
+import { loadPoints } from "./bundle.mjs";
 
 function fail(message) {
   console.error(`FAIL: ${message}`);
@@ -180,7 +181,9 @@ function checkCase(label, payload) {
   return { fields, rows: rows.length - 1 };
 }
 
-const points = J("points.json");
+// Stations now live in an index plus detail shards; the export check needs the
+// full records, so it reads the merged view.
+const points = loadPoints(new URL("../", import.meta.url));
 const countries = J("countries.json");
 const ocean = J("ocean.json");
 const seaice = J("seaice.json");
@@ -310,11 +313,15 @@ for (const marker of [
 ]) {
   if (!main.includes(marker)) fail(`main.js is missing ${marker}`);
 }
+// City, country, ocean, sea ice, grid cell, global field and the derived case.
+const RENDERERS = 7;
 const wired = (main.match(/setExport\(\{/g) || []).length;
-if (wired !== 6) fail(`only ${wired} of the 6 case renderers hand their numbers to the export`);
+if (wired !== RENDERERS) {
+  fail(`only ${wired} of the ${RENDERERS} case renderers hand their numbers to the export`);
+}
 
 console.log(
-  `export verified: station, country, ocean, both sea-ice measures, grid cell and global refit to their ` +
+  `export verified: station, country, ocean, both sea-ice measures, grid cell, global and the derived field case refit to their ` +
     `stored slopes (worst ${worstSlopeError.toExponential(1)} relative) · statistics copied unrounded · ` +
     `${slug} naming · CSV escaping and BOM`
 );

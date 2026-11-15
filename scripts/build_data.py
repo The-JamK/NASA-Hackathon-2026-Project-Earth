@@ -29,6 +29,7 @@ import numpy as np
 if __package__ in (None, ""):
     sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
+from scripts import points_bundle
 from scripts.build_cities import candidate_cities, fill_sparse_regions, merge_new_cities
 from scripts.envfile import load_env
 from scripts.fetch_sources import (
@@ -726,7 +727,9 @@ def main() -> int:
     points_path = PUBLIC / "points.json"
     existing_points: dict[str, dict[str, Any]] = {}
     if points_path.exists():
-        existing_payload = json.loads(points_path.read_text(encoding="utf-8"))
+        # The bundle is split in two tiers; the build needs the merged view so a
+        # rebuild can reuse the series it already has instead of refetching.
+        existing_payload = points_bundle.load_bundle(PUBLIC)
         existing_points = {point["id"]: point for point in existing_payload.get("points", [])}
 
     sources_path = PUBLIC / "sources.json"
@@ -777,7 +780,14 @@ def main() -> int:
     )
 
     points_payload = build_points(env, sources, [*curated, *new_rows, *sparse_rows], existing_points)
-    points_path.write_text(json.dumps(points_payload, ensure_ascii=False, separators=(",", ":")), encoding="utf-8")
+    # Two tiers: an index the app loads eagerly and per-shard detail it fetches
+    # when a case is opened. See scripts/points_bundle.py.
+    point_report = points_bundle.write_bundle(PUBLIC, points_payload)
+    print(
+        f"  points.json          {point_report['index_bytes'] / 1024:7.1f} KB index · "
+        f"{point_report['detail_bytes'] / 1024:7.1f} KB detail in "
+        f"{point_report['details']} shards"
+    )
 
     grid_path = PUBLIC / "grid.json"
     if args.skip_grid:
@@ -837,7 +847,6 @@ def main() -> int:
     print("\nwrote:")
     for name in (
         "variables.json",
-        "points.json",
         "grid.json",
         "rag_index.json",
         "countries.json",

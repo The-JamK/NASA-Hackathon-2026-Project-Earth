@@ -1,17 +1,23 @@
-// Workers entry: /api/live plus the static app. METEOMATICS_USERNAME and
-// METEOMATICS_PASSWORD are runtime secrets; they are never sent to the client.
+// Workers entry: /api/live and /api/resolve plus the static app.
+// METEOMATICS_USERNAME and METEOMATICS_PASSWORD are runtime secrets; they are
+// never sent to the client. The place resolver needs no key at all.
 
 import { handleLive } from "./live.js";
+import { handleResolve, indexGazetteer } from "./resolve.js";
 
 let pointsPromise = null;
+let gazetteerPromise = null;
+
+function assetJson(env, origin, path, label) {
+  return env.ASSETS.fetch(new URL(path, origin)).then((response) => {
+    if (!response.ok) throw new Error(`${label} returned ${response.status}`);
+    return response.json();
+  });
+}
 
 function loadPoints(env, origin) {
   if (!pointsPromise) {
-    pointsPromise = env.ASSETS.fetch(new URL("/data/points.json", origin))
-      .then((response) => {
-        if (!response.ok) throw new Error(`points.json returned ${response.status}`);
-        return response.json();
-      })
+    pointsPromise = assetJson(env, origin, "/data/points.json", "points.json")
       .then((payload) => payload.points || [])
       .catch((error) => {
         pointsPromise = null;
@@ -19,6 +25,20 @@ function loadPoints(env, origin) {
       });
   }
   return pointsPromise;
+}
+
+// The gazetteer is server-side only: the browser never downloads it, and the
+// index is built once per isolate rather than per request.
+function loadGazetteer(env, origin) {
+  if (!gazetteerPromise) {
+    gazetteerPromise = assetJson(env, origin, "/data/gazetteer.json", "gazetteer.json")
+      .then((payload) => indexGazetteer(payload.places || []))
+      .catch((error) => {
+        gazetteerPromise = null;
+        throw error;
+      });
+  }
+  return gazetteerPromise;
 }
 
 export default {
@@ -40,6 +60,18 @@ export default {
         username: env.METEOMATICS_USERNAME,
         password: env.METEOMATICS_PASSWORD,
       });
+    }
+
+    if (url.pathname === "/api/resolve") {
+      let entries = [];
+      try {
+        entries = await loadGazetteer(env, url.origin);
+      } catch {
+        // A missing gazetteer is not fatal: the model fallback can still run,
+        // and with neither the handler says so instead of guessing.
+        entries = [];
+      }
+      return handleResolve(request, { entries });
     }
 
     if (env.ASSETS) return env.ASSETS.fetch(request);
