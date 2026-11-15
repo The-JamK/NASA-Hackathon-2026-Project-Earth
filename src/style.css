@@ -248,6 +248,11 @@ a.source-pill:focus-visible {
 .case-panel {
   right: 24px;
   width: 418px;
+  /* The panel starts just under the top bar. On screens too narrow to hold it
+     and the map's controls in one row it stops a short gap above the legend. */
+  top: 72px;
+  bottom: 50px;
+  max-height: none;
 }
 
 /* No case open, no case panel: the right side stays clear for the globe. */
@@ -550,16 +555,9 @@ body.has-case .case-panel { display: block; }
 .case-head {
   display: flex;
   align-items: flex-start;
-  justify-content: space-between;
+  justify-content: flex-end;
   gap: 12px;
   margin-bottom: 12px;
-}
-
-.case-id {
-  font-size: 9px;
-  letter-spacing: 0.18em;
-  text-transform: uppercase;
-  color: var(--dim);
 }
 
 .case-close {
@@ -1422,7 +1420,8 @@ details.work p {
   z-index: 20;
   display: flex;
   align-items: center;
-  justify-content: space-between;
+  /* Legend and layer switch sit left of the case panel, not under it. */
+  justify-content: flex-start;
   gap: 18px;
   pointer-events: none;
 }
@@ -1481,18 +1480,6 @@ details.work p {
 
 .layer-switch button + button { border-left: 1px solid var(--line-strong); }
 .layer-switch button.on { color: var(--accent); background: rgba(95, 211, 224, 0.08); }
-
-.hint {
-  font-size: 9px;
-  letter-spacing: 0.12em;
-  text-transform: uppercase;
-  color: var(--dim);
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
-.hint.live { color: var(--accent); }
 
 /* ---------- loading + toast ---------- */
 
@@ -1696,6 +1683,27 @@ details.work p {
 
 /* ---------- responsive ---------- */
 
+/* Close rides in the panel's corner instead of holding a row above the title,
+   so the case starts at the top of the panel rather than under a gap. */
+@media (min-width: 901px) {
+  .case-panel { padding-top: 18px; }
+  .case-panel .case-head {
+    position: absolute;
+    top: 14px;
+    right: 16px;
+    margin: 0;
+  }
+  .case-panel .place-title { padding-right: 68px; }
+}
+
+/* Wide enough for the panel and the map's controls side by side: the panel runs
+   to the bottom of the screen and the legend and layer switch keep to the
+   column left of it, so the two never share a pixel. */
+@media (min-width: 1181px) {
+  .case-panel { bottom: 16px; }
+  body.has-case .bottom-bar { right: calc(24px + 418px + 16px); }
+}
+
 @media (max-width: 1180px) {
   .ask-panel { width: 320px; left: 16px; }
   .case-panel { width: 380px; right: 16px; }
@@ -1755,7 +1763,6 @@ details.work p {
   }
   .layer-switch { flex: 0 0 auto; }
   .layer-switch button { padding: 8px 10px; min-height: 32px; white-space: nowrap; }
-  .hint { display: none; }
 
   .case-close { padding: 10px 8px; margin: -10px -8px 0 4px; min-height: 40px; font-size: 10.5px; }
   .var-chip { padding: 8px 9px; min-height: 32px; }
@@ -1790,7 +1797,7 @@ details.work p {
   .plan-sources,
   .plan-meta { font-size: 10px; }
 
-  /* The sheet scrolls a long way, so the case id and Close stay pinned. */
+  /* The sheet scrolls a long way, so Close stays pinned. */
   .case-panel { padding-top: 0; }
   .case-head {
     position: sticky;
@@ -1863,7 +1870,6 @@ details.work p {
   .bottom-bar { bottom: calc(6px + env(safe-area-inset-bottom, 0px)); }
   .panel-lede,
   .panel-foot { display: none; }
-  .hint { display: none; }
 }
 
 /* ---------- landing page ---------- */
@@ -2183,7 +2189,7 @@ html.landing body {
   bottom: 26px;
   z-index: 45;
   margin: 0;
-  padding: 9px 16px 9px 14px;
+  padding: 9px 16px;
   border: 1px solid rgba(255, 255, 255, 0.18);
   border-radius: 999px;
   background: rgba(5, 8, 14, 0.9);
@@ -2200,17 +2206,6 @@ html.landing body {
   transition: opacity 0.22s ease, transform 0.22s ease;
 }
 
-.hero-toast::before {
-  content: "";
-  display: inline-block;
-  width: 6px;
-  height: 6px;
-  margin-right: 9px;
-  vertical-align: 1px;
-  border-radius: 50%;
-  background: #ff6b4a;
-}
-
 .hero-toast.is-shown {
   opacity: 1;
   transform: translate(-50%, 0);
@@ -2223,7 +2218,7 @@ html.landing body {
 }
 
 @media (max-width: 640px) {
-  .hero-toast { bottom: 16px; padding: 8px 14px 8px 12px; font-size: 12px; }
+  .hero-toast { bottom: 16px; padding: 8px 14px; font-size: 12px; }
   .topbar { height: 54px; padding: 0 14px; }
   .topbar .brand { font-size: 9.5px; letter-spacing: 0.18em; }
 }
