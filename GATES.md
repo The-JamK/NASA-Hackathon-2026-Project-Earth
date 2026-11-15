@@ -631,31 +631,84 @@ Last verified: 2026-11-14
   EXPECT: (no output)
   EVIDENCE: `git status --porcelain --untracked-files=no` prints nothing and `cloud_git push` reported `989b76b..0eefae5  HEAD -> main`. Two commits plus a merge: `71f5315` (the quiet motion and its check), `0eefae5` (merge of `main`'s comparative-vocabulary change, with this ledger's gates renumbered G120–G124 around its new G118–G119). `main` moved once during the work, from `64e6dfb` to `989b76b`. The only untracked path is `artifacts/`, the screenshots and deck renders that have never been in the repository.
 
+- [x] G125: A place name that comes back from a public geocoder cannot execute script in the derived case narrative.
+  CHECK: node scripts/verify_security.mjs
+  EXPECT: security verified
+  EVIDENCE: `derivedNarrative` drew `${place.name}` unescaped into two `innerHTML` sentences (`No complete annual series is available for the cell nearest …` and `read it as the region around …, not as the town itself`), and that name is third-party data: `worker/resolve.js` copies `place.name` from Open-Meteo or OpenStreetMap Nominatim (community-editable) into the answer, and `field.js` falls back to the raw question. All three draws are now `escapeHtml(place.name)`; the check counts 3 draws, requires each to start with `escapeHtml`, and first proves the hostile string `<img src=x onerror=alert(1)>` still reaches the page through the resolver, so the escape is the guard rather than luck.
 
-- [x] G125: The landing screen carries eight copy boxes, and the two new ones state who the site is for: the general public, with simple search and a clear answer; technical analysts, with the numbers, the calculations and data ready to download.
+- [x] G126: The metered Meteomatics quota behind `/api/live` cannot be spent by a public caller.
+  CHECK: node scripts/verify_security.mjs
+  EXPECT: security verified
+  EVIDENCE: Three gaps. `?ids=` was order-sensitive, so `?ids=b,a` and `?ids=a,b` were two cache entries and two upstream queries. The id list was unbounded, so one request could name 708 points = 29 upstream queries in one call. And nothing budgeted a miss at all, so a loop could burn the 1,000-query day in a minute. Now the list is deduplicated, sorted (one cache entry per set), capped at 60 ids with a 2,000-character query cap, and a cache miss is budgeted at 1,000 upstream coordinates a minute per isolate — 20 × 60-point requests allowed exactly 16 before 429, with 3 upstream queries each and every 17th refused; a warm case still answers from cache with 0 upstream queries. `rate_limited` carries `retry-after: 60`.
+
+- [x] G127: `/api/resolve` refuses an oversized body before it parses one.
+  CHECK: node scripts/verify_security.mjs
+  EXPECT: security verified
+  EVIDENCE: The handler called `request.json()` on whatever arrived, so a megabyte body became a string and a parse even though the question is capped at 240 characters. `content-length` is now checked first and the read body is checked again for a chunked request; both answer `413 body_too_large` with an 8 kB limit, and the stub geocoder counted 0 calls. Both JSON helpers now send `x-content-type-options: nosniff`.
+
+- [x] G128: Workers CI hands `CLOUDFLARE_API_TOKEN` only to the steps that use it.
+  CHECK: node scripts/verify_security.mjs
+  EXPECT: security verified
+  EVIDENCE: The token sat in the job-level `env:`, so `npm ci` and `npm run build` ran with a live Cloudflare token in their environment — any dependency install script could have read and exfiltrated it, and `npx wrangler@4` was not the only consumer. It is now scoped to the creds-check step and the deploy step only (exactly 2 × 10-space `env:` entries, 0 at job level). The committed `CLOUDFLARE_ACCOUNT_ID` is an account identifier, not a credential, and is left as the default.
+
+- [x] G129: The live proxy still costs one upstream query per case and keeps its cache.
+  CHECK: node scripts/verify_live_proxy.mjs
+  EXPECT: live proxy verified
+  EVIDENCE: `live proxy verified: 1 point = 1 upstream query, cache, chunking, 503/502/504/405/400` — unchanged after the budget, including the 60-point no-ids chunk test (3 queries) and the 400 for an unknown id.
+
+- [x] G130: The resolver contract is unchanged by the body cap.
+  CHECK: node scripts/verify_resolve.mjs
+  EXPECT: resolver verified
+  EVIDENCE: `resolver verified: 10974 gazetteer places · Gold Coast → Australia · keyless fallbacks open-meteo → nominatim · place query, validation, caching and rate limit checked · no API key anywhere`.
+
+- [x] G131: The production build still succeeds with the escaped render site.
+  CHECK: npm run build
+  EXPECT: built in
+  EVIDENCE: `✓ built in 2.48s`; `dist/assets/app.js` 205.19 kB (70.71 kB gzip), `style.js` 1,819.20 kB (515.93 kB gzip). The escaper survives minification (`&quot;` present once in the bundle).
+
+- [x] G132: No credential material is tracked or shipped, and the local `.env` is not readable by other local accounts.
+  MANUAL: `node scripts/verify_clean.mjs` plus a file-mode check.
+  EVIDENCE: `env: local .env is ignored; no tracked secrets` · `clean verified`; `git ls-files | grep -iE 'env|secret|key|pem|credentials|token'` lists only `.env.example` and `scripts/envfile.py`; `git log --all -- .env` is empty; an AKIA/gh*_/sk-/PEM/xox/AIza/Bearer scan over every tracked file matched nothing; a `METEOMATICS|EARTHDATA|password|api_key` scan over `dist/` found only the public source names (`Meteomatics`, `Earthdata`) in copy and data, never a value. `chmod 600 .env` applied (mode 600).
+
+- [x] G133: Neither dependency tree carries a published advisory.
+  CHECK: npm audit
+  EXPECT: found 0 vulnerabilities
+  EVIDENCE: `found 0 vulnerabilities` with 88 packages installed (d3, globe.gl, three, topojson-client, world-atlas, vite 7). Python: `uv run --with pip-audit pip-audit` → `No known vulnerabilities found` against the resolved numpy/pandas/scipy/statsmodels/xarray/requests/earthaccess/pillow/rasterio set.
+
+- [x] G134: The committed live snapshot carries this hour's conditions for every featured point that had one.
+  CHECK: uv run python scripts/verify_data.py
+  EXPECT: data verified
+  EVIDENCE: Credentials alone were not enough: `fetch_meteomatics` is cache-first (`if path.exists() … return`), so a build with valid credentials would still have shipped the 2026-11-14 snapshot and labelled it current. The six stale `data/cache/meteomatics/*.json` files were cleared and the build's own helper re-run against `.env`: 6/6 refreshed at `2026-11-15T08:00:00Z` — nairobi 23.3 °C / 3.0 m/s, niamey 26.8 / 2.8, delhi 25.8 / 1.0, london 2.7 / 1.3, manaus 26.6 / 1.8, sydney 18.7 / 5.1 — matching the live `/api/live` answer for the same hour. The diff is 3 lines (`points.json` is one line, `sources.json` two: `generated_utc` and the detail that no longer claims "snapshot carried from the cache; no credentials in this environment"). `verify_data` → `points: 708 · featured: 14 · live: 6` and `data verified`; `verify_bundle` → 8,460 summaries agree, index 199 kB gzip of 1,671 kB; `verify_firstload` → 294 kB gzip critical path, under the 1,050 kB limit.
+
+- [x] G135: A build can be asked for current conditions instead of the cached snapshot, so the snapshot does not have to be refreshed by deleting cache files by hand.
+  CHECK: uv run python scripts/build_data.py --help
+  EXPECT: --refresh-live
+  EVIDENCE: `--refresh-live` appears in the usage and groups with `--skip-grid` and `--skip-imagery`. The flag reaches `fetch_meteomatics(..., refresh=True)`, which skips the cache-first shortcut that made credentials alone useless for a refresh. Proved with a sentinel rather than a timestamp: writing `{"valid_time":"SENTINEL-FROM-CACHE"}` into `data/cache/meteomatics/nairobi.json` and calling the helper twice returned `SENTINEL-FROM-CACHE` with `refresh=False` and `2026-11-15T09:00:00Z · 24.4 °C` with `refresh=True`, and the cache file was rewritten — so the bypass is real, not a coincidence of both paths reading the same hour. A full `--refresh-live --skip-grid --skip-imagery` run also completed (`BUILD EXIT=0`, 708 points, 4,039 cells, 16 shards), but its data was **not** committed: a rebuild moves every stored statistic in the 14th–15th digit (708 of 708 summaries differ, e.g. `0.31298738738738535` → `…574`, with 0 verdict changes), which is float churn rather than a refresh. Reverted with `git checkout -- public/data`. Unrelated pre-existing note measured while checking this: `refit_bundle.py --check` reports `11,169 records differ` identically at `e69c166` and at HEAD, while the suite's own `verify_refit.py` passes — so the `--check` comparison is unstable on this bundle for a reason that predates this commit.
+
+- [x] G136: The landing screen carries eight copy boxes, and the two new ones state who the site is for: the general public, with simple search and a clear answer; technical analysts, with the numbers, the calculations and data ready to download.
   CHECK: node scripts/verify_hero.mjs
   EXPECT: HERO CHECK PASS
   EVIDENCE: `HERO CHECK PASS`, exit 0: eight boxes, one per position, each with copy; `the public box says it is made for the general public, through simple search and a clear answer`; `the analyst box says it is made for technical analysts, with detailed numbers and calculations fully explained`; `the analyst box says the data is organised and ready to download`; the formats named as CSV, Excel and R; `no leader lines or anchor dots`. `verify_app.mjs` now asserts the same two sentences and the count of eight, so the landing cannot quietly lose a box.
 
-- [x] G126: No em-dash remains anywhere a reader can meet one: the two pages, the app's source strings, the stylesheet's prose, the README, the demo notes, and the shipped data's labels.
+- [x] G137: No em-dash remains anywhere a reader can meet one: the two pages, the app's source strings, the stylesheet's prose, the README, the demo notes, and the shipped data's labels.
   CHECK: node scripts/verify_prose.mjs
   EXPECT: PROSE CHECK PASS
   EVIDENCE: `PROSE CHECK PASS`, exit 0, `scanned 25 files, 139 en-dashes kept in ranges` (the en-dashes in 1990–2025 stay). The first run failed with `121 em-dashes left (U+2014)`, and the sweep was done twice: the first attempt collapsed comma-plus-punctuation sequences and thereby ate JavaScript spread operators and Python variadic tuples in ten files (`{ points...creds }`, `tuple[str, Any]...`), which `node --check` and `py_compile` caught. The redo touches only the em-dash character and was gated on a before/after count of 17 spread operators, unchanged, with every JS and Python file compiling and all nine data files parsing afterwards.
 
-- [x] G127: All eight boxes hug the Earth and none of them collide, clip the viewport or spill across the sphere's centre, measured at several screen sizes.
+- [x] G138: All eight boxes hug the Earth and none of them collide, clip the viewport or spill across the sphere's centre, measured at several screen sizes.
   MANUAL: box rectangles against the stage and the globe, photographed.
   EVIDENCE: `getBoundingClientRect` in the browser at five sizes. Arc layout, the sphere between two columns of four: 1202x700, 1202x800, 1280x800, 1440x900 and 1920x1080, all `overlaps: []`, `clipped: []`, no page scroll. At 1440x900 the inner edges sit 360px (name), 441px (public and members) and 395px (about) from the centre line with the sphere between them, and the right column mirrors those numbers. Below 1200px the page keeps its existing stacked layout, name above the globe and the rest below: 1024x768 and 390x844 stack, scroll, and overlap nothing. Screenshots: `artifacts/hero-1440.png`, `artifacts/hero-1280.png`, `artifacts/hero-1024.png`, `artifacts/hero-390.png`, `artifacts/hero-390-full.png`.
 
-- [x] G128: Every check that passed before still passes with the new landing and the rewritten prose.
+- [x] G139: Every check that passed before still passes with the new landing and the rewritten prose.
   CHECK: SKIP_LIVE=1 bash scripts/verify_all.sh
   EXPECT: all checks passed
   EVIDENCE: `all checks passed` with the three new steps inside it (`MOTION CHECK PASS`, `PROSE CHECK PASS`, `HERO CHECK PASS`) and every earlier check unchanged, including `app verified`, `hero: eight copy boxes, no leader lines`, `case layout: narrative paragraph above the verdict block` and `verdict: tone fills the box, no left bar`. `npm run build` succeeds and first-load stays inside its 1,025 kB budget.
 
-- [ ] G129: The result is committed to main and pushed.
+- [ ] G140: The result is committed to main and pushed.
   CHECK: git status --porcelain --untracked-files=no
   EXPECT: (no output)
   EVIDENCE: pending
 
-MET: 127
+MET: 138
 UNMET: 2
 ABANDONED: 0

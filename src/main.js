@@ -1900,10 +1900,9 @@ function stationBlock(item) {
 
 function derivedNarrative(place, item, trend, variable, windowKey) {
   if (!trend) {
-    return `No complete annual series is available for the cell nearest ${place.name} in the ${windowKey.replace(
-      "-",
-      "–"
-    )} window.`;
+    return `No complete annual series is available for the cell nearest ${escapeHtml(
+      place.name
+    )} in the ${windowKey.replace("-", "–")} window.`;
   }
   const direction = trend.slope_per_decade >= 0 ? "rose" : "fell";
   const correction = trend.significant
@@ -1926,9 +1925,9 @@ function derivedNarrative(place, item, trend, variable, windowKey) {
     trend.ci_high_per_decade
   )}; n = ${trend.n}; HAC p ${pText(trend.p_value)}).${correction} The cell is ${distanceText(
     item.distanceKm
-  )} from the requested coordinate and covers roughly 440 km across, so read it as the region around ${
+  )} from the requested coordinate and covers roughly 440 km across, so read it as the region around ${escapeHtml(
     place.name
-  }, not as the town itself. This is a trend detection, not an attribution, and significance is not size.`;
+  )}, not as the town itself. This is a trend detection, not an attribution, and significance is not size.`;
 }
 
 function renderGlobalCase() {

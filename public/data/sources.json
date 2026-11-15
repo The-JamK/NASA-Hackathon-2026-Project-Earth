@@ -1,5 +1,5 @@
 {
- "generated_utc": "2026-11-14T08:11:17+00:00",
+ "generated_utc": "2026-11-15T08:59:07+00:00",
  "sources": [
   {
    "id": "earthdata",
@@ -55,7 +55,7 @@
    "name": "Meteomatics",
    "kind": "live",
    "status": "ok",
-   "detail": "Current conditions for 6 featured point(s) (snapshot carried from the cache; no credentials in this environment)"
+   "detail": "Current conditions for 6 featured point(s)"
   },
   {
    "id": "gistemp",

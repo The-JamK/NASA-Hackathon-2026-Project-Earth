@@ -138,11 +138,14 @@ def fetch_meteomatics(
     username: str,
     password: str,
     cache: Path = CACHE,
+    refresh: bool = False,
 ) -> dict[str, Any] | None:
     # A cached snapshot needs no credentials, so it is served first: the build
     # can still ship current conditions on a machine that has no API key.
+    # `refresh` skips that shortcut, so a build asked for current conditions
+    # actually asks the API instead of re-shipping the hour it cached first.
     path = cache / "meteomatics" / f"{slug}.json"
-    if path.exists() and path.stat().st_size > 0:
+    if not refresh and path.exists() and path.stat().st_size > 0:
         return json.loads(path.read_text(encoding="utf-8"))
     if not username or not password:
         return None
