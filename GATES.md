@@ -410,6 +410,15 @@ Last verified: 2026-11-14
   MANUAL: Cloud browser, built site, 1440x900.
   EVIDENCE: `document.documentElement.scrollHeight` is 900 against `window.innerHeight` 900, so there is no scrollbar; `innerText` contains no occurrence of the word scroll; the top bar's text is exactly `GAUSSIAN FRONTIERS` with zero links or buttons in it; six `.hero-box` articles remain, `.landing-main`, `footer` and `section.section` all return null and there are 0 such sections; `main` measures 834 px tall, filling the height under the 66 px bar. Clicking `#hero-globe` navigated to `/app.html` (title `Gaussian Frontiers — Signal & Noise`), which is now the only route into the app. Screenshot: `artifacts/hero-only.png`.
 
-MET: 79
+- [x] G80: The snapshot chip is text only, and the verdict is a solid block of its own colour with no left bar.
+  CHECK: node scripts/verify_app.mjs
+  EXPECT: app verified
+  EVIDENCE: `liveChip()` no longer emits the `<i></i>` that drew the dot, and the two rules that styled it (`.live-chip i` and the `pulse` animation only it used) are gone with the now-unused `@keyframes pulse`. `.verdict` loses `border-left` and the near-transparent wash; each tone sets `background` to its own token (warm `--warm`, cool `--cool`, none `--flat`, explore `--amber`) and an ink colour, and the stamp, rate, unit and sub-line all inherit that ink instead of the dark-theme `--text`/`--muted` values, which were the two things that would have been unreadable on a filled block. `verify_app.mjs` fails if `<i></i>` returns to `main.js`, if the `.verdict` rule regains a `border-left`, or if any of the four tones stops setting its background token; it fetches the stylesheet through `?direct` because the dev server otherwise answers that path as a JS module.
+
+- [x] G81: In the browser the Sydney case shows no dot, a fully filled verdict block, and dark ink that clears 4.5:1 on every tone.
+  MANUAL: Cloud browser, built site, 1440x900, case opened with "Is Sydney getting hotter?" then Run case.
+  EVIDENCE: The live chip's text starts at the box edge — `SNAPSHOT · 26.7 °C NOW · 0.00 MM/H · 1.7 M/S · METEOMATICS · 14 NOV 00:00 UTC` — and `document.querySelectorAll('.live-chip i').length` is 0. The verdict reads `OPEN AND SHUT` / `+0.35 °C / decade` / `Significant warming · 95% CI +0.18 to +0.51 · n = 36` with computed `background: rgb(255, 107, 74)` and `border-left-width: 0px`. Contrast measured in the page for all four tones (background against the resolved colour of the stamp, rate, unit and sub-line) is warm 6.83, cool 5.93, none 4.76, explore 7.95 — all above the 4.5 AA floor, with the grey tone the tightest and therefore pinned to pure black ink and full opacity. Screenshots: `artifacts/verdict-filled.png`, `artifacts/chip-no-dot.png`.
+
+MET: 81
 UNMET: 1
 ABANDONED: 0

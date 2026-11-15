@@ -2155,7 +2155,7 @@ function liveChip(point) {
       )}); the live proxy is unavailable`;
   return `<div class="live-chip ${live ? "is-live" : "is-snapshot"}" title="${escapeHtml(
     title
-  )}"><i></i>${live ? "Live" : "Snapshot"} · ${escapeHtml(
+  )}">${live ? "Live" : "Snapshot"} · ${escapeHtml(
     values.join(" · ")
   )} · Meteomatics${observed ? ` · ${escapeHtml(observed)}` : ""}</div>`;
 }

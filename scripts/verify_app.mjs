@@ -203,6 +203,27 @@ if (narrativeAt === -1 || verdictAt === -1 || narrativeAt > verdictAt) {
   fail("the narrative paragraph is not rendered above the verdict block");
 }
 
+// The snapshot chip is text only — the status dot above the word went with it —
+// and the verdict fills its whole box with the tone colour instead of drawing a
+// bar down the left edge. The ink for every tone is asserted against 4.5:1 in
+// the ledger's browser gate; here the wiring is what is pinned.
+if (/<i><\/i>/.test(main)) fail("the snapshot chip still draws a status dot");
+// The dev server hands a raw stylesheet only through ?direct; without it the
+// same path answers as a JS module wrapping the CSS in a string.
+const css = await (await get("/src/style.css?direct", "text/css")).text();
+const verdictRule = css.slice(css.indexOf("\n.verdict {"), css.indexOf("\n.verdict::after"));
+if (verdictRule.includes("border-left")) fail("the verdict block still draws a left bar");
+for (const [tone, token] of [
+  ["warm", "warm"],
+  ["cool", "cool"],
+  ["none", "flat"],
+  ["explore", "amber"],
+]) {
+  if (!css.includes(`.verdict.${tone} { background: var(--${token});`)) {
+    fail(`the ${tone} verdict does not fill its box with the ${token} colour`);
+  }
+}
+
 console.log(`page: ${BASE}`);
 console.log(`points: ${points.points.length} · grid: ${grid.cells.length} · sources: ${sources.sources.length}`);
 console.log(`assets: 3 textures · ${points.points.filter((point) => point.imagery).length} context images`);
@@ -210,5 +231,6 @@ console.log("recommendation: overlay element served and wired to the tap handler
 console.log("chrome: tagline, brand dot, Intake label and case board wording removed");
 console.log("hero: six copy boxes, no leader lines");
 console.log("case layout: narrative paragraph above the verdict block");
+console.log("verdict: tone fills the box, no left bar · snapshot chip carries no dot");
 console.log(`country averages: ${countries.countries.length} · cities suggested: ${countries.countries.reduce((total, country) => total + country.cities.length, 0)}`);
 console.log("app verified");
